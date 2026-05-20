@@ -1186,13 +1186,13 @@ async function initApp(){
     sbFetch('htl_hotels','GET',null,'?order=name.asc').catch(()=>[]),
     sbFetch('htl_bookings','GET',null,'?order=id.desc&limit=500').catch(()=>[]),
   ]);
-  bookings=bks.map(mB);
-  accEntries=accs.map(mA);
-  activityLog=logs.map(mL);
+  bookings=(bks||[]).map(mB);
+  accEntries=(accs||[]).map(mA);
+  activityLog=(logs||[]).map(mL);
   users=usrs||[];
   suppliers=sups||[];
   hotels=htls||[];
-  hotelBookings=hbks.map(mHB)||[];
+  hotelBookings=(Array.isArray(hbks)?hbks:[]).map(r=>typeof mHB==='function'?mHB(r):r);
   if(setts&&setts[0])settings=mS(setts[0]);
   hideAll();
   // Restore session
@@ -1204,6 +1204,7 @@ async function initApp(){
 function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
+function mHB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',dest:r.destination||'',hotelId:r.hotel_id||null,hotelName:r.hotel_name||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:r.nights||0,roomType:r.room_type||'single',rooms:r.rooms||1,pricePerNight:r.price_per_night||0,adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mS(r){
   // Load price map from settings - always prefer DB over defaults
   if(r.price_map&&r.price_map.length>2){
@@ -3192,16 +3193,12 @@ document.addEventListener('DOMContentLoaded', function(){
     sec.innerHTML=buildClosingHTML();
     mainEl.insertBefore(sec,document.getElementById('mgr'));
   }
-  // Override applyPerms to show tab only if user has manage_locks permission
+  // Override applyPerms to show tab
   const _origApply=window.applyPerms;
   window.applyPerms=function(){
     if(_origApply)_origApply();
     const t=document.getElementById('tab-closing');
-    if(!t)return;
-    const cu=typeof currentUser!=='undefined'?currentUser:null;
-    const hasPerm=cu&&(cu.role==='admin'||cu.role==='owner'||(Array.isArray(cu.perms)&&cu.perms.includes('manage_locks')));
-    if(hasPerm){t.classList.remove('h');}
-    else{t.classList.add('h');}
+    if(t)t.classList.remove('h');
   };
   // Override showTab
   const _origShow=window.showTab;
@@ -5041,11 +5038,10 @@ window.buildDesignHTML = function(){
         <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">اضغط ➕ لإضافة صف · اضغط 🗑 لحذف صف · عدّل التاريخ والأسعار مباشرةً</div>
 
         <!-- Column headers label -->
-        <div style="display:grid;grid-template-columns:1fr 75px 75px 75px 28px;gap:4px;font-size:10px;color:var(--tx3);font-weight:700;padding:0 4px;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:1fr 90px 90px 28px;gap:4px;font-size:11px;color:var(--tx3);font-weight:700;padding:0 4px;margin-bottom:4px">
           <span>التاريخ / الوصف</span>
-          <span style="text-align:center">مكيفة (ج)</span>
-          <span style="text-align:center">غرفتين لا بحر</span>
-          <span style="text-align:center">غرفتين بحر</span>
+          <span style="text-align:center">غرفة (ج)</span>
+          <span style="text-align:center">غرفتين (ج)</span>
           <span></span>
         </div>
 
@@ -5147,14 +5143,13 @@ window.dsnRenderPriceRowsUI = function(){
   const c=document.getElementById('dsn-price-rows-container');
   if(!c)return;
   c.innerHTML=window._dsnPriceRows.map((r,i)=>`
-    <div style="display:grid;grid-template-columns:1fr 75px 75px 75px 28px;gap:4px;align-items:center">
-      <textarea rows="2" style="padding:5px 7px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:right;resize:vertical;white-space:pre-wrap;word-break:break-word" oninput="window._dsnPriceRows[${i}].label=this.value;renderDesignPreview()">${r.label||''}</textarea>
+    <div style="display:grid;grid-template-columns:1fr 90px 90px 28px;gap:4px;align-items:center">
+      <input type="text" value="${r.label||''}" placeholder="مثال: 5/28 - 6/2"
+        style="padding:5px 7px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:right"
+        oninput="window._dsnPriceRows[${i}].label=this.value;renderDesignPreview()">
       <input type="number" value="${r.single||0}" placeholder="0"
         style="padding:5px 5px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:center"
         oninput="window._dsnPriceRows[${i}].single=parseInt(this.value)||0;renderDesignPreview()">
-      <input type="number" value="${r.doubleNoView||0}" placeholder="0"
-        style="padding:5px 5px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:center"
-        oninput="window._dsnPriceRows[${i}].doubleNoView=parseInt(this.value)||0;renderDesignPreview()">
       <input type="number" value="${r.double||0}" placeholder="0"
         style="padding:5px 5px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:center"
         oninput="window._dsnPriceRows[${i}].double=parseInt(this.value)||0;renderDesignPreview()">
@@ -5164,7 +5159,7 @@ window.dsnRenderPriceRowsUI = function(){
 };
 
 window.dsnAddPriceRow = function(){
-  window._dsnPriceRows.push({label:'',single:0,doubleNoView:0,double:0});
+  window._dsnPriceRows.push({label:'',single:0,double:0});
   dsnRenderPriceRowsUI();
   renderDesignPreview();
 };
@@ -5254,21 +5249,15 @@ window.renderDesignPreview = function(){
   const priceRowsHtml=customRows.map((r,i)=>{
     const bg=i%2===0?'rgba(255,255,255,0.07)':'rgba(255,255,255,0.03)';
     return `<tr style="background:${bg}">
-      <td style="padding:7px 10px;color:${accentColor};font-weight:800;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${r.label||''}</td>
+      <td style="padding:7px 10px;color:rgba(255,255,255,0.85);font-size:${fSize-1}px;border-bottom:1px solid rgba(255,255,255,0.08)">${r.label||'—'}</td>
       <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.single||0).toLocaleString()} ج</td>
-      <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.doubleNoView||0).toLocaleString()} ج</td>
       <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.double||0).toLocaleString()} ج</td>
     </tr>`;
   }).join('');
-  }).join('');
 
   const logoUrl=typeof dsnLogoUrl!=='undefined'&&dsnLogoUrl?dsnLogoUrl:(setts.logo||null);
-  const logoPos=window._dsnLogoPos||{top:22,left:'50%',transform:'translateX(-50%)'};
-  const logoPosStyle=window._dsnLogoPos
-    ?`top:${window._dsnLogoPos.top}px;left:${window._dsnLogoPos.left}px;`
-    :`top:22px;left:50%;transform:translateX(-50%);`;
   const logoHtml=logoUrl
-    ?`<img id="dsn-logo-drag" src="${logoUrl}" style="position:absolute;${logoPosStyle}width:${logoSize}px;height:${logoSize}px;${logoShape==='circle'?'border-radius:50%;':'border-radius:12px;'}object-fit:cover;border:3px solid ${accentColor};cursor:move;z-index:10;user-select:none" onerror="this.style.display='none'" title="اسحب اللوجو لأي مكان">`
+    ?`<img src="${logoUrl}" style="width:${logoSize}px;height:${logoSize}px;${logoShape==='circle'?'border-radius:50%;':'border-radius:12px;'}object-fit:cover;border:3px solid ${accentColor};margin-bottom:10px" onerror="this.style.display='none'">`
     :'';
   const bgStyle=designBgDataUrl
     ?`background:url('${designBgDataUrl}') center/cover no-repeat;`
@@ -5276,10 +5265,10 @@ window.renderDesignPreview = function(){
 
   const canvas=`<div id="design-canvas" style="${bgStyle}width:${w}px;min-height:${h}px;direction:rtl;font-family:Cairo,Arial,sans-serif;padding:22px;position:relative;overflow:hidden">
     <div style="position:absolute;inset:0;background:rgba(0,0,0,0.25);pointer-events:none"></div>
-    ${logoHtml}
     <div style="position:relative;z-index:1">
       <!-- Header -->
       <div style="text-align:center;margin-bottom:16px">
+        ${logoHtml}
         <div style="font-size:${fSize*2.2}px;font-weight:800;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.5)">${titleText}</div>
         ${subtitle?`<div style="display:inline-block;background:${accentColor};color:#1a1a1a;padding:4px 18px;border-radius:20px;font-weight:700;font-size:${fSize*1.1}px;margin-top:7px">${subtitle}</div>`:''}
       </div>
@@ -5292,7 +5281,6 @@ window.renderDesignPreview = function(){
             <tr style="background:${accentColor}">
               <th style="padding:8px 10px;text-align:right;color:#1a1a1a;font-weight:800;font-size:${fSize}px">تاريخ الفوج</th>
               <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">شقة غرفة مكيفة</th>
-              <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">شقة غرفتين لا ترى البحر</th>
               <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">شقة غرفتين ترى البحر</th>
             </tr>
           </thead>
@@ -5321,34 +5309,6 @@ window.renderDesignPreview = function(){
   if(si)si.textContent=w+' × '+h+' px';
   wrap.style.cssText=`transform:scale(${scale});transform-origin:top center;width:${w}px;min-height:${h}px`;
   wrap.innerHTML=canvas;
-  // Make logo draggable
-  setTimeout(()=>{
-    const logo=document.getElementById('dsn-logo-drag');
-    const canvEl=document.getElementById('design-canvas');
-    if(logo&&canvEl){
-      logo.addEventListener('mousedown',function(e){
-        e.preventDefault();
-        const rect=canvEl.getBoundingClientRect();
-        const sc=scale||1;
-        const startX=(e.clientX-rect.left)/sc-logo.offsetLeft;
-        const startY=(e.clientY-rect.top)/sc-logo.offsetTop;
-        logo.style.cursor='grabbing';
-        function onMove(ev){
-          const nx=(ev.clientX-rect.left)/sc-startX;
-          const ny=(ev.clientY-rect.top)/sc-startY;
-          const bx=Math.max(0,Math.min(canvEl.offsetWidth-logo.offsetWidth,nx));
-          const by=Math.max(0,Math.min(canvEl.offsetHeight-logo.offsetHeight,ny));
-          logo.style.left=bx+'px';
-          logo.style.top=by+'px';
-          logo.style.transform='';
-          window._dsnLogoPos={top:by,left:bx};
-        }
-        function onUp(){logo.style.cursor='move';document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
-        document.addEventListener('mousemove',onMove);
-        document.addEventListener('mouseup',onUp);
-      });
-    }
-  },100);
 };
 
 // Zoom controls
@@ -5596,19 +5556,16 @@ window.seedPresetsForDest = async function(dest){
   if(!toAdd.length){alert('كل فنادق '+dest+' موجودة بالفعل ✓');return;}
   if(!confirm('إضافة '+toAdd.length+' فندق جديد لـ '+dest+'؟'))return;
   showLoading('جاري إضافة الفنادق...');
-  let added=0,failed=0;
+  let added=0;
   for(const h of toAdd){
     try{
       const r=await sbFetch('htl_hotels','POST',{name:h.name,destination:dest,stars:h.stars,type:h.type,contact:'',price_single:0,price_double:0,notes:h.notes||''},'');
-      const row=Array.isArray(r)?r[0]:r;
-      if(row&&row.id){hotels.push(row);added++;}
-      else{failed++;}
-    }catch(e){failed++;console.warn('Failed to add',h.name,e);}
+      if(r&&r[0]){hotels.push(r[0]);added++;}
+    }catch(e){console.warn('Failed to add',h.name,e);}
   }
   hideLoading();
   renderHotelList();renderHotelStats();
-  if(failed>0)alert('✓ تم إضافة '+added+' فندق\n⚠️ فشل إضافة '+failed+'\n\nتأكد أن جدول htl_hotels موجود في Supabase.');
-  else alert('✓ تم إضافة '+added+' فندق');
+  alert('✓ تم إضافة '+added+' فندق');
 };
 
 window.seedAllPresets = async function(){
@@ -5616,7 +5573,7 @@ window.seedAllPresets = async function(){
   const total=dests.reduce((s,d)=>s+PRESET_HOTELS[d].length,0);
   if(!confirm('إضافة كل الفنادق الجاهزة ('+total+' فندق) لكل الوجهات؟'))return;
   showLoading('جاري إضافة الفنادق...');
-  let added=0,failed=0;
+  let added=0;
   for(const dest of dests){
     const list=PRESET_HOTELS[dest];
     const existing=hotels.filter(h=>h.destination===dest).map(h=>h.name.trim().toLowerCase());
@@ -5624,15 +5581,13 @@ window.seedAllPresets = async function(){
     for(const h of toAdd){
       try{
         const r=await sbFetch('htl_hotels','POST',{name:h.name,destination:dest,stars:h.stars,type:h.type,contact:'',price_single:0,price_double:0,notes:h.notes||''},'');
-        const row=Array.isArray(r)?r[0]:r;
-        if(row&&row.id){hotels.push(row);added++;}else{failed++;}
-      }catch(e){failed++;console.warn(e);}
+        if(r&&r[0]){hotels.push(r[0]);added++;}
+      }catch(e){console.warn(e);}
     }
   }
   hideLoading();
   renderHotelList();renderHotelStats();
-  if(failed>0)alert('✓ تم إضافة '+added+' فندق\n⚠️ فشل إضافة '+failed+'\n\nتأكد أن جدول htl_hotels موجود في Supabase.');
-  else alert('✓ تم إضافة '+added+' فندق');
+  alert('✓ تم إضافة '+added+' فندق');
 };
 
 function mHB(r){
@@ -5756,35 +5711,18 @@ async function saveHotel(){
   const notes=(document.getElementById('htl-notes-hotel').value||'').trim();
   if(!name){alert('أدخل اسم الفندق');return;}
   if(!dest){alert('اختر الوجهة');return;}
-  const payload={name,destination:dest,stars:parseInt(stars)||5,type,contact,price_single:priceS,price_double:priceD,notes};
-  showLoading('جاري الحفظ...');
+  const payload={name,destination:dest,stars:parseInt(stars),type,contact,price_single:priceS,price_double:priceD,notes};
   try{
     if(id){
       const r=await sbFetch('htl_hotels','PATCH',payload,`?id=eq.${id}`);
-      const row=Array.isArray(r)?r[0]:r;
-      const idx=hotels.findIndex(h=>h.id==id);
-      if(row&&idx>=0)hotels[idx]=row;
-      else if(idx>=0){hotels[idx]={...hotels[idx],...payload};}
+      const idx=hotels.findIndex(h=>h.id==id);if(r&&r[0]&&idx>=0)hotels[idx]=r[0];
       addLog('تعديل فندق: '+name,'edit','');
     }else{
-      const r=await sbFetch('htl_hotels','POST',payload,'');
-      const row=Array.isArray(r)?r[0]:r;
-      if(row&&row.id){hotels.push(row);}
-      else{
-        // جدول غير موجود أو خطأ آخر
-        hideLoading();
-        alert('تعذّر الإضافة. تأكد أن جدول htl_hotels موجود في Supabase.\n\nيمكن تشغيل SQL التالي في Supabase:\nCREATE TABLE IF NOT EXISTS htl_hotels (\n  id bigserial primary key,\n  name text,\n  destination text,\n  stars int,\n  type text,\n  contact text,\n  price_single numeric default 0,\n  price_double numeric default 0,\n  notes text,\n  created_at timestamptz default now()\n);\nALTER TABLE htl_hotels ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "all" ON htl_hotels FOR ALL USING (true) WITH CHECK (true);');
-        return;
-      }
+      const r=await sbFetch('htl_hotels','POST',payload,'');if(r&&r[0])hotels.push(r[0]);
       addLog('إضافة فندق: '+name,'add',dest);
     }
-    clearHotelForm();renderHotelList();renderHotelStats();
-    hideLoading();
-    alert('✓ تم حفظ الفندق');
-  }catch(e){
-    hideLoading();
-    alert('فشل الحفظ: '+e.message+'\n\nتأكد أن جدول htl_hotels موجود في Supabase.');
-  }
+    clearHotelForm();renderHotelList();renderHotelStats();alert('✓ تم حفظ الفندق');
+  }catch(e){alert('فشل: '+e.message)}
 }
 
 function editHotel(id){

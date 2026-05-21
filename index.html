@@ -959,7 +959,8 @@ tr:hover td{background:#f5f8fc}
       </div>
       <div id="logo-preview" style="margin-top:5px"></div>
     </div>
-    <div class="fg"><label>شروط وملاحظات الإيصال</label><textarea id="mgr-notes" style="min-height:90px"></textarea></div>
+    <div class="fg"><label>شروط وملاحظات إيصال مطروح</label><textarea id="mgr-notes" style="min-height:90px"></textarea></div>
+    <div class="fg"><label>شروط وملاحظات إيصالات الفنادق (شرم / الغردقة / السخنة)</label><textarea id="mgr-hotel-terms" style="min-height:90px" placeholder="تظهر في إيصالات الفنادق فقط..."></textarea></div>
     <div style="display:flex;align-items:center;gap:9px">
       <button class="btn btn-p" onclick="saveMgr()">حفظ</button>
       <span id="mgr-ok" style="font-size:12px;color:var(--ac);font-weight:700;display:none">✓ تم</span>
@@ -1309,7 +1310,7 @@ function mS(r){
     }catch(e){}
   }
   loadLocks(r);
-  return{name:r.resort_name||'مصيف مطروح 2026',company:r.company_name||'',contact:r.contact||'',license:r.license_num||'',logo:r.logo||'',notes:r.notes||'',notesHtml:r.notes_html||''}
+  return{name:r.resort_name||'مصيف مطروح 2026',company:r.company_name||'',contact:r.contact||'',license:r.license_num||'',logo:r.logo||'',notes:r.notes||'',notesHtml:r.notes_html||'',hotelTerms:r.hotel_terms||''}
 }
 
 // ============================================================
@@ -2258,14 +2259,21 @@ function renderAccs(){
   // Build set of confirmed refs - check both bookingPayRef formats
   // Build confirmed set from bookingPayRef which stores "bookingId_payIdx"
   const conf=new Set(accEntries
-    .filter(e=>e.bookingPayRef && /^\d+_\d+$/.test(e.bookingPayRef))
+    .filter(e=>e.bookingPayRef && (/^\d+_\d+$/.test(e.bookingPayRef)||/^htl_\d+_\d+$/.test(e.bookingPayRef)))
     .map(e=>e.bookingPayRef)
   );
   const pend=[];
   bookings.forEach(b=>b.payments.forEach((p,pi)=>{
     const ref=String(b.id)+'_'+pi;
-    if(!conf.has(ref)) pend.push({...p,clientName:b.name,bookingId:b.id,payIdx:pi,ref});
+    if(!conf.has(ref)) pend.push({...p,clientName:b.name,bookingId:b.id,payIdx:pi,ref,isHotel:false});
   }));
+  // Also check hotel booking payments
+  if(typeof hotelBookings!=='undefined'){
+    hotelBookings.forEach(b=>(b.payments||[]).forEach((p,pi)=>{
+      const ref='htl_'+b.id+'_'+pi;
+      if(!conf.has(ref)) pend.push({amount:p.amount,date:p.date,payMethod:p.type,note:p.ref||'',clientName:b.name+' (فندق: '+(b.hotelName||'')+')',bookingId:b.id,payIdx:pi,ref,isHotel:true});
+    }));
+  }
   const pe=document.getElementById('acc-pending');
   pe.innerHTML=pend.length?`<div class="card" style="border-color:var(--wn);margin-bottom:.875rem"><div class="ctitle" style="color:var(--wn)">مدفوعات في انتظار الاعتماد (${pend.length} · ${pend.reduce((s,p)=>s+p.amount,0).toLocaleString()} ج)</div>
     <div class="warn-box">هذه الدفعات مسجلة في الحجوزات ولم تُعتمد في الحسابات بعد.</div>
@@ -2280,9 +2288,9 @@ function renderAccs(){
       <td><input type="text" id="pend-note-${safeRef}" value="${p.note||''}" placeholder="ملاحظة" style="font-size:11px;padding:3px 5px;border:1px solid var(--bd);border-radius:5px;background:var(--sf);color:var(--tx);width:110px"></td>
       <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
         ${p.addedBy?`<span title="أضاف: ${p.addedBy}${p.addedAt?' في '+p.addedAt:''}" style="cursor:help;font-size:14px">ℹ️</span>`:''}
-        <button class="btn btn-s btn-sm" onclick="savePendPay(${p.bookingId},${p.payIdx},'${safeRef}')">💾 حفظ</button>
-        <button class="btn btn-p btn-sm" onclick="approvePay('${p.ref}','${p.payMethod}',${p.amount},'${p.clientName}','${p.date||''}',${p.bookingId},${p.payIdx},'${safeRef}')">✅ اعتماد</button>
-        <button class="btn btn-d btn-sm" onclick="delPendPay(${p.bookingId},${p.payIdx})">🗑</button>
+        ${!p.isHotel?`<button class="btn btn-s btn-sm" onclick="savePendPay(${p.bookingId},${p.payIdx},'${safeRef}')">💾 حفظ</button>`:''}
+        <button class="btn btn-p btn-sm" onclick="approvePay('${p.ref}','${p.payMethod}',${p.amount},'${p.clientName}','${p.date||''}',${p.bookingId},${p.payIdx},'${safeRef}',${p.isHotel?'true':'false'})">✅ اعتماد</button>
+        ${!p.isHotel?`<button class="btn btn-d btn-sm" onclick="delPendPay(${p.bookingId},${p.payIdx})">🗑</button>`:''}
       </td></tr>`;}).join('')}
     </tbody></table></div></div>`:'';
   // Init nav
@@ -2398,7 +2406,7 @@ async function savePendPay(bookingId,payIdx,safeRef){
     if(row){row.style.background='var(--acl)';setTimeout(()=>{if(row)row.style.background='';},1200);}
   }catch(e){alert('فشل: '+e.message)}
 }
-async function approvePay(ref,pmType,amount,clientName,date,bookingId,payIdx,safeRef){
+async function approvePay(ref,pmType,amount,clientName,date,bookingId,payIdx,safeRef,isHotel){
   // Read live values from editable fields first
   if(safeRef){
     const el_amt=document.getElementById('pend-amt-'+safeRef);
@@ -2409,6 +2417,21 @@ async function approvePay(ref,pmType,amount,clientName,date,bookingId,payIdx,saf
     if(el_date)date=el_date.value||date;
   }
   if(!confirm(`اعتماد ${amount.toLocaleString()} ج - ${pmType}؟`))return;
+  if(isHotel){
+    // Hotel booking payment approval
+    const hb=typeof hotelBookings!=='undefined'?hotelBookings.find(x=>x.id===bookingId):null;
+    const realAmt=hb&&(hb.payments||[])[payIdx]?hb.payments[payIdx].amount:amount;
+    const realPm=hb&&(hb.payments||[])[payIdx]?hb.payments[payIdx].type:pmType;
+    const autoDesc=`حجز فندق: ${clientName}`;
+    try{
+      const payRef='htl_'+bookingId+'_'+payIdx;
+      const r=await sbFetch('mtr_acc','POST',{type:realPm,op:'in',amount:realAmt,entry_date:date||new Date().toISOString().split('T')[0],description:autoDesc,client_name:clientName,category:'',booking_ref:'htl_'+String(bookingId),booking_pay_ref:payRef,supplier_id:null},'');
+      if(r&&r[0])accEntries.push(mA(r[0]));
+      await addLog(`اعتماد دفعة فندق: ${clientName} - ${realPm} - ${realAmt.toLocaleString()} ج`,'add',`المبلغ: ${realAmt.toLocaleString()} ج · العميل: ${clientName}`);
+      renderAccs();
+    }catch(e){alert('فشل: '+e.message)}
+    return;
+  }
   const b=bookings.find(x=>x.id===bookingId);
   const realAmt=b&&b.payments[payIdx]?b.payments[payIdx].amount:amount;
   const realPm=b&&b.payments[payIdx]?b.payments[payIdx].payMethod:pmType;
@@ -2680,6 +2703,7 @@ function loadMgr(){
   document.getElementById('mgr-contact').value=settings.contact||'';
   document.getElementById('mgr-logo').value=settings.logo||'';
   document.getElementById('mgr-notes').value=settings.notes||'';
+  document.getElementById('mgr-hotel-terms').value=settings.hotelTerms||'';
   // Refresh rich editor if already exists
   const richEd=document.getElementById('rich-editor');
   if(richEd) richEd.innerHTML=settings.notes||'';
@@ -2700,9 +2724,9 @@ async function saveMgr(){
   const richEd=document.getElementById('rich-editor');
   const notesEl=document.getElementById('mgr-notes');
   if(richEd&&notesEl) notesEl.value=richEd.innerHTML||'';
-  settings={name:document.getElementById('mgr-name').value,company:document.getElementById('mgr-company').value,contact:document.getElementById('mgr-contact').value,license:document.getElementById('mgr-license').value,logo:document.getElementById('mgr-logo').value,notes:notesEl?notesEl.value:''};
+  settings={name:document.getElementById('mgr-name').value,company:document.getElementById('mgr-company').value,contact:document.getElementById('mgr-contact').value,license:document.getElementById('mgr-license').value,logo:document.getElementById('mgr-logo').value,notes:notesEl?notesEl.value:'',hotelTerms:document.getElementById('mgr-hotel-terms')?.value||''};
   try{
-    await sbFetch('mtr_settings','PATCH',{resort_name:settings.name,company_name:settings.company,contact:settings.contact,license_num:settings.license,logo:settings.logo,notes:settings.notes},'?id=eq.1');
+    await sbFetch('mtr_settings','PATCH',{resort_name:settings.name,company_name:settings.company,contact:settings.contact,license_num:settings.license,logo:settings.logo,notes:settings.notes,hotel_terms:settings.hotelTerms||''},'?id=eq.1');
     await addLog('تعديل إعدادات النظام','edit',`اسم: ${settings.name||'-'} · شركة: ${settings.company||'-'} · تواصل: ${settings.contact||'-'}`);
     updateLogoDsp();const el=document.getElementById('mgr-ok');el.style.display='inline';setTimeout(()=>el.style.display='none',2000);
   }catch(e){alert('فشل: '+e.message)}
@@ -3410,6 +3434,15 @@ function buildClosingHTML(){
       <button class="btn" onclick="printClosing()">🖨 طباعة</button>
     </div>
   </div>
+  <div class="card" style="margin-top:.75rem;background:var(--acl);border-color:var(--ac)">
+    <div class="ctitle" style="color:var(--ac)">📥 استيراد ملف تقفيلة</div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:.65rem">يمكنك رفع ملف Excel (.xlsx/.xls) أو PDF لأرشفته مع التقفيلة</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="closing-import-file" accept=".xlsx,.xls,.pdf" style="flex:1;font-size:12px">
+      <button class="btn btn-s btn-sm" onclick="closingImportFile()">📤 رفع الملف</button>
+    </div>
+    <div id="closing-imported-list" style="margin-top:.5rem;font-size:12px"></div>
+  </div>
   <div id="closing-output"></div>`;
 }
 
@@ -3425,6 +3458,49 @@ function populateClosingConvoys(){
   });
 }
 
+
+function closingImportFile(){
+  const input=document.getElementById('closing-import-file');
+  if(!input||!input.files||!input.files[0]){alert('اختر ملف أولاً');return;}
+  const file=input.files[0];
+  const fn=file.name;
+  const ext=fn.split('.').pop().toLowerCase();
+  const list=document.getElementById('closing-imported-list');
+  const convSel=document.getElementById('cl-convoy-sel');
+  const convLabel=convSel?.options[convSel.selectedIndex]?.text||'';
+  // Read as base64 and store in sessionStorage for this session
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const data={name:fn,type:ext,url:e.target.result,convoy:convLabel,date:new Date().toLocaleDateString('ar-EG')};
+    let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+    stored.push(data);
+    try{sessionStorage.setItem('closing_files',JSON.stringify(stored));}catch(ex){alert('الملف كبير جداً للتخزين المؤقت');}
+    renderClosingImported();
+    alert('✓ تم رفع الملف: '+fn);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderClosingImported(){
+  const list=document.getElementById('closing-imported-list');
+  if(!list)return;
+  let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+  if(!stored.length){list.innerHTML='';return;}
+  list.innerHTML='<div style="font-weight:700;color:var(--ac);margin-bottom:4px">الملفات المرفوعة:</div>'+
+    stored.map((d,i)=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 7px;background:var(--sf);border-radius:6px;margin-bottom:3px;border:1px solid var(--bd)">
+      <span style="font-size:16px">${d.type==='pdf'?'📄':'📊'}</span>
+      <div style="flex:1"><div style="font-size:12px;font-weight:700">${d.name}</div><div style="font-size:10px;color:var(--tx3)">${d.convoy||'—'} · ${d.date}</div></div>
+      <a href="${d.url}" download="${d.name}" style="color:var(--ac);font-size:12px;text-decoration:none;padding:2px 7px;border:1px solid var(--ac);border-radius:5px">تنزيل</a>
+      <button onclick="delClosingFile(${i})" style="color:var(--dn);background:none;border:none;cursor:pointer;font-size:15px">🗑</button>
+    </div>`).join('');
+}
+
+function delClosingFile(i){
+  let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+  stored.splice(i,1);
+  try{sessionStorage.setItem('closing_files',JSON.stringify(stored));}catch(ex){}
+  renderClosingImported();
+}
 
 function printClosing(){
   const out=document.getElementById('closing-output');
@@ -3836,6 +3912,49 @@ function renderClosing(){
     ${busColl?`<div style="display:flex;justify-content:flex-end;margin-top:.5rem;margin-bottom:1rem"><button class="btn btn-sm" onclick="printOneTable('closing-bus')" style="background:var(--wnl);color:var(--wn);border-color:var(--wn)">🖨 طباعة تحصيلات الباص</button></div><div id="closing-bus">${busColl}</div>`:''}
     ${bldColl?`<div style="display:flex;justify-content:flex-end;margin-top:.5rem;margin-bottom:1rem"><button class="btn btn-sm" onclick="printOneTable('closing-bld')" style="background:var(--dnl);color:var(--dn);border-color:var(--dn)">🖨 طباعة تحصيلات البرج</button></div><div id="closing-bld">${bldColl}</div>`:''}
     ${allOk}`;
+}
+
+function closingImportFile(){
+  const input=document.getElementById('closing-import-file');
+  if(!input||!input.files||!input.files[0]){alert('اختر ملف أولاً');return;}
+  const file=input.files[0];
+  const fn=file.name;
+  const ext=fn.split('.').pop().toLowerCase();
+  const list=document.getElementById('closing-imported-list');
+  const convSel=document.getElementById('cl-convoy-sel');
+  const convLabel=convSel?.options[convSel.selectedIndex]?.text||'';
+  // Read as base64 and store in sessionStorage for this session
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const data={name:fn,type:ext,url:e.target.result,convoy:convLabel,date:new Date().toLocaleDateString('ar-EG')};
+    let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+    stored.push(data);
+    try{sessionStorage.setItem('closing_files',JSON.stringify(stored));}catch(ex){alert('الملف كبير جداً للتخزين المؤقت');}
+    renderClosingImported();
+    alert('✓ تم رفع الملف: '+fn);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderClosingImported(){
+  const list=document.getElementById('closing-imported-list');
+  if(!list)return;
+  let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+  if(!stored.length){list.innerHTML='';return;}
+  list.innerHTML='<div style="font-weight:700;color:var(--ac);margin-bottom:4px">الملفات المرفوعة:</div>'+
+    stored.map((d,i)=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 7px;background:var(--sf);border-radius:6px;margin-bottom:3px;border:1px solid var(--bd)">
+      <span style="font-size:16px">${d.type==='pdf'?'📄':'📊'}</span>
+      <div style="flex:1"><div style="font-size:12px;font-weight:700">${d.name}</div><div style="font-size:10px;color:var(--tx3)">${d.convoy||'—'} · ${d.date}</div></div>
+      <a href="${d.url}" download="${d.name}" style="color:var(--ac);font-size:12px;text-decoration:none;padding:2px 7px;border:1px solid var(--ac);border-radius:5px">تنزيل</a>
+      <button onclick="delClosingFile(${i})" style="color:var(--dn);background:none;border:none;cursor:pointer;font-size:15px">🗑</button>
+    </div>`).join('');
+}
+
+function delClosingFile(i){
+  let stored=[];try{stored=JSON.parse(sessionStorage.getItem('closing_files')||'[]');}catch(ex){}
+  stored.splice(i,1);
+  try{sessionStorage.setItem('closing_files',JSON.stringify(stored));}catch(ex){}
+  renderClosingImported();
 }
 
 function printClosing(){
@@ -5221,10 +5340,11 @@ window.buildDesignHTML = function(){
         <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">اضغط ➕ لإضافة صف · اضغط 🗑 لحذف صف · عدّل التاريخ والأسعار مباشرةً</div>
 
         <!-- Column headers label -->
-        <div style="display:grid;grid-template-columns:1fr 90px 90px 28px;gap:4px;font-size:11px;color:var(--tx3);font-weight:700;padding:0 4px;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:1fr 75px 75px 75px 28px;gap:4px;font-size:10px;color:var(--tx3);font-weight:700;padding:0 4px;margin-bottom:4px">
           <span>التاريخ / الوصف</span>
-          <span style="text-align:center">غرفة (ج)</span>
-          <span style="text-align:center">غرفتين (ج)</span>
+          <span style="text-align:center">مكيفة (ج)</span>
+          <span style="text-align:center">غرفتين بحر (ج)</span>
+          <span style="text-align:center">غرفتين لا بحر (ج)</span>
           <span></span>
         </div>
 
@@ -5326,7 +5446,7 @@ window.dsnRenderPriceRowsUI = function(){
   const c=document.getElementById('dsn-price-rows-container');
   if(!c)return;
   c.innerHTML=window._dsnPriceRows.map((r,i)=>`
-    <div style="display:grid;grid-template-columns:1fr 90px 90px 28px;gap:4px;align-items:center">
+    <div style="display:grid;grid-template-columns:1fr 75px 75px 75px 28px;gap:4px;align-items:center">
       <input type="text" value="${r.label||''}" placeholder="مثال: 5/28 - 6/2"
         style="padding:5px 7px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:right"
         oninput="window._dsnPriceRows[${i}].label=this.value;renderDesignPreview()">
@@ -5336,13 +5456,16 @@ window.dsnRenderPriceRowsUI = function(){
       <input type="number" value="${r.double||0}" placeholder="0"
         style="padding:5px 5px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:center"
         oninput="window._dsnPriceRows[${i}].double=parseInt(this.value)||0;renderDesignPreview()">
+      <input type="number" value="${r.doubleNoView||0}" placeholder="0"
+        style="padding:5px 5px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:Cairo,Arial;background:var(--sf);color:var(--tx);text-align:center"
+        oninput="window._dsnPriceRows[${i}].doubleNoView=parseInt(this.value)||0;renderDesignPreview()">
       <button onclick="window.dsnRemovePriceRow(${i})"
         style="width:26px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--dnl);color:var(--dn);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">🗑</button>
     </div>`).join('');
 };
 
 window.dsnAddPriceRow = function(){
-  window._dsnPriceRows.push({label:'',single:0,double:0});
+  window._dsnPriceRows.push({label:'',single:0,double:0,doubleNoView:0});
   dsnRenderPriceRowsUI();
   renderDesignPreview();
 };
@@ -5367,7 +5490,7 @@ window.dsnLoadFromSystem = function(){
       const samePrice=CONVS.filter(cc=>{const pp=PM[cc.checkin]||{single:9400,double:12800};return pp.single===p.single&&pp.double===p.double;});
       // Build date label
       const dates=samePrice.map(cc=>cc.checkin.replace('2026-','').replace(/-(\d)/,'/').replace('-','/')).join(' - ');
-      rows.push({label:dates,single:p.single,double:p.double});
+      rows.push({label:dates,single:p.single,double:p.double,doubleNoView:p.doubleNoView||0});
     }
   });
   if(rows.length===0){alert('لا توجد بيانات في النظام');return;}
@@ -5435,6 +5558,7 @@ window.renderDesignPreview = function(){
       <td style="padding:7px 10px;color:rgba(255,255,255,0.85);font-size:${fSize-1}px;border-bottom:1px solid rgba(255,255,255,0.08)">${r.label||'—'}</td>
       <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.single||0).toLocaleString()} ج</td>
       <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.double||0).toLocaleString()} ج</td>
+      <td style="padding:7px 10px;color:${textColor};font-weight:800;text-align:center;font-size:${fSize}px;border-bottom:1px solid rgba(255,255,255,0.08)">${(r.doubleNoView||0)>0?(r.doubleNoView||0).toLocaleString()+' ج':'—'}</td>
     </tr>`;
   }).join('');
 
@@ -5464,7 +5588,8 @@ window.renderDesignPreview = function(){
             <tr style="background:${accentColor}">
               <th style="padding:8px 10px;text-align:right;color:#1a1a1a;font-weight:800;font-size:${fSize}px">تاريخ الفوج</th>
               <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">شقة غرفة مكيفة</th>
-              <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">شقة غرفتين ترى البحر</th>
+              <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">غرفتين ترى البحر</th>
+              <th style="padding:8px 10px;text-align:center;color:#1a1a1a;font-weight:800;font-size:${fSize}px">غرفتين لا ترى البحر</th>
             </tr>
           </thead>
           <tbody>${priceRowsHtml}</tbody>
@@ -5843,6 +5968,7 @@ function renderHotelBookings(){
     <td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'};font-weight:700">${b.remaining.toLocaleString()} ج</td>
     <td>${htlStatusBadge(b.status)}</td>
     <td style="white-space:nowrap">
+      <button class="btn btn-sm" onclick="printHotelReceipt(${b.id})" style="padding:2px 8px;font-size:11px;background:var(--acl);color:var(--ac);border-color:var(--ac)">🖨</button>
       <button class="btn btn-sm btn-p" onclick="editHotelBooking(${b.id})" style="padding:2px 8px;font-size:11px">✏</button>
       <button class="btn btn-sm btn-d" onclick="deleteHotelBooking(${b.id})" style="padding:2px 8px;font-size:11px">🗑</button>
     </td></tr>`).join('');
@@ -6010,6 +6136,105 @@ function populateHotelBkSalesRep(){
   });
 }
 
+
+function printHotelReceipt(id){
+  const b=hotelBookings.find(x=>x.id==id);if(!b)return;
+  const setts=settings||{};
+  const logo=setts.logo?`<img src="${setts.logo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.9);margin-bottom:10px" onerror="this.style.display='none'">`:'';
+  const destMap={'شرم الشيخ':'🌊','الغردقة':'🐠','العين السخنة':'🌅','دهب':'🤿'};
+  const destIcon=destMap[b.dest]||'🏨';
+  const rtMap={'single':'غرفة عادية','double':'غرفة مزدوجة','suite':'جناح'};
+  const rtLabel=rtMap[b.roomType]||b.roomType||'غرفة';
+  const statusMap={'confirmed':'✅ مؤكد','pending':'⏳ انتظار','cancelled':'❌ ملغي'};
+  const statusLabel=statusMap[b.status]||b.status||'—';
+  const pRows=(b.payments||[]).map(p=>`<tr><td>${p.date||'-'}</td><td style="font-weight:700">${p.amount.toLocaleString()} ج</td><td>${p.type||'-'}</td><td>${p.ref||'-'}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center">—</td></tr>';
+  // Hotel terms (specific to hotel receipts)
+  const hotelTerms=setts.hotelTerms||'';
+  const fmtTxt=t=>{if(!t)return'';if(/<[a-z]/i.test(t))return t;return t.replace(/\r/g,'').replace(/\n/g,'<br>');};
+  const termsHtml=fmtTxt(hotelTerms);
+  const rH=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>إيصال فندق - ${b.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{font-family:'Cairo',Arial,sans-serif;padding:12px;direction:rtl;color:#1a2535;font-size:13px;line-height:1.65;background:#f8fafc;display:flex;justify-content:center;align-items:flex-start}
+.page{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.1);width:100%;max-width:680px;flex-shrink:0}
+.hdr{background:linear-gradient(135deg,#1a3a5c,#1a5276,#117a65);color:#fff;padding:18px 24px;text-align:center}
+.hdr .co{font-size:14px;font-weight:700;opacity:.95;margin-bottom:3px}
+.hdr h1{font-size:20px;font-weight:800;margin-bottom:4px}
+.hdr .sub{font-size:12px;opacity:.9}
+.hdr .lic{font-size:11px;opacity:.85;border:1px solid rgba(255,255,255,.4);display:inline-block;padding:2px 12px;border-radius:20px;font-weight:600;margin-top:5px}
+.body{padding:16px 20px}
+.sec{margin-bottom:14px}
+.st{font-size:11px;font-weight:800;color:#1a5276;border-bottom:2px solid #d6eaf8;padding-bottom:4px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.st::before{content:'';display:inline-block;width:3px;height:14px;background:#1a5276;border-radius:2px}
+.row{display:flex;justify-content:space-between;padding:4px 7px;font-size:13px;border-bottom:1px solid #f0f4f8;border-radius:3px}
+.row:nth-child(even){background:#f8fafc}
+.row .l{color:#4a6278}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#1a5276}
+th{padding:7px 10px;text-align:right;font-weight:700;color:#fff;font-size:11px}
+td{padding:6px 10px;border-bottom:1px solid #eaf2fb;text-align:right}
+tr:nth-child(even) td{background:#f8fafc}
+.tot{background:linear-gradient(135deg,#f0f4f8,#e8f4fd);padding:12px;border-radius:8px;border:1.5px solid #d6eaf8;margin-top:8px}
+.tr{display:flex;justify-content:space-between;padding:3px 0;font-size:13px}
+.tr.disc{color:#c0392b}
+.tr.big{font-size:16px;font-weight:800;border-top:2px solid #aed6f1;margin-top:6px;padding-top:7px;color:#1a5276}
+.tr.grn{color:#117a65;font-weight:700}
+.tr.red{color:#c0392b;font-weight:700}
+.dest-badge{display:inline-block;background:#d6eaf8;color:#1a5276;border-radius:20px;padding:3px 12px;font-weight:700;font-size:13px;margin-top:4px}
+.terms{background:#f0f7ff;border:1.5px solid #c5d8ea;border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:12px;line-height:1.9;color:#2c3e50;font-weight:600}
+.terms-t{font-weight:800;color:#1a5276;margin-bottom:5px;font-size:11px;display:block}
+.sig{display:flex;justify-content:space-between;padding-top:12px;border-top:1px dashed #aed6f1;gap:24px;margin-top:12px}
+.sig-box{text-align:center;font-size:11px;color:#888;flex:1}
+.sig-dots{border-bottom:2px dotted #aaa;height:40px;margin:0 auto 5px;width:100%}
+*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+@media print{@page{margin:6mm;size:A4}html,body{padding:0;background:white;display:block}.page{box-shadow:none;border-radius:0;width:100%;max-width:100%}}</style></head><body>
+<div class="page">
+<div class="hdr">${logo}${setts.company?`<div class="co">${setts.company}</div>`:''}<h1>إيصال حجز فندقي</h1><div class="dest-badge">${destIcon} ${b.dest||'—'}</div>${setts.contact?`<div class="sub" style="margin-top:5px">${setts.contact}</div>`:''}${setts.license?`<div class="lic">رقم الترخيص: ${setts.license}</div>`:''}<div class="sub" style="margin-top:5px;opacity:.7">رقم: #HTL-${String(b.id).slice(-6)} · ${b.created||''}</div></div>
+<div class="body">
+<div class="sec"><div class="st">بيانات العميل</div>
+  <div class="row"><span class="l">الاسم</span><strong style="font-size:15px">${b.name}</strong></div>
+  <div class="row"><span class="l">الهاتف</span><span>${b.phone||'-'}</span></div>
+  ${(b.adults||0)>0||(b.children||0)>0?`<div class="row"><span class="l">الأفراد</span><span>${b.adults||0} كبار${(b.children||0)>0?' · '+(b.children||0)+' أطفال':''}</span></div>`:''}
+  ${b.salesRep?`<div class="row"><span class="l">مسؤول المبيعات</span><span>${b.salesRep}</span></div>`:''}
+</div>
+<div class="sec"><div class="st">تفاصيل الحجز</div>
+  <div class="row"><span class="l">الفندق</span><strong>${b.hotelName||'—'}</strong></div>
+  <div class="row"><span class="l">الوجهة</span><span>${destIcon} ${b.dest||'—'}</span></div>
+  <div class="row"><span class="l">نوع الغرفة</span><span>${rtLabel}</span></div>
+  <div class="row"><span class="l">عدد الغرف</span><span>${b.rooms||1}</span></div>
+  <div class="row"><span class="l">تاريخ الدخول</span><span style="font-weight:700">${b.checkin||'-'}</span></div>
+  <div class="row"><span class="l">تاريخ الخروج</span><span style="font-weight:700">${b.checkout||'-'}</span></div>
+  <div class="row"><span class="l">عدد الليالي</span><span style="font-weight:700;color:#1a5276">${b.nights||0} ليلة</span></div>
+  <div class="row"><span class="l">حالة الحجز</span><span>${statusLabel}</span></div>
+  ${b.notes?`<div class="row"><span class="l">ملاحظات</span><span>${b.notes}</span></div>`:''}
+</div>
+<div class="sec"><div class="st">تفاصيل الحساب</div><div class="tot">
+  <div class="tr"><span>سعر الليلة</span><span style="font-weight:700">${(b.pricePerNight||0).toLocaleString()} ج</span></div>
+  <div class="tr"><span>عدد الليالي</span><span>${b.nights||0}</span></div>
+  <div class="tr"><span>عدد الغرف</span><span>${b.rooms||1}</span></div>
+  ${(b.disc||0)>0?`<div class="tr disc"><span>خصم${b.discReason?' ('+b.discReason+')':''}</span><span>- ${(b.disc||0).toLocaleString()} ج</span></div>`:''}
+  <div class="tr big"><span>الإجمالي الكلي</span><span>${(b.total||0).toLocaleString()} ج</span></div>
+  <div class="tr grn"><span>المدفوع</span><span>${(b.paid||0).toLocaleString()} ج</span></div>
+  <div class="tr red"><span>المتبقي</span><span>${(b.remaining||0).toLocaleString()} ج</span></div>
+</div></div>
+${(b.payments||[]).length?`<div class="sec"><div class="st">سجل الدفعات</div><table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th><th>مرجع</th></tr></thead><tbody>${pRows}</tbody></table></div>`:''}
+${termsHtml?`<div class="terms"><span class="terms-t">الشروط والأحكام:</span><div style="line-height:2;font-size:12px;color:#2c3e50">${termsHtml}</div></div>`:''}
+<div class="sig">
+  <div class="sig-box"><div class="sig-dots"></div><div>توقيع العميل</div></div>
+  <div class="sig-box"><div class="sig-dots"></div><div>توقيع المسؤول</div><div style="font-weight:700;color:#1a5276;margin-top:2px">${b.salesRep||b.createdBy||'—'}</div></div>
+</div>
+</div></div>
+<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),600))<\/script></body></html>`;
+  try{
+    const blob=new Blob([rH],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);
+    const win=window.open(url,'_blank');
+    if(win){setTimeout(()=>URL.revokeObjectURL(url),15000);}
+    else{const iframe=document.createElement('iframe');iframe.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:none;z-index:99999';iframe.srcdoc=rH;document.body.appendChild(iframe);iframe.onload=()=>setTimeout(()=>{iframe.contentWindow.print();setTimeout(()=>document.body.removeChild(iframe),8000)},700);}
+    addLog('طباعة إيصال فندق: '+b.name,'edit',b.dest+' - '+b.hotelName);
+  }catch(err){alert('تعذر فتح الإيصال: '+err.message)}
+}
+
 async function saveHotelBooking(){
   const editId=document.getElementById('hbk-edit-id').value;
   const name=(document.getElementById('hbk-name')?.value||'').trim();
@@ -6041,13 +6266,36 @@ async function saveHotelBooking(){
   const remaining=Math.max(0,total-paid);
   const payload={name,phone,destination:dest,hotel_id:hotelId?parseInt(hotelId):null,hotel_name:hotelName.replace(/^-- اختار الفندق --/,''),checkin:ci,checkout:co,nights,room_type:rtype,rooms,price_per_night:priceN,adults,children,disc,disc_reason:discReason,total,paid,remaining,payments,status,notes,sales_rep:salesRep,created_by:currentUser?.name||''};
   try{
+    let savedBk=null;
     if(editId){
       const r=await sbFetch('htl_bookings','PATCH',payload,`?id=eq.${editId}`);
-      const idx=hotelBookings.findIndex(b=>b.id==editId);if(r&&r[0]&&idx>=0)hotelBookings[idx]=mHB(r[0]);
+      const idx=hotelBookings.findIndex(b=>b.id==editId);if(r&&r[0]){hotelBookings[idx]=mHB(r[0]);savedBk=mHB(r[0]);}
       addLog('تعديل حجز فندق: '+name,'edit',dest+' - '+hotelName);
     }else{
-      const r=await sbFetch('htl_bookings','POST',payload,'');if(r&&r[0])hotelBookings.unshift(mHB(r[0]));
+      const r=await sbFetch('htl_bookings','POST',payload,'');if(r&&r[0]){hotelBookings.unshift(mHB(r[0]));savedBk=mHB(r[0]);}
       addLog('حجز فندق: '+name,'add',dest+' · '+hotelName+' · '+nights+' ليلة');
+    }
+    // Auto-approve payments to accounts (like matrouh bookings)
+    if(savedBk && payments.length){
+      for(let pi=0;pi<payments.length;pi++){
+        const p=payments[pi];if(!p.amount||p.amount<=0)continue;
+        const payRef='htl_'+savedBk.id+'_'+pi;
+        // Check if already approved
+        const alreadyApproved=accEntries.some(e=>e.bookingPayRef===payRef);
+        if(!alreadyApproved){
+          try{
+            const accR=await sbFetch('mtr_acc','POST',{
+              type:p.type||PM_TYPES[0],op:'in',amount:p.amount,
+              entry_date:p.date||new Date().toISOString().split('T')[0],
+              description:'حجز فندق: '+name+' - '+hotelName,
+              client_name:name,category:'',
+              booking_ref:'htl_'+savedBk.id,
+              booking_pay_ref:payRef,supplier_id:null
+            },'');
+            if(accR&&accR[0])accEntries.push(mA(accR[0]));
+          }catch(accErr){console.warn('Hotel payment acc error:',accErr);}
+        }
+      }
     }
     clearHotelBookingForm();switchHotelTab('bookings');renderHotelStats();alert('✓ تم حفظ الحجز');
   }catch(e){alert('فشل: '+e.message)}

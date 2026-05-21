@@ -908,6 +908,10 @@ tr:hover td{background:#f5f8fc}
       وده مفيد لو فوج اكتمل أو مش مفتوح للحجز دلوقتي.
     </div>
     <div id="lock-manager-container"></div>
+    <div style="display:flex;gap:7px;margin-top:.75rem">
+      <button class="btn btn-s btn-sm" onclick="exportLocksExcel()">📥 تصدير Excel</button>
+      <button class="btn btn-p btn-sm" onclick="exportLocksPDF()">📄 تصدير PDF</button>
+    </div>
   </div>
   <div class="card" style="margin-top:.75rem">
     <div class="ctitle">📋 إدارة صلاحية تجاوز القفل</div>
@@ -1067,6 +1071,87 @@ function renderBypassUsers(){
   if(!bypassUsers.length){el.innerHTML='<span style="font-size:12px;color:var(--tx3)">لا يوجد مستخدمين بهذه الصلاحية — أضفها من تاب المستخدمين</span>';return;}
   el.innerHTML=bypassUsers.map(u=>`<div style="padding:7px 14px;border-radius:8px;background:var(--acl);border:1px solid var(--ac);font-size:12px;font-weight:700;color:var(--ac)">👤 ${u.name} <span style="font-weight:400;color:var(--tx2);font-size:11px">(${u.role==='admin'?'أدمن':u.role})</span></div>`).join('');
 }
+
+function _lockTableHTML(){
+  const rows=CONVOYS.map(c=>{
+    const locked=!!LOCKED_CONVOYS[c.num];
+    return `<tr><td>${c.label}</td><td>${c.checkin}</td><td>${locked?'🔒 مقفول':'🔓 مفتوح'}</td></tr>`;
+  }).join('');
+  return `<table border="1" style="border-collapse:collapse;width:100%;font-family:Cairo,Arial;direction:rtl"><thead><tr style="background:#1a5276;color:#fff"><th style="padding:8px">الفوج</th><th>تاريخ الدخول</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function exportLocksExcel(){
+  const BOM='\uFEFF';
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>td,th{font-family:Arial;font-size:11pt;text-align:right}</style></head><body>${_lockTableHTML()}</body></html>`;
+  const blob=new Blob([BOM+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='تقفيل_الأفواج_'+new Date().toLocaleDateString('en-CA')+'.xls';a.click();
+}
+function exportLocksPDF(){
+  const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>تقفيل الأفواج</title><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet"><style>body{font-family:'Cairo',Arial;padding:20px;direction:rtl}h2{margin-bottom:12px;color:#1a5276}table{width:100%;border-collapse:collapse}th{background:#1a5276;color:#fff;padding:8px;text-align:right}td{padding:7px;border-bottom:1px solid #ddd}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@media print{@page{size:A4;margin:10mm}}</style></head><body><h2>🔒 جدول تقفيل الأفواج — ${settings.name||'مصيف مطروح 2026'}</h2><p style="font-size:11px;color:#888;margin-bottom:12px">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>${_lockTableHTML()}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
+  const blob=new Blob([h],{type:'text/html;charset=utf-8'});window.open(URL.createObjectURL(blob),'_blank');
+}
+
+// ====== إذن استلام / إذن صرف ======
+function printVoucher(bookingId, type){
+  // type: 'receipt' = إذن استلام | 'payment' = إذن صرف
+  const b=bookings.find(x=>x.id===bookingId);if(!b)return;
+  const m=b.mgrSnap||settings||{};
+  const logo=m.logo||settings.logo||'';
+  const logoHtml=logo?`<img src="${logo}" style="width:70px;height:70px;border-radius:50%;object-fit:cover;border:3px solid #1a5276;margin-bottom:8px" onerror="this.style.display='none'">`:'';
+  const isReceipt=type==='receipt';
+  const vTitle=isReceipt?'إذن استلام':'إذن صرف';
+  const vColor=isReceipt?'#1a6b3a':'#8b1a1a';
+  const vBg=isReceipt?'#f0faf3':'#fdf0f0';
+  const conv=getConv(b.convoy);
+  const now=new Date().toLocaleDateString('ar-EG');
+  const totalPaid=b.payments.reduce((s,p)=>s+p.amount,0);
+  const lastPay=b.payments.length?b.payments[b.payments.length-1]:null;
+  const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${vTitle} - ${b.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',Arial,sans-serif;padding:30px 40px;direction:rtl;color:#1a2535;font-size:13px;line-height:1.8;max-width:700px;margin:0 auto}
+.header{text-align:center;margin-bottom:24px;padding:18px;background:${vBg};border:2px solid ${vColor};border-radius:12px}
+.v-title{font-size:22px;font-weight:800;color:${vColor};margin:10px 0 4px}
+.v-num{font-size:11px;color:#888}
+.body-box{border:1.5px solid #e0e8f0;border-radius:10px;padding:18px;margin-bottom:18px}
+.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #e5eaf2;font-size:13px}
+.row:last-child{border-bottom:none}.row .l{color:#555}.row .v{font-weight:700;color:#1a2535}
+.amount-box{background:${vBg};border:2px solid ${vColor};border-radius:10px;padding:16px;text-align:center;margin:18px 0}
+.amount-label{font-size:12px;color:${vColor};font-weight:600;margin-bottom:4px}
+.amount-val{font-size:28px;font-weight:800;color:${vColor}}
+.sig-row{display:flex;justify-content:space-between;margin-top:32px;gap:20px}
+.sig-box{flex:1;text-align:center;border-top:1.5px solid #ccc;padding-top:8px;font-size:12px;color:#888}
+@media print{body{padding:10mm}@page{size:A4;margin:10mm}}</style></head>
+<body>
+<div class="header">
+  ${logoHtml}
+  <div style="font-weight:800;font-size:16px;color:#1a2535">${m.company||settings.company||''} ${m.name||settings.name||'مصيف مطروح 2026'}</div>
+  <div class="v-title">${isReceipt?'✅':'💸'} ${vTitle}</div>
+  <div class="v-num">رقم الحجز: #${b.id} · تاريخ الطباعة: ${now}</div>
+</div>
+<div class="body-box">
+  <div class="row"><span class="l">اسم العميل</span><span class="v">${b.name}</span></div>
+  <div class="row"><span class="l">رقم الهاتف</span><span class="v">${b.phone||'—'}</span></div>
+  <div class="row"><span class="l">الفوج / موعد الرحلة</span><span class="v">${conv?conv.label:('فوج '+b.convoy)}</span></div>
+  <div class="row"><span class="l">تاريخ الدخول</span><span class="v">${b.checkin||'—'}</span></div>
+  <div class="row"><span class="l">الشقق</span><span class="v">${(b.apts||[]).join('، ')||'—'}</span></div>
+  <div class="row"><span class="l">إجمالي الحجز</span><span class="v">${b.total.toLocaleString()} ج</span></div>
+  <div class="row"><span class="l">المُسدَّد</span><span class="v">${totalPaid.toLocaleString()} ج</span></div>
+  <div class="row"><span class="l">المتبقي</span><span class="v" style="color:${b.remaining>0?'#c0392b':'#1a6b3a'}">${b.remaining.toLocaleString()} ج</span></div>
+  ${lastPay?`<div class="row"><span class="l">طريقة ${isReceipt?'الاستلام':'الصرف'} الأخيرة</span><span class="v">${lastPay.payMethod||'—'}</span></div>`:''}
+</div>
+<div class="amount-box">
+  <div class="amount-label">${isReceipt?'المبلغ المستلم':'المبلغ المصروف'}</div>
+  <div class="amount-val">${(lastPay?lastPay.amount:b.paid).toLocaleString()} ج</div>
+</div>
+<div class="sig-row">
+  <div class="sig-box">توقيع ${isReceipt?'المُسلِّم':'المستلم'}<br><span style="font-weight:700;color:#1a2535">${b.name}</span></div>
+  <div class="sig-box">توقيع المسؤول<br><span style="font-weight:700;color:#1a2535">${b.createdBy||currentUser?.name||'—'}</span></div>
+  <div class="sig-box">ختم الشركة</div>
+</div>
+<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+</body></html>`;
+  const blob=new Blob([h],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),20000);
+}
 const TAB_PERMS={reports:null,log:'view_log',users:'manage_users',mgr:'settings',prices:'manage_prices',design:'view_design',locks:'manage_locks'};
 
 // ============================================================
@@ -1201,7 +1286,7 @@ async function initApp(){
 }
 
 // Mappers
-function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
+function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
 function mHB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',dest:r.destination||'',hotelId:r.hotel_id||null,hotelName:r.hotel_name||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:r.nights||0,roomType:r.room_type||'single',rooms:r.rooms||1,pricePerNight:r.price_per_night||0,adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
@@ -1528,10 +1613,11 @@ function getConvoys(){
 }
 const CONVOYS=getConvoys();
 function getConv(n){return CONVOYS.find(c=>c.num===n)}
-function bookedApts(cn,excId){return bookings.filter(b=>b.convoy===cn&&b.id!==excId).flatMap(b=>b.apts)}
+function activeBookings(){return bookings.filter(b=>b.status!=='cancelled');}
+function bookedApts(cn,excId){return activeBookings().filter(b=>b.convoy===cn&&b.id!==excId).flatMap(b=>b.apts)}
 function effSeats(b){return(b.seats||0)+(b.extraSeats||0)-(b.seatDiscount||0)}
-function convEffSeats(cn){return bookings.filter(b=>b.convoy===cn).reduce((s,b)=>s+effSeats(b),0)}
-function cColor(bid,cn){const ids=bookings.filter(b=>b.convoy===cn).map(b=>b.id);return SEAT_COLORS[ids.indexOf(bid)%SEAT_COLORS.length]}
+function convEffSeats(cn){return activeBookings().filter(b=>b.convoy===cn).reduce((s,b)=>s+effSeats(b),0)}
+function cColor(bid,cn){const ids=activeBookings().filter(b=>b.convoy===cn).map(b=>b.id);return SEAT_COLORS[ids.indexOf(bid)%SEAT_COLORS.length]}
 function aptP(ci,type){return(PRICE_MAP[ci]||{single:9400,double:12800})[type]}
 
 function populateCities(){
@@ -1603,12 +1689,14 @@ function showTab(t){
 // DASHBOARD
 // ============================================================
 function renderDash(){
-  const tot=bookings.reduce((s,b)=>s+b.total,0);
-  const paid=bookings.reduce((s,b)=>s+b.paid,0);
-  const trans=bookings.reduce((s,b)=>s+(b.extraSeats||0)*(b.seatPrice||0)+(b.intTotal||0),0);
-  const discs=bookings.reduce((s,b)=>s+(b.seatDiscAmt||0)+(b.disc||0),0);
+  const ab=activeBookings();
+  const tot=ab.reduce((s,b)=>s+b.total,0);
+  const paid=ab.reduce((s,b)=>s+b.paid,0);
+  const trans=ab.reduce((s,b)=>s+(b.extraSeats||0)*(b.seatPrice||0)+(b.intTotal||0),0);
+  const discs=ab.reduce((s,b)=>s+(b.seatDiscAmt||0)+(b.disc||0),0);
+  const cancelledCount=bookings.filter(b=>b.status==='cancelled').length;
   document.getElementById('dash-stats').innerHTML=`
-    <div class="stat"><div class="stat-label">الحجوزات</div><div class="stat-val">${bookings.length}</div></div>
+    <div class="stat"><div class="stat-label">الحجوزات النشطة</div><div class="stat-val">${ab.length}${cancelledCount?`<span style="font-size:11px;color:var(--dn);margin-right:5px">(${cancelledCount} ملغي)</span>`:''}</div></div>
     <div class="stat gold"><div class="stat-label">الإيرادات</div><div class="stat-val">${tot.toLocaleString()} ج</div></div>
     <div class="stat green"><div class="stat-label">المحصل</div><div class="stat-val">${paid.toLocaleString()} ج</div></div>
     <div class="stat teal"><div class="stat-label">إيراد النقل</div><div class="stat-val">${trans.toLocaleString()} ج</div></div>
@@ -1626,7 +1714,7 @@ function renderDash(){
     <td style="font-weight:700">${b.total.toLocaleString()} ج</td>
     <td style="color:var(--dn);font-weight:700">${b.remaining.toLocaleString()} ج</td>
     <td>${b.remaining<=0?'<span class="badge b-gr">مكتمل</span>':'<span class="badge b-wn">باقي</span>'}</td>
-    <td><button class="btn btn-p btn-sm" onclick="printReceipt(${b.id})">إيصال</button></td>
+    <td><button class="btn btn-p btn-sm" onclick="printReceipt(${b.id})">إيصال</button><button class="btn btn-s btn-sm" onclick="printVoucher(${b.id},'receipt')">📥 استلام</button><button class="btn btn-d btn-sm" onclick="printVoucher(${b.id},'payment')">💸 صرف</button></td>
   </tr>`).join('');
 }
 
@@ -1831,7 +1919,7 @@ function renderClients(){
     <td style="color:var(--ac);font-weight:700">${b.paid.toLocaleString()} ج</td>
     <td style="color:var(--dn);font-weight:700">${b.remaining.toLocaleString()} ج</td>
     <td>${b.remaining<=0?'<span class="badge b-gr">مكتمل</span>':'<span class="badge b-wn">باقي</span>'}</td>
-    <td><button class="btn btn-p btn-sm" onclick="printReceipt(${b.id})">إيصال</button></td>
+    <td><button class="btn btn-p btn-sm" onclick="printReceipt(${b.id})">إيصال</button><button class="btn btn-s btn-sm" onclick="printVoucher(${b.id},'receipt')">📥 استلام</button><button class="btn btn-d btn-sm" onclick="printVoucher(${b.id},'payment')">💸 صرف</button></td>
   </tr>`).join('');
 }
 function viewClient(id){
@@ -1941,9 +2029,9 @@ function renderBusTab(){
 function selectBusConv(n){activeBusConv=n;renderBusTab()}
 function printBusLayout(cn){
   const conv=getConv(cn);if(!conv)return;
-  const bks=bookings.filter(b=>b.convoy===cn&&effSeats(b)>0);
+  const bks=activeBookings().filter(b=>b.convoy===cn&&effSeats(b)>0);
   const occ={};
-  bookings.filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||''};});});
+  activeBookings().filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||''};});});
   // Group by pickup
   const byPickup={};
   bks.forEach(b=>{const p=b.pickup||'غير محدد';if(!byPickup[p])byPickup[p]=[];
@@ -1998,7 +2086,7 @@ table{border-collapse:collapse}
 }
 function renderBusLayout(cn){
   const conv=getConv(cn),used=convEffSeats(cn);
-  const bks=bookings.filter(b=>b.convoy===cn&&effSeats(b)>0);
+  const bks=activeBookings().filter(b=>b.convoy===cn&&effSeats(b)>0);
   document.getElementById('bus-warn').innerHTML=used>MAX_SEATS?`<div class="warn-box">تحذير: ممتلئ (${used}/${MAX_SEATS})</div>`:'';
   document.getElementById('bus-stats').innerHTML=`
     <div class="stat" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">محجوز</div><div class="stat-val" style="font-size:14px">${used}</div></div>
@@ -2008,10 +2096,10 @@ function renderBusLayout(cn){
   document.getElementById('pickup-summary').innerHTML=Object.entries(pickupCount).map(([p,c])=>`<div class="pickup-tag">من <span>${p}</span>: <span>${c}</span> مقعد</div>`).join('');
   // Occupied
   const occ={};
-  bookings.filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx};});});
+  activeBookings().filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx};});});
   // Pool (unassigned)
   const pool={};
-  bookings.filter(b=>b.convoy===cn&&effSeats(b)>0).forEach(b=>{
+  activeBookings().filter(b=>b.convoy===cn&&effSeats(b)>0).forEach(b=>{
     const p=b.pickup||'غير محدد';if(!pool[p])pool[p]=[];
     (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn)});});
   });
@@ -2049,7 +2137,7 @@ async function busDrop(e,cn,toSn){
   e.preventDefault();
   if(poolDragInfo){
     const{bookingId,assignIdx}=poolDragInfo;poolDragInfo=null;
-    const occ={};bookings.filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={bookingId:b.id,assignIdx:idx};});});
+    const occ={};activeBookings().filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={bookingId:b.id,assignIdx:idx};});});
     if(occ[toSn]){const bTo=bookings.find(x=>x.id===occ[toSn].bookingId);bTo.seatAssign[occ[toSn].assignIdx].seatNum=null;await sbFetch('mtr_bookings','PATCH',{seat_assign:bTo.seatAssign},`?id=eq.${bTo.id}`);}
     const b=bookings.find(x=>x.id===bookingId);if(!b)return;
     b.seatAssign[assignIdx].seatNum=toSn;
@@ -2058,7 +2146,7 @@ async function busDrop(e,cn,toSn){
   }
   if(dragInfo&&dragInfo.cn===cn){
     const fromSn=dragInfo.sn;dragInfo=null;if(fromSn===toSn)return;
-    const occ={};bookings.filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={bookingId:b.id,assignIdx:idx};});});
+    const occ={};activeBookings().filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={bookingId:b.id,assignIdx:idx};});});
     const from=occ[fromSn];if(!from)return;
     const bF=bookings.find(x=>x.id===from.bookingId),to=occ[toSn];
     if(to){const bT=bookings.find(x=>x.id===to.bookingId);bF.seatAssign[from.assignIdx].seatNum=toSn;bT.seatAssign[to.assignIdx].seatNum=fromSn;await sbFetch('mtr_bookings','PATCH',{seat_assign:bT.seatAssign},`?id=eq.${bT.id}`);}
@@ -2181,8 +2269,21 @@ function renderAccs(){
   const pe=document.getElementById('acc-pending');
   pe.innerHTML=pend.length?`<div class="card" style="border-color:var(--wn);margin-bottom:.875rem"><div class="ctitle" style="color:var(--wn)">مدفوعات في انتظار الاعتماد (${pend.length} · ${pend.reduce((s,p)=>s+p.amount,0).toLocaleString()} ج)</div>
     <div class="warn-box">هذه الدفعات مسجلة في الحجوزات ولم تُعتمد في الحسابات بعد.</div>
-    <div class="tbl-wrap"><table><thead><tr><th>العميل</th><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th><th></th></tr></thead><tbody>
-    ${pend.map(p=>{const safeRef=String(p.ref).replace(/[^a-z0-9]/gi,'_');return`<tr><td style="font-weight:700">${p.clientName}</td><td style="font-size:11px">${p.date||'-'}</td><td style="font-weight:700;color:var(--wn)">${p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td style="display:flex;gap:4px"><button class="btn btn-s btn-sm" onclick="approvePay('${p.ref}','${p.payMethod}',${p.amount},'${p.clientName}','${p.date||''}',${p.bookingId},${p.payIdx})">اعتماد</button><button class="btn btn-d btn-sm" onclick="delPendPay(${p.bookingId},${p.payIdx})">حذف</button></td></tr>`}).join('')}
+    <div class="tbl-wrap"><table><thead><tr><th>العميل</th><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th><th>ملاحظة</th><th></th></tr></thead><tbody>
+    ${pend.map(p=>{const safeRef=String(p.ref).replace(/[^a-z0-9]/gi,'_');return`<tr id="pend-row-${safeRef}">
+      <td style="font-weight:700">${p.clientName}</td>
+      <td><input type="date" id="pend-date-${safeRef}" value="${p.date||''}" style="font-size:11px;padding:3px 5px;border:1px solid var(--bd);border-radius:5px;background:var(--sf);color:var(--tx);width:130px"></td>
+      <td><input type="number" id="pend-amt-${safeRef}" value="${p.amount}" min="0" style="font-size:13px;font-weight:700;color:var(--wn);padding:3px 5px;border:1px solid var(--bd);border-radius:5px;background:var(--sf);color:var(--wn);width:100px"></td>
+      <td><select id="pend-pm-${safeRef}" style="font-size:12px;padding:3px 5px;border:1px solid var(--bd);border-radius:5px;background:var(--sf);color:var(--tx)">
+        ${PM_TYPES.map(pm=>`<option value="${pm}" ${pm===p.payMethod?'selected':''}>${pm}</option>`).join('')}
+      </select></td>
+      <td><input type="text" id="pend-note-${safeRef}" value="${p.note||''}" placeholder="ملاحظة" style="font-size:11px;padding:3px 5px;border:1px solid var(--bd);border-radius:5px;background:var(--sf);color:var(--tx);width:110px"></td>
+      <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
+        ${p.addedBy?`<span title="أضاف: ${p.addedBy}${p.addedAt?' في '+p.addedAt:''}" style="cursor:help;font-size:14px">ℹ️</span>`:''}
+        <button class="btn btn-s btn-sm" onclick="savePendPay(${p.bookingId},${p.payIdx},'${safeRef}')">💾 حفظ</button>
+        <button class="btn btn-p btn-sm" onclick="approvePay('${p.ref}','${p.payMethod}',${p.amount},'${p.clientName}','${p.date||''}',${p.bookingId},${p.payIdx},'${safeRef}')">✅ اعتماد</button>
+        <button class="btn btn-d btn-sm" onclick="delPendPay(${p.bookingId},${p.payIdx})">🗑</button>
+      </td></tr>`;}).join('')}
     </tbody></table></div></div>`:'';
   // Init nav
   onAccNavChange();
@@ -2279,7 +2380,34 @@ function filterAcc(){
   const op=document.getElementById('acc-op-f')?.value||'';
   document.querySelectorAll('#acc-tbl tbody tr').forEach(r=>{r.style.display=(!q||(r.dataset.desc||'').includes(q))&&(!op||r.dataset.op===op)?'':'none';});
 }
-async function approvePay(ref,pmType,amount,clientName,date,bookingId,payIdx){
+async function savePendPay(bookingId,payIdx,safeRef){
+  const b=bookings.find(x=>x.id===bookingId);if(!b||!b.payments[payIdx])return;
+  const newAmt=parseFloat(document.getElementById('pend-amt-'+safeRef)?.value)||b.payments[payIdx].amount;
+  const newDate=document.getElementById('pend-date-'+safeRef)?.value||b.payments[payIdx].date;
+  const newPm=document.getElementById('pend-pm-'+safeRef)?.value||b.payments[payIdx].payMethod;
+  const newNote=document.getElementById('pend-note-'+safeRef)?.value||b.payments[payIdx].note||'';
+  const oldAmt=b.payments[payIdx].amount;
+  b.payments[payIdx]={...b.payments[payIdx],amount:newAmt,date:newDate,payMethod:newPm,note:newNote,editedBy:currentUser?.name||'—',editedAt:new Date().toLocaleDateString('ar-EG')};
+  b.paid=b.payments.reduce((s,p)=>s+p.amount,0);
+  b.remaining=b.total-b.paid;
+  try{
+    await sbFetch('mtr_bookings','PATCH',{payments:b.payments,paid:b.paid,remaining:b.remaining},`?id=eq.${bookingId}`);
+    await addLog(`تعديل دفعة: ${b.name}`,'edit',`المبلغ: ${oldAmt.toLocaleString()} ← ${newAmt.toLocaleString()} ج · ${newPm} · ${currentUser?.name||'—'}`);
+    renderAccs();
+    const row=document.getElementById('pend-row-'+safeRef);
+    if(row){row.style.background='var(--acl)';setTimeout(()=>{if(row)row.style.background='';},1200);}
+  }catch(e){alert('فشل: '+e.message)}
+}
+async function approvePay(ref,pmType,amount,clientName,date,bookingId,payIdx,safeRef){
+  // Read live values from editable fields first
+  if(safeRef){
+    const el_amt=document.getElementById('pend-amt-'+safeRef);
+    const el_pm=document.getElementById('pend-pm-'+safeRef);
+    const el_date=document.getElementById('pend-date-'+safeRef);
+    if(el_amt)amount=parseFloat(el_amt.value)||amount;
+    if(el_pm)pmType=el_pm.value||pmType;
+    if(el_date)date=el_date.value||date;
+  }
   if(!confirm(`اعتماد ${amount.toLocaleString()} ج - ${pmType}؟`))return;
   const b=bookings.find(x=>x.id===bookingId);
   const realAmt=b&&b.payments[payIdx]?b.payments[payIdx].amount:amount;
@@ -2442,12 +2570,32 @@ function genReport(){
   else if(type==='bus'){const cn=filter?parseInt(filter):null;const conv=cn?CONVOYS.find(c=>c.num===cn):null;const bks=allBks.filter(b=>!cn||b.convoy===cn);title=`تقرير الباص: ${conv?conv.label:'الكل'}`;count=bks.reduce((s,b)=>s+(b.seatAssign||[]).filter(sa=>sa.seatNum).length,0);const pg={};bks.forEach(b=>{const p=b.pickup||'غير محدد';if(!pg[p])pg[p]=[];pg[p].push({name:b.name,phone:b.phone||'-',seats:effSeats(b),assigned:(b.seatAssign||[]).filter(sa=>sa.seatNum).length,nums:(b.seatAssign||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join('،')});});html=Object.entries(pg).map(([pl,cl])=>`<div style="margin-bottom:1rem"><div style="font-weight:700;color:var(--ac);padding:5px 0;border-bottom:2px solid var(--acl);margin-bottom:.5rem">${pl} · ${cl.reduce((s,c)=>s+c.seats,0)} مقعد</div><table><thead><tr><th>العميل</th><th>الهاتف</th><th>الكراسي</th><th>المحددة</th><th>الأرقام</th></tr></thead><tbody>${cl.map(c=>`<tr><td>${c.name}</td><td>${c.phone}</td><td>${c.seats}</td><td>${c.assigned}</td><td style="font-weight:700">${c.nums||'-'}</td></tr>`).join('')}</tbody></table></div>`).join('');}
   if(!html)html='<div style="text-align:center;color:var(--tx3);padding:2rem">لا توجد بيانات</div>';
   const now=new Date().toLocaleDateString('ar-EG');
-  out.innerHTML=`<div id="rpt-printable"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px"><div><div style="font-size:15px;font-weight:700;color:var(--pr)">${title}</div><div style="font-size:12px;color:var(--tx2)">${from||'البداية'} → ${to||'الآن'} · ${now}</div></div><div style="display:flex;gap:7px">${count?`<span class="badge b-bl">${count} عنصر</span>`:''} ${total!==0?`<span class="badge ${total>0?'b-gr':'b-rd'}">${total.toLocaleString()} ج</span>`:''} <button class="btn btn-sm" onclick="printRpt()">طباعة</button></div></div><div class="tbl-wrap">${html}</div></div>`;
+  out.innerHTML=`<div id="rpt-printable"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px"><div><div style="font-size:15px;font-weight:700;color:var(--pr)">${title}</div><div style="font-size:12px;color:var(--tx2)">${from||'البداية'} → ${to||'الآن'} · ${now}</div></div><div style="display:flex;gap:7px;flex-wrap:wrap">${count?`<span class="badge b-bl">${count} عنصر</span>`:''} ${total!==0?`<span class="badge ${total>0?'b-gr':'b-rd'}">${total.toLocaleString()} ج</span>`:''} <button class="btn btn-sm" onclick="printRpt()">🖨 طباعة</button><button class="btn btn-s btn-sm" onclick="exportRptExcel()">📥 Excel</button><button class="btn btn-p btn-sm" onclick="exportRptPDF()">📄 PDF</button></div></div><div class="tbl-wrap">${html}</div></div>`;
 }
 function printRpt(){
   const c=document.getElementById('rpt-printable');if(!c){alert('أنشئ التقرير أولاً');return;}
   const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',Arial,sans-serif;padding:20px;direction:rtl;color:#1a2535;font-size:13px;line-height:1.6}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}th{background:#1a5276;color:#fff;padding:8px 10px;text-align:right;font-weight:700;font-size:11px}td{padding:7px 10px;border-bottom:1px solid #eaf2fb;text-align:right}tr:nth-child(even) td{background:#f8fafc}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@media print{@page{margin:10mm;size:A4}body{padding:0}}</style></head><body>${c.innerHTML}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
   const blob=new Blob([h],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+function exportRptExcel(){
+  const tbl=document.querySelector('#rpt-printable table');
+  if(!tbl){alert('أنشئ التقرير أولاً');return;}
+  const titleEl=document.querySelector('#rpt-printable div[style*="font-size:15px"]');
+  const title=titleEl?titleEl.textContent.trim():'تقرير';
+  // Build Excel-compatible HTML table with UTF-8 BOM
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${title}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><style>td,th{font-family:Arial;font-size:11pt;direction:rtl;text-align:right}th{background:#1a5276;color:#fff;font-weight:bold}</style></head><body><table border="1">${tbl.innerHTML}</table></body></html>`;
+  const BOM='\uFEFF';
+  const blob=new Blob([BOM+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=title+'_'+new Date().toLocaleDateString('en-CA')+'.xls';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+function exportRptPDF(){
+  const c=document.getElementById('rpt-printable');if(!c){alert('أنشئ التقرير أولاً');return;}
+  const titleEl=c.querySelector('div[style*="font-size:15px"]');
+  const title=titleEl?titleEl.textContent.trim():'تقرير';
+  const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${title}</title><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',Arial,sans-serif;padding:16px;direction:rtl;color:#1a2535;font-size:12px;line-height:1.6}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}th{background:#1a5276;color:#fff;padding:7px 9px;text-align:right;font-weight:700;font-size:10px}td{padding:6px 9px;border-bottom:1px solid #e0eaf5;text-align:right}tr:nth-child(even) td{background:#f4f8fc}.badge{padding:2px 6px;border-radius:10px;font-size:10px}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@media print{@page{margin:8mm;size:A4 landscape}button{display:none!important}}</style></head><body>${c.innerHTML}<script>window.onload=function(){document.querySelectorAll('button').forEach(b=>b.style.display='none');setTimeout(()=>window.print(),500);}<\/script></body></html>`;
+  const blob=new Blob([h],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),20000);
 }
 
 // ============================================================
@@ -2839,6 +2987,23 @@ function editBooking(id){
       <div class="fg"><label>عدد الأطفال</label><input type="number" id="edit-children" value="${b.children||0}" min="0"></div>
     </div>
     <div class="fg"><label>ملاحظات</label><textarea id="edit-notes" style="min-height:60px">${b.notes||''}</textarea></div>
+    <div class="g2" style="margin-top:.75rem">
+      <div class="fg"><label>حالة الحجز</label>
+        <select id="edit-status" style="font-weight:700">
+          <option value="active" ${(b.status||'active')==='active'?'selected':''}>✅ مؤكد / نشط</option>
+          <option value="cancelled" ${b.status==='cancelled'?'selected':''}>❌ ملغي</option>
+        </select>
+        <div id="cancel-warn" style="display:${b.status==='cancelled'?'block':'none'};margin-top:5px;padding:7px;background:var(--dnl);border:1px solid var(--dn);border-radius:7px;font-size:11px;color:var(--dn)">
+          ⚠️ الحجز الملغي يُشال من الحسابات والباص والجداول كأنه محذوف
+        </div>
+      </div>
+      <div class="fg" style="font-size:11px;color:var(--tx3);padding-top:6px">
+        <div>📝 أنشأ الحجز: <b>${b.createdBy||'—'}</b></div>
+        <div style="margin-top:3px">📅 تاريخ الإنشاء: <b>${b.created||'—'}</b></div>
+        ${b.lastEditBy?`<div style="margin-top:3px">✏️ آخر تعديل: <b>${b.lastEditBy}</b> — ${b.lastEditAt||''}</div>`:''}
+      </div>
+    </div>
+    <script>document.getElementById('edit-status').onchange=function(){document.getElementById('cancel-warn').style.display=this.value==='cancelled'?'block':'none';}<\/script>
     <div id="edit-total-display" class="tsum" style="margin:.75rem 0;padding:.75rem"></div>
     <div style="display:flex;gap:8px;margin-top:.75rem">
       <button class="btn btn-p" onclick="saveEditBooking(${id})">حفظ التعديلات</button>
@@ -2945,10 +3110,16 @@ async function saveEditBooking(id){
     adults:adultsVal, children:childrenVal,
     seat_assign:newSA,
     disc_reason:discReason,
-    created_by:newCreatedBy
+    created_by:newCreatedBy,
+    status:document.getElementById('edit-status')?.value||b.status||'active',
+    last_edit_by:currentUser?.name||'—',
+    last_edit_at:new Date().toLocaleDateString('ar-EG')
   };
 
   try{
+    const newStatus=document.getElementById('edit-status')?.value||b.status||'active';
+    const wasCancelled=b.status==='cancelled';
+    const nowCancelled=newStatus==='cancelled';
     await sbFetch('mtr_bookings','PATCH',payload,`?id=eq.${id}`);
     Object.assign(b,{
       name,phone,pickup,
@@ -2961,8 +3132,20 @@ async function saveEditBooking(id){
       intSeats:intS, intSeatPrice:intP, intTotal:intT,
       transferFee:tfee, disc, discReason, total, remaining, notes,
       adults:adultsVal, children:childrenVal, seatAssign:newSA,
-      createdBy:newCreatedBy
+      createdBy:newCreatedBy,
+      status:newStatus,
+      lastEditBy:currentUser?.name||'—',
+      lastEditAt:new Date().toLocaleDateString('ar-EG')
     });
+    // If booking just became cancelled → remove its acc entries
+    if(nowCancelled&&!wasCancelled){
+      const toRemove=accEntries.filter(e=>e.bookingRef===String(id));
+      for(const e of toRemove){
+        try{await sbFetch('mtr_acc','DELETE',null,`?id=eq.${e.id}`);}catch(_){}
+      }
+      accEntries=accEntries.filter(e=>e.bookingRef!==String(id));
+      await addLog(`إلغاء حجز: ${name}`,'del',`تم إزالة ${toRemove.length} قيد محاسبي`);
+    }
     delete editSelApts[id];
     // Build detailed change log
     const changes=[];

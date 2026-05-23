@@ -791,6 +791,7 @@ tr:hover td{background:#f5f8fc}
         <div class="trow"><span>سعر الغرفة/ليلة</span><span id="hts-pn">0 ج</span></div>
         <div class="trow"><span>عدد الغرف</span><span id="hts-rooms">1</span></div>
         <div class="trow disc"><span>الخصم</span><span id="hts-disc">- 0 ج</span></div>
+        <div class="trow" id="hts-transport-row"><span>🚌 الانتقالات</span><span id="hts-transport-amt">0 ج</span></div>
         <div class="trow big"><span>الإجمالي الكلي</span><span id="hts-total">0 ج</span></div>
         <div class="trow"><span style="color:var(--ac)">المدفوع</span><span id="hts-paid" style="color:var(--ac)">0 ج</span></div>
         <div class="trow disc"><span>المتبقي</span><span id="hts-rem">0 ج</span></div>
@@ -800,6 +801,34 @@ tr:hover td{background:#f5f8fc}
       <div class="ctitle" style="font-size:12px;margin-bottom:5px">الدفعات</div>
       <div id="hbk-pay-cont"></div>
       <button class="btn btn-sm" onclick="addHotelPayRow()" style="margin-bottom:8px">+ دفعة</button>
+
+      <!-- TRANSPORT SECTION -->
+      <div class="card" style="background:var(--prl);border-color:var(--bd2);margin-bottom:.75rem;margin-top:.5rem">
+        <div class="ctitle" style="color:var(--pr);font-size:13px;margin-bottom:.65rem">🚌 تفاصيل الانتقالات</div>
+        <div class="g2">
+          <div class="fg">
+            <label>مكان الركوب (رايح)</label>
+            <select id="hbk-pickup">
+              <option value="">-- اختار مكان الركوب --</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>مكان الركوب (جاي)</label>
+            <select id="hbk-dropoff">
+              <option value="">-- اختار مكان النزول --</option>
+            </select>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="fg"><label>عدد كراسي الباص</label><input type="number" id="hbk-bus-seats" value="0" min="0" oninput="calcHotelTotal()"></div>
+          <div class="fg"><label>سعر الكرسي (ج)</label><input type="number" id="hbk-bus-seat-price" value="0" min="0" oninput="calcHotelTotal()"></div>
+          <div class="fg">
+            <label>إجمالي الانتقالات</label>
+            <div id="hbk-transport-total" style="padding:.55rem .75rem;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);font-weight:700;color:var(--pr)">0 ج</div>
+          </div>
+        </div>
+        <div class="fg"><label>ملاحظة الانتقالات</label><input type="text" id="hbk-transport-note" placeholder="مثلاً: باص خاص · ميعاد الرحلة 8 صباحاً..."></div>
+      </div>
 
       <div class="g2">
         <div class="fg"><label>حالة الحجز</label>
@@ -2252,13 +2281,19 @@ function renderBusLayout(cn,busIdx){
   busIdx=busIdx||0;
   const conv=getConv(cn),used=convEffSeats(cn);
   const busName=getBusNames(cn)[busIdx]||'الباص '+(busIdx+1);
-  // Filter bookings for this specific bus index
+  const busNames=getBusNames(cn);
+  // ALL bookings with seats for this convoy
   const allBks=activeBookings().filter(b=>b.convoy===cn&&effSeats(b)>0);
+  // Bookings assigned to THIS bus (busIdx)
   const bks=allBks.filter(b=>(b.busIdx===undefined?0:b.busIdx)===busIdx);
+  // Bookings NOT yet assigned to any bus (busIdx undefined/0 only when bus count is 1)
+  const busCount=busNames.length;
   document.getElementById('bus-warn').innerHTML=used>MAX_SEATS?`<div class="warn-box">تحذير: ممتلئ (${used}/${MAX_SEATS})</div>`:'';
+  const usedThisBus=bks.reduce((s,b)=>s+effSeats(b),0);
   document.getElementById('bus-stats').innerHTML=`
-    <div class="stat" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">محجوز</div><div class="stat-val" style="font-size:14px">${used}</div></div>
-    <div class="stat green" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">متاح</div><div class="stat-val" style="font-size:14px;color:var(--ac)">${Math.max(0,MAX_SEATS-used)}</div></div>
+    <div class="stat" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">كل الفوج</div><div class="stat-val" style="font-size:14px">${used}</div></div>
+    <div class="stat green" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">هذا الباص</div><div class="stat-val" style="font-size:14px;color:var(--ac)">${usedThisBus}</div></div>
+    <div class="stat" style="padding:.5rem .75rem;min-width:75px"><div class="stat-label">فاضي</div><div class="stat-val" style="font-size:14px;color:var(--pr)">${Math.max(0,MAX_SEATS-usedThisBus)}</div></div>
     <div class="stat" style="padding:.5rem .75rem;min-width:100px;border-top-color:var(--gd)"><div class="stat-label">🚌 ${busName}</div><div class="stat-val" style="font-size:12px;color:var(--gd)">${bks.length} حجز</div></div>`;
   const pickupCount={};
   bks.forEach(b=>{const p=b.pickup||'—';pickupCount[p]=(pickupCount[p]||0)+effSeats(b);});
@@ -2266,22 +2301,60 @@ function renderBusLayout(cn,busIdx){
   // Occupied seats for this bus
   const occ={};
   bks.forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx};});});
-  // Pool (unassigned) for this bus
+  // Pool (unassigned) for this bus ONLY - clients already in another bus won't appear here
   const pool={};
   bks.forEach(b=>{
     const p=b.pickup||'غير محدد';if(!pool[p])pool[p]=[];
     (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn)});});
   });
+  // Unassigned clients (not in any bus yet) - only show if multiple buses
+  const unassignedBks = busCount>1 ? allBks.filter(b=>{
+    const bi=b.busIdx===undefined?0:b.busIdx;
+    // Client is "unassigned" only if their busIdx is still 0 AND there are multiple buses
+    // We DON'T show them here - they appear in bus 0 by default
+    return false; // We handle bus assignment differently via the assign button
+  }) : [];
   let poolHtml='';
   if(Object.values(pool).some(a=>a.length)){
-    poolHtml=`<div style="margin-bottom:1rem;padding:.875rem;background:var(--sf2);border:1px solid var(--bd2);border-radius:var(--rl)"><div style="font-size:13px;font-weight:700;color:var(--pr);margin-bottom:.5rem">اسحب من هنا وضع في الباص</div>`;
+    poolHtml=`<div style="margin-bottom:1rem;padding:.875rem;background:var(--sf2);border:1px solid var(--bd2);border-radius:var(--rl)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem;flex-wrap:wrap;gap:6px">
+      <div style="font-size:13px;font-weight:700;color:var(--pr)">🎫 ينتظرون تخصيص مقعد في ${busName}</div>
+      <span style="font-size:11px;color:var(--tx3)">${Object.values(pool).flat().length} شخص</span>
+    </div>`;
     Object.entries(pool).forEach(([place,people])=>{
       if(!people.length)return;
-      poolHtml+=`<div style="margin-bottom:.5rem"><div style="font-size:11px;font-weight:700;color:var(--ac);margin-bottom:.3rem">${place}</div><div style="display:flex;flex-wrap:wrap;gap:5px">`;
-      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:72px;border:2px solid rgba(255,255,255,.3)"><div>${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.8">${p.phone?p.phone.slice(-4):''}</div></div>`).join('');
+      poolHtml+=`<div style="margin-bottom:.65rem;padding:.5rem;background:var(--sf);border-radius:var(--r);border:1px solid var(--bd)">
+        <div style="font-size:11px;font-weight:700;color:var(--ac);margin-bottom:.4rem">📍 ${place} (${people.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">`;
+      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:2px solid rgba(255,255,255,.3);box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div></div>`).join('');
       poolHtml+=`</div></div>`;
     });
-    poolHtml+=`</div>`;
+    poolHtml+=`<div style="font-size:10px;color:var(--tx3);margin-top:.4rem;text-align:center">↕ اسحب لتخصيص مقعد في الباص</div></div>`;
+  }
+  // Show clients in OTHER buses (read-only info panel) if multiple buses
+  if(busCount>1){
+    const otherBusClients=[];
+    busNames.forEach((bn,bi)=>{
+      if(bi===busIdx)return;
+      const otherBks=allBks.filter(b=>(b.busIdx===undefined?0:b.busIdx)===bi);
+      if(otherBks.length) otherBusClients.push({busName:bn,busIdx:bi,bks:otherBks});
+    });
+    if(otherBusClients.length){
+      poolHtml+=`<div style="margin-bottom:1rem;padding:.875rem;background:var(--prl);border:1px solid var(--bd2);border-radius:var(--rl)">
+        <div style="font-size:13px;font-weight:700;color:var(--pr);margin-bottom:.65rem">🚌 العملاء في الباصات الأخرى</div>`;
+      otherBusClients.forEach(({busName:bn,busIdx:bi,bks:obks})=>{
+        poolHtml+=`<div style="margin-bottom:.5rem;padding:.5rem;background:var(--sf);border-radius:var(--r);border:1px solid var(--bd)">
+          <div style="font-size:11px;font-weight:700;color:var(--pr2);margin-bottom:.35rem">🚌 ${bn} (${obks.length} عميل · ${obks.reduce((s,b)=>s+effSeats(b),0)} كرسي)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">`;
+        poolHtml+=obks.map(b=>`<div onclick="moveToBus(${b.id},${bi},${busIdx})" title="اضغط لنقله لـ ${busName}" style="background:${cColor(b.id,cn)};color:#fff;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid rgba(255,255,255,.25);opacity:.85;display:flex;flex-direction:column;align-items:center;min-width:68px">
+          <div>${b.name.split(' ').slice(0,2).join(' ')}</div>
+          <div style="font-size:9px;opacity:.8">${effSeats(b)} كرسي</div>
+          <div style="font-size:9px;background:rgba(255,255,255,.2);border-radius:4px;padding:1px 5px;margin-top:2px">نقل ←</div>
+        </div>`).join('');
+        poolHtml+=`</div></div>`;
+      });
+      poolHtml+=`</div>`;
+    }
   }
   function ms(sn){
     const o=occ[sn];
@@ -2329,7 +2402,21 @@ async function clearSeat(cn,sn){
   const b=bookings.find(bb=>bb.convoy===cn&&(bb.seatAssign||[]).some(s=>s.seatNum===sn));if(!b)return;
   b.seatAssign.forEach((sa,i)=>{if(sa.seatNum===sn)b.seatAssign[i].seatNum=null;});
   await sbFetch('mtr_bookings','PATCH',{seat_assign:b.seatAssign},`?id=eq.${b.id}`);
-  renderBusLayout(cn);renderBusTab();
+  renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();
+}
+
+async function moveToBus(bookingId,fromBusIdx,toBusIdx){
+  const b=bookings.find(x=>x.id===bookingId);if(!b)return;
+  const busNames=getBusNames(b.convoy);
+  const toName=busNames[toBusIdx]||'الباص '+(toBusIdx+1);
+  const fromName=busNames[fromBusIdx]||'الباص '+(fromBusIdx+1);
+  if(!confirm(`نقل "${b.name}" من ${fromName} إلى ${toName}؟`))return;
+  // Clear all seat assignments for this client first
+  if(b.seatAssign)b.seatAssign.forEach(sa=>sa.seatNum=null);
+  b.busIdx=toBusIdx;
+  await sbFetch('mtr_bookings','PATCH',{bus_idx:toBusIdx,seat_assign:b.seatAssign||[]},`?id=eq.${bookingId}`);
+  addLog(`نقل ${b.name} من ${fromName} إلى ${toName}`,'edit',`فوج ${b.convoy}`);
+  renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();
 }
 
 // ============================================================
@@ -4722,94 +4809,116 @@ window.showEntryPopup = async function(id){
   document.getElementById('entry-popup-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.id='entry-popup-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(3px)';
-  overlay.onclick=ev=>{if(ev.target===overlay)overlay.remove();};
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:2000;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(6px);animation:fadeInOvr .2s ease';
+  // Add animation style
+  if(!document.getElementById('popup-anim-style')){
+    const st=document.createElement('style');st.id='popup-anim-style';
+    st.textContent=`@keyframes fadeInOvr{from{opacity:0}to{opacity:1}}@keyframes slideUpModal{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}`;
+    document.head.appendChild(st);
+  }
+  overlay.onclick=ev=>{if(ev.target===overlay){overlay.style.opacity='0';overlay.style.transition='opacity .15s';setTimeout(()=>overlay.remove(),150);}};
 
   let totalDr=0,totalCr=0;
   const rowsHtml=paired.map((p,i)=>{
     const isDr=p.op==='expense';
     if(isDr) totalDr+=p.amount; else totalCr+=p.amount;
     const color=isDr?'#c0392b':'#117a65';
-    const bg=isDr?'#fff8f8':'#f0fff8';
-    // Find linked booking for this entry
+    const bg=isDr?'rgba(192,57,43,.04)':'rgba(17,122,101,.04)';
     const linkedBk = p.bookingRef&&!p.bookingRef.startsWith('pair_') ? bookings.find(b=>String(b.id)===String(p.bookingRef)) : null;
-    return `<tr style="background:${bg}">
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;font-weight:700;color:#1a5276;font-size:13px">${i+1}</td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;min-width:160px">
-        <div style="font-weight:700;color:#1a5276;font-size:13px">${p.type||'-'}</div>
-        ${p.category?`<div style="font-size:11px;color:#888;background:#f4f7fb;border-radius:4px;padding:1px 6px;display:inline-block;margin-top:2px">${p.category}</div>`:''}
-        ${p.clientName&&p.clientName!==p.desc?`<div style="font-size:11px;color:#7d3c98;margin-top:2px">العميل: ${p.clientName}</div>`:''}
-        ${linkedBk?`<div style="font-size:10px;color:#117a65;margin-top:2px">ملف: ${p.bookingRef}</div>`:''}
-        ${p.supplierId?`<div style="font-size:11px;color:#d68910;margin-top:1px">🏢 مورد</div>`:''}
+    return `<tr style="background:${bg};transition:background .1s" onmouseover="this.style.background='${isDr?'rgba(192,57,43,.08)':'rgba(17,122,101,.08)'}'" onmouseout="this.style.background='${bg}'">
+      <td style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:800;color:#1a5276;font-size:13px">${i+1}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06);min-width:150px">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>
+          <span style="font-weight:700;color:#1a2535;font-size:13px">${p.type||'-'}</span>
+        </div>
+        ${p.category?`<span style="font-size:10px;color:#888;background:#f0f4f8;border-radius:10px;padding:2px 8px;display:inline-block;margin-top:3px">${p.category}</span>`:''}
+        ${p.clientName&&p.clientName!==p.desc?`<div style="font-size:11px;color:#7d3c98;margin-top:3px">👤 ${p.clientName}</div>`:''}
+        ${p.supplierId?`<div style="font-size:11px;color:#d68910;margin-top:2px">🏢 مورد</div>`:''}
       </td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#555;max-width:240px">
-        <div style="font-weight:600;color:#333">${p.desc||p.clientName||'-'}</div>
-        ${linkedBk?`<div style="font-size:11px;color:#555;margin-top:2px;line-height:1.7">دخول: ${linkedBk.checkin||'-'}<br>خروج: ${linkedBk.checkout||'-'}<br>الشقق: ${(linkedBk.apts||[]).join('، ')||'-'}</div>`:''}
-        ${p.date&&!linkedBk?`<div style="font-size:11px;color:#aaa;margin-top:1px">${p.date}</div>`:''}
+      <td style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06);font-size:12px;max-width:200px">
+        <div style="font-weight:600;color:#333;line-height:1.5">${p.desc||p.clientName||'-'}</div>
+        ${linkedBk?`<div style="font-size:10px;color:#888;margin-top:3px;line-height:1.7;background:#f8fafc;border-radius:6px;padding:3px 7px">📅 ${linkedBk.checkin||'-'} → ${linkedBk.checkout||'-'}<br>🏠 ${(linkedBk.apts||[]).join('، ')||'-'}</div>`:''}
+        ${p.date?`<div style="font-size:10px;color:#bbb;margin-top:2px">📆 ${p.date}</div>`:''}
       </td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:left;font-weight:800;font-size:15px;color:${isDr?'#c0392b':'#ccc'}">${isDr?p.amount.toLocaleString():'-'}</td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:left;font-weight:800;font-size:15px;color:${!isDr?'#117a65':'#ccc'}">${!isDr?p.amount.toLocaleString():'-'}</td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:12px;color:#888">1</td>
-      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:12px;font-weight:700;color:#7d3c98">ج.م</td>
+      <td style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);text-align:center">
+        ${isDr?`<span style="display:inline-block;background:rgba(192,57,43,.1);color:#c0392b;font-weight:800;font-size:14px;padding:4px 10px;border-radius:8px;min-width:80px">${p.amount.toLocaleString()}</span>`:`<span style="color:#ddd;font-size:12px">—</span>`}
+      </td>
+      <td style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);text-align:center">
+        ${!isDr?`<span style="display:inline-block;background:rgba(17,122,101,.1);color:#117a65;font-weight:800;font-size:14px;padding:4px 10px;border-radius:8px;min-width:80px">${p.amount.toLocaleString()}</span>`:`<span style="color:#ddd;font-size:12px">—</span>`}
+      </td>
+      <td style="padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06);text-align:center;font-size:11px;color:#aaa;font-weight:700">ج.م</td>
     </tr>`;
   }).join('');
 
   const balanced=Math.abs(totalDr-totalCr)<0.01;
   
   overlay.innerHTML=`
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.35);direction:rtl;font-family:Cairo,Arial,sans-serif">
-      <div style="background:linear-gradient(135deg,#1a3a5c,#1a5276);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start">
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-            <span style="font-size:18px;font-weight:800;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 10px">J-${e.id}</span>
-            <span style="font-size:13px;opacity:.85">${e.date||'-'}</span>
-            ${e.bookingRef&&!e.bookingRef.startsWith('pair_')?`<span style="background:rgba(255,255,255,.15);border-radius:6px;padding:2px 10px;font-size:12px">حجز #${e.bookingRef}</span>`:''}
-            ${pairRef&&pairRef.startsWith('pair_')?`<span style="background:rgba(255,193,7,.25);border-radius:6px;padding:2px 10px;font-size:12px">قيد مزدوج · ${paired.length} أطراف</span>`:''}
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:660px;overflow:hidden;box-shadow:0 32px 100px rgba(0,0,0,.4);direction:rtl;font-family:Cairo,Arial,sans-serif;animation:slideUpModal .25s cubic-bezier(.34,1.56,.64,1)">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#0d2137,#1a5276,#1a7a65);color:#fff;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="background:rgba(255,255,255,.18);border-radius:8px;padding:3px 11px;font-size:13px;font-weight:800;letter-spacing:.5px">📋 J-${e.id}</div>
+            <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:3px 10px;font-size:12px">${e.date||'-'}</div>
+            ${e.bookingRef&&!e.bookingRef.startsWith('pair_')?`<div style="background:rgba(255,255,255,.1);border-radius:8px;padding:3px 10px;font-size:12px">حجز #${e.bookingRef}</div>`:''}
+            ${pairRef&&pairRef.startsWith('pair_')?`<div style="background:rgba(255,193,7,.3);border-radius:8px;padding:3px 10px;font-size:12px;color:#ffe082">⚖ قيد مزدوج · ${paired.length} أطراف</div>`:''}
           </div>
-          <div style="font-size:16px;font-weight:800">${e.desc||e.clientName||'قيد حسابي'}</div>
-          ${e.type?`<div style="font-size:12px;opacity:.8;margin-top:3px">${e.type}${e.category?' · '+e.category:''}</div>`:''}
+          <div style="font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.desc||e.clientName||'قيد حسابي'}</div>
+          ${e.type?`<div style="font-size:11px;opacity:.75;margin-top:4px">💳 ${e.type}${e.category?' · '+e.category:''}</div>`:''}
         </div>
-        <button onclick="document.getElementById('entry-popup-overlay').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:8px">✕</button>
+        <button onclick="(()=>{const o=document.getElementById('entry-popup-overlay');o.style.opacity='0';o.style.transition='opacity .15s';setTimeout(()=>o.remove(),150)})()" style="background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.25);color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.28)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">✕</button>
       </div>
-      <div style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+      <!-- Totals bar -->
+      <div style="display:grid;grid-template-columns:1fr 1fr ${paired.length>1?'1fr':'0fr'};background:#f8fafc;border-bottom:1px solid #e8eff7;padding:12px 20px;gap:12px">
+        <div style="text-align:center"><div style="font-size:10px;color:#c0392b;font-weight:700;margin-bottom:2px;text-transform:uppercase">إجمالي مدين Dr</div><div style="font-size:20px;font-weight:800;color:#c0392b">${totalDr.toLocaleString()} <span style="font-size:11px">ج</span></div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:#117a65;font-weight:700;margin-bottom:2px;text-transform:uppercase">إجمالي دائن Cr</div><div style="font-size:20px;font-weight:800;color:#117a65">${totalCr.toLocaleString()} <span style="font-size:11px">ج</span></div></div>
+        ${paired.length>1?`<div style="text-align:center;display:flex;align-items:center;justify-content:center"><div style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;background:${balanced?'rgba(17,122,101,.1)':'rgba(192,57,43,.1)'};color:${balanced?'#117a65':'#c0392b'};border:1.5px solid ${balanced?'rgba(17,122,101,.3)':'rgba(192,57,43,.3)'}">${balanced?'✓ متوازن':'⚠ غير متوازن'}</div></div>`:''}
+      </div>
+      <!-- Table -->
+      <div style="overflow-x:auto;max-height:52vh;overflow-y:auto">
         <table style="width:100%;border-collapse:collapse;font-family:Cairo,Arial,sans-serif">
-          <thead style="position:sticky;top:0">
-            <tr style="background:#f4f7fb">
-              <th style="padding:9px 10px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700;white-space:nowrap">#</th>
-              <th style="padding:9px 10px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700">اسم الحساب</th>
-              <th style="padding:9px 10px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700">البيان / الملاحظات</th>
-              <th style="padding:9px 10px;text-align:left;font-size:11px;color:#c0392b;border-bottom:2px solid #d6eaf8;font-weight:700;white-space:nowrap">مدين Dr</th>
-              <th style="padding:9px 10px;text-align:left;font-size:11px;color:#117a65;border-bottom:2px solid #d6eaf8;font-weight:700;white-space:nowrap">دائن Cr</th>
-              <th style="padding:9px 10px;text-align:center;font-size:11px;color:#7d3c98;border-bottom:2px solid #d6eaf8;font-weight:700;white-space:nowrap">معدل</th>
-              <th style="padding:9px 10px;text-align:center;font-size:11px;color:#7d3c98;border-bottom:2px solid #d6eaf8;font-weight:700;white-space:nowrap">العملة</th>
+          <thead style="position:sticky;top:0;z-index:1">
+            <tr style="background:linear-gradient(135deg,#f4f7fb,#edf2f9)">
+              <th style="padding:10px 12px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700">#</th>
+              <th style="padding:10px 12px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700">الحساب</th>
+              <th style="padding:10px 12px;text-align:right;font-size:11px;color:#1a5276;border-bottom:2px solid #d6eaf8;font-weight:700">البيان</th>
+              <th style="padding:10px 12px;text-align:center;font-size:11px;color:#c0392b;border-bottom:2px solid #d6eaf8;font-weight:700">مدين Dr</th>
+              <th style="padding:10px 12px;text-align:center;font-size:11px;color:#117a65;border-bottom:2px solid #d6eaf8;font-weight:700">دائن Cr</th>
+              <th style="padding:10px 12px;text-align:center;font-size:11px;color:#888;border-bottom:2px solid #d6eaf8;font-weight:700">عملة</th>
             </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot>
-            <tr style="background:#fef9e7">
-              <td colspan="3" style="padding:10px 12px;font-weight:800;color:#7d6608;font-size:13px">الإجمالي</td>
-              <td style="padding:10px 12px;font-weight:800;color:#c0392b;font-size:15px;text-align:left">${totalDr.toLocaleString()}</td>
-              <td style="padding:10px 12px;font-weight:800;color:#117a65;font-size:15px;text-align:left">${totalCr.toLocaleString()}</td>
-              <td colspan="2" style="padding:10px 12px;text-align:center;color:#aaa;font-size:12px">ج.م</td>
+            <tr style="background:linear-gradient(135deg,#fef9e7,#fdf5d3)">
+              <td colspan="3" style="padding:11px 14px;font-weight:800;color:#7d6608;font-size:13px">الإجمالي</td>
+              <td style="padding:11px 14px;font-weight:800;color:#c0392b;font-size:16px;text-align:center">${totalDr.toLocaleString()}</td>
+              <td style="padding:11px 14px;font-weight:800;color:#117a65;font-size:16px;text-align:center">${totalCr.toLocaleString()}</td>
+              <td style="padding:11px 14px;text-align:center;color:#aaa;font-size:11px">ج.م</td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <div style="padding:10px 16px;background:${balanced?'#f0fff8':'#fff8f8'};border-top:1px solid ${balanced?'#d5f5e3':'#fadbd8'};font-size:13px;font-weight:700;color:${balanced?'#117a65':'#c0392b'}">
-        ${balanced?'✓ القيد متوازن':'⚠ غير متوازن · فرق: '+Math.abs(totalDr-totalCr).toLocaleString()+' ج'}
+      <!-- Balance status -->
+      <div style="padding:10px 20px;background:${balanced?'linear-gradient(135deg,#f0fff8,#e8fff5)':'linear-gradient(135deg,#fff8f8,#ffe8e8)'};border-top:2px solid ${balanced?'rgba(17,122,101,.15)':'rgba(192,57,43,.15)'};font-size:13px;font-weight:700;color:${balanced?'#117a65':'#c0392b'};display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">${balanced?'✅':'⚠️'}</span>
+        ${balanced?'القيد متوازن بشكل صحيح':'القيد غير متوازن · الفرق: '+Math.abs(totalDr-totalCr).toLocaleString()+' ج'}
       </div>
-      <div style="padding:12px 16px;display:flex;gap:7px;justify-content:flex-end;background:#f8fafc;border-top:1px solid #eee">
-        <button onclick="startEntryEditInline(${e.id})" class="btn btn-sm">✏ تعديل</button>
+      <!-- Actions -->
+      <div style="padding:14px 20px;display:flex;gap:8px;justify-content:flex-end;background:#f8fafc;border-top:1px solid #eef2f8;flex-wrap:wrap">
+        <button onclick="startEntryEditInline(${e.id})" class="btn btn-sm" style="background:#fff;border-color:#d6eaf8;color:#1a5276">✏ تعديل</button>
         <button onclick="document.getElementById('entry-popup-overlay').remove();delAccE(${e.id})" class="btn btn-d btn-sm">🗑 حذف</button>
         <button onclick="window.printEntryPopup && window.printEntryPopup(${e.id})" class="btn btn-sm" style="background:var(--wnl);color:var(--wn);border-color:var(--wn)">🖨 طباعة</button>
-        <button onclick="document.getElementById('entry-popup-overlay').remove()" class="btn btn-p btn-sm">إغلاق</button>
+        <button onclick="(()=>{const o=document.getElementById('entry-popup-overlay');o.style.opacity='0';o.style.transition='opacity .15s';setTimeout(()=>o.remove(),150)})()" class="btn btn-p btn-sm">إغلاق</button>
       </div>
-      <div id="entry-edit-inline-${e.id}" style="display:none;padding:14px 16px;border-top:1px solid #eee;background:#fff">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><label style="font-size:11px;font-weight:700;color:var(--tx2)">المبلغ</label><input type="number" id="ea-${e.id}" value="${e.amount}" style="width:100%;font-size:14px;padding:7px 10px;border:1.5px solid #d6eaf8;border-radius:8px;margin-top:3px"></div>
-          <div><label style="font-size:11px;font-weight:700;color:var(--tx2)">البيان</label><input type="text" id="ed-${e.id}" value="${e.desc||''}" style="width:100%;font-size:14px;padding:7px 10px;border:1.5px solid #d6eaf8;border-radius:8px;margin-top:3px"></div>
+      <!-- Inline edit -->
+      <div id="entry-edit-inline-${e.id}" style="display:none;padding:16px 20px;border-top:2px solid #d6eaf8;background:linear-gradient(135deg,#f0f8ff,#f8fafc)">
+        <div style="font-size:13px;font-weight:700;color:#1a5276;margin-bottom:10px">✏ تعديل القيد</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><label style="font-size:11px;font-weight:700;color:#4a6278;display:block;margin-bottom:4px">المبلغ (ج)</label><input type="number" id="ea-${e.id}" value="${e.amount}" style="width:100%;font-size:14px;padding:8px 12px;border:1.5px solid #d6eaf8;border-radius:10px;font-family:Cairo,sans-serif;outline:none" onfocus="this.style.borderColor='#2471a3'" onblur="this.style.borderColor='#d6eaf8'"></div>
+          <div><label style="font-size:11px;font-weight:700;color:#4a6278;display:block;margin-bottom:4px">البيان</label><input type="text" id="ed-${e.id}" value="${e.desc||''}" style="width:100%;font-size:14px;padding:8px 12px;border:1.5px solid #d6eaf8;border-radius:10px;font-family:Cairo,sans-serif;outline:none" onfocus="this.style.borderColor='#2471a3'" onblur="this.style.borderColor='#d6eaf8'"></div>
         </div>
-        <button onclick="saveEe(${e.id}).then(()=>document.getElementById('entry-popup-overlay').remove())" class="btn btn-s">حفظ التعديل</button>
+        <button onclick="saveEe(${e.id}).then(()=>document.getElementById('entry-popup-overlay').remove())" class="btn btn-s" style="border-radius:10px">💾 حفظ التعديل</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -6134,7 +6243,9 @@ function mHB(r){
     adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',
     total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],
     status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',
-    createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''
+    createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',
+    busSeats:r.bus_seats||0,busSeatPrice:r.bus_seat_price||0,transportTotal:r.transport_total||0,
+    pickup:r.pickup||'',dropoff:r.dropoff||'',transportNote:r.transport_note||''
   };
 }
 
@@ -6182,7 +6293,9 @@ function renderHotelBookings(){
   });
   const tb=document.getElementById('htl-tbl');if(!tb)return;
   if(!list.length){tb.innerHTML='<tr><td colspan="12" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد حجوزات</td></tr>';return;}
-  tb.innerHTML=list.map(b=>`<tr>
+  tb.innerHTML=list.map(b=>{
+    const hasTransport=(b.busSeats||b.bus_seats||0)>0;
+    return`<tr>
     <td style="font-weight:700">${b.name}</td>
     <td style="font-size:11px">${b.phone||'—'}</td>
     <td>${b.hotelName||'—'}</td>
@@ -6191,14 +6304,15 @@ function renderHotelBookings(){
     <td><span class="badge b-gy" style="font-size:10px">${b.checkout}</span></td>
     <td style="text-align:center">${b.rooms} × ${roomLabel(b.roomType)}</td>
     <td style="text-align:center">${(b.adults||0)+(b.children||0)}</td>
-    <td style="font-weight:700">${b.total.toLocaleString()} ج</td>
+    <td style="font-weight:700">${b.total.toLocaleString()} ج${hasTransport?`<br><span style="font-size:10px;color:var(--pr)">🚌 ${(b.busSeats||b.bus_seats||0)} كرسي</span>`:''}${(b.pickup||b.dropoff)?`<br><span style="font-size:10px;color:var(--ac)">📍 ${b.pickup||''}${b.dropoff&&b.pickup?' ← '+b.dropoff:b.dropoff||''}</span>`:''}</td>
     <td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'};font-weight:700">${b.remaining.toLocaleString()} ج</td>
     <td>${htlStatusBadge(b.status)}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-sm" onclick="printHotelReceipt(${b.id})" style="padding:2px 8px;font-size:11px;background:var(--acl);color:var(--ac);border-color:var(--ac)">🖨</button>
       <button class="btn btn-sm btn-p" onclick="editHotelBooking(${b.id})" style="padding:2px 8px;font-size:11px">✏</button>
       <button class="btn btn-sm btn-d" onclick="deleteHotelBooking(${b.id})" style="padding:2px 8px;font-size:11px">🗑</button>
-    </td></tr>`).join('');
+    </td></tr>`;
+  }).join('');
 }
 
 function renderHotelList(){
@@ -6295,11 +6409,55 @@ function clearHotelForm(){
   document.getElementById('htl-cancel-edit').style.display='none';
 }
 
+// Transport pickup cities per destination
+const HTL_TRANSPORT_CITIES={
+  'شرم الشيخ':[
+    'القاهرة - ميدان التحرير','القاهرة - مدينة نصر','القاهرة - المعادي',
+    'القاهرة - حلوان','القاهرة - 6 أكتوبر','الجيزة - الهرم',
+    'الجيزة - فيصل','القاهرة الجديدة - مدينتي','القاهرة الجديدة - الرحاب',
+    'السويس','الإسماعيلية','بور سعيد','طنطا','المنصورة','الإسكندرية'
+  ],
+  'الغردقة':[
+    'القاهرة - ميدان التحرير','القاهرة - مدينة نصر','القاهرة - المعادي',
+    'القاهرة - 6 أكتوبر','الجيزة - الهرم','الجيزة - فيصل',
+    'القاهرة الجديدة - مدينتي','القاهرة الجديدة - الرحاب',
+    'السويس','الإسماعيلية','بني سويف','المنيا','أسيوط','طنطا'
+  ],
+  'العين السخنة':[
+    'القاهرة - ميدان التحرير','القاهرة - مدينة نصر','القاهرة - المعادي',
+    'القاهرة - حلوان','القاهرة - 6 أكتوبر','الجيزة - الهرم',
+    'الجيزة - فيصل','القاهرة الجديدة - مدينتي','القاهرة الجديدة - الرحاب',
+    'السويس','طنطا','المنصورة','الإسكندرية'
+  ],
+  'دهب':[
+    'القاهرة - ميدان التحرير','القاهرة - مدينة نصر','القاهرة - المعادي',
+    'القاهرة - حلوان','القاهرة - 6 أكتوبر','الجيزة - الهرم',
+    'شرم الشيخ - المطار','شرم الشيخ - النعمة باي','طابا'
+  ]
+};
+
+function populateHotelTransportCities(dest){
+  const cities=(dest&&HTL_TRANSPORT_CITIES[dest])||Object.values(HTL_TRANSPORT_CITIES).flat().filter((v,i,a)=>a.indexOf(v)===i).sort();
+  const baseOpt='<option value="">-- اختار --</option><option value="أخرى">أخرى / يحدده العميل</option>';
+  const opts=baseOpt+cities.map(c=>`<option value="${c}">${c}</option>`).join('');
+  ['hbk-pickup','hbk-dropoff'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML=opts;
+    if(cur)sel.value=cur;
+  });
+}
+
 function filterHotelsByDest(){
   const dest=document.getElementById('hbk-dest')?.value||'';
   const sel=document.getElementById('hbk-hotel');if(!sel)return;
   const filtered=dest?hotels.filter(h=>h.destination===dest):hotels;
-  sel.innerHTML='<option value="">-- اختار الفندق --</option>'+filtered.map(h=>`<option value="${h.id}" data-ps="${h.price_single||0}" data-pd="${h.price_double||0}">${h.name}</option>`).join('');
+  sel.innerHTML='<option value="">-- اختار الفندق --</option>'+filtered.map(h=>{
+    const stars='⭐'.repeat(h.stars||0);
+    return `<option value="${h.id}" data-ps="${h.price_single||0}" data-pd="${h.price_double||0}">${stars} ${h.name}</option>`;
+  }).join('');
+  populateHotelTransportCities(dest);
   calcHotelTotal();
 }
 
@@ -6317,8 +6475,14 @@ function calcHotelTotal(){
   const priceN=parseFloat(document.getElementById('hbk-price-night')?.value)||0;
   const rooms=parseInt(document.getElementById('hbk-rooms')?.value)||1;
   const disc=parseFloat(document.getElementById('hbk-disc')?.value)||0;
+  const busSeats=parseInt(document.getElementById('hbk-bus-seats')?.value)||0;
+  const busSeatPrice=parseFloat(document.getElementById('hbk-bus-seat-price')?.value)||0;
+  const transportTotal=busSeats*busSeatPrice;
+  const tEl=document.getElementById('hbk-transport-total');
+  if(tEl)tEl.textContent=(transportTotal>0?transportTotal.toLocaleString():0)+' ج';
   let nights=0;if(ci&&co){const d=(new Date(co)-new Date(ci))/(864e5);nights=d>0?d:0;}
-  const total=Math.max(0,nights*priceN*rooms-disc);
+  const roomTotal=Math.max(0,nights*priceN*rooms-disc);
+  const total=roomTotal+transportTotal;
   let paid=0;
   document.querySelectorAll('#hbk-pay-cont .pay-row').forEach(row=>{paid+=parseFloat(row.querySelector('.pay-amt')?.value)||0;});
   const rem=Math.max(0,total-paid);
@@ -6333,6 +6497,11 @@ function calcHotelTotal(){
     else if(id==='hts-paid')el.textContent=paid.toLocaleString()+' ج';
     else if(id==='hts-rem')el.textContent=rem.toLocaleString()+' ج';
   });
+  // Transport summary row
+  const tAmtEl=document.getElementById('hts-transport-amt');
+  const tRowEl=document.getElementById('hts-transport-row');
+  if(tAmtEl)tAmtEl.textContent=transportTotal.toLocaleString()+' ج';
+  if(tRowEl)tRowEl.style.display=transportTotal>0?'':'none';
 }
 
 function addHotelPayRow(data){
@@ -6441,6 +6610,9 @@ tr:nth-child(even) td{background:#f8fafc}
   <div class="tr"><span>عدد الليالي</span><span>${b.nights||0}</span></div>
   <div class="tr"><span>عدد الغرف</span><span>${b.rooms||1}</span></div>
   ${(b.disc||0)>0?`<div class="tr disc"><span>خصم${b.discReason?' ('+b.discReason+')':''}</span><span>- ${(b.disc||0).toLocaleString()} ج</span></div>`:''}
+  ${(b.transportTotal||0)>0?`<div class="tr" style="color:#1a5276"><span>🚌 انتقالات (${b.busSeats||0} كرسي × ${(b.busSeatPrice||0).toLocaleString()} ج)</span><span style="font-weight:700">${(b.transportTotal||0).toLocaleString()} ج</span></div>`:''}
+  ${(b.pickup||b.dropoff)?`<div class="tr" style="font-size:12px;color:#555"><span>مكان الركوب / النزول</span><span>${b.pickup||'—'}${b.dropoff?' ← '+b.dropoff:''}</span></div>`:''}
+  ${b.transportNote?`<div class="tr" style="font-size:11px;color:#888"><span>ملاحظة الانتقالات</span><span>${b.transportNote}</span></div>`:''}
   <div class="tr big"><span>الإجمالي الكلي</span><span>${(b.total||0).toLocaleString()} ج</span></div>
   <div class="tr grn"><span>المدفوع</span><span>${(b.paid||0).toLocaleString()} ج</span></div>
   <div class="tr red"><span>المتبقي</span><span>${(b.remaining||0).toLocaleString()} ج</span></div>
@@ -6489,9 +6661,15 @@ async function saveHotelBooking(){
   if(nights<=0){alert('تاريخ الخروج يجب أن يكون بعد الدخول');return;}
   const payments=getHotelPayments();
   const paid=payments.reduce((s,p)=>s+p.amount,0);
-  const total=Math.max(0,nights*priceN*rooms-disc);
+  const busSeats=parseInt(document.getElementById('hbk-bus-seats')?.value)||0;
+  const busSeatPrice=parseFloat(document.getElementById('hbk-bus-seat-price')?.value)||0;
+  const transportTotal=busSeats*busSeatPrice;
+  const pickup=document.getElementById('hbk-pickup')?.value||'';
+  const dropoff=document.getElementById('hbk-dropoff')?.value||'';
+  const transportNote=(document.getElementById('hbk-transport-note')?.value||'').trim();
+  const total=Math.max(0,nights*priceN*rooms-disc)+transportTotal;
   const remaining=Math.max(0,total-paid);
-  const payload={name,phone,destination:dest,hotel_id:hotelId?parseInt(hotelId):null,hotel_name:hotelName.replace(/^-- اختار الفندق --/,''),checkin:ci,checkout:co,nights,room_type:rtype,rooms,price_per_night:priceN,adults,children,disc,disc_reason:discReason,total,paid,remaining,payments,status,notes,sales_rep:salesRep,created_by:currentUser?.name||''};
+  const payload={name,phone,destination:dest,hotel_id:hotelId?parseInt(hotelId):null,hotel_name:hotelName.replace(/^-- اختار الفندق --/,''),checkin:ci,checkout:co,nights,room_type:rtype,rooms,price_per_night:priceN,adults,children,disc,disc_reason:discReason,total,paid,remaining,payments,status,notes,sales_rep:salesRep,created_by:currentUser?.name||'',bus_seats:busSeats,bus_seat_price:busSeatPrice,transport_total:transportTotal,pickup,dropoff,transport_note:transportNote};
   try{
     let savedBk=null;
     if(editId){
@@ -6550,6 +6728,15 @@ function editHotelBooking(id){
       document.getElementById('hbk-disc-reason').value=b.discReason||'';
       document.getElementById('hbk-status').value=b.status||'pending';
       document.getElementById('hbk-notes').value=b.notes||'';
+      // Transport fields
+      const bsEl=document.getElementById('hbk-bus-seats');if(bsEl)bsEl.value=b.busSeats||b.bus_seats||0;
+      const bspEl=document.getElementById('hbk-bus-seat-price');if(bspEl)bspEl.value=b.busSeatPrice||b.bus_seat_price||0;
+      const tnEl=document.getElementById('hbk-transport-note');if(tnEl)tnEl.value=b.transportNote||b.transport_note||'';
+      populateHotelTransportCities(b.dest);
+      setTimeout(()=>{
+        const pu=document.getElementById('hbk-pickup');if(pu)pu.value=b.pickup||'';
+        const du=document.getElementById('hbk-dropoff');if(du)du.value=b.dropoff||'';
+      },50);
       const ce=document.getElementById('hbk-cancel-edit');if(ce)ce.style.display='';
       document.getElementById('hbk-pay-cont').innerHTML='';
       (b.payments||[]).forEach(p=>addHotelPayRow(p));
@@ -6571,13 +6758,14 @@ async function deleteHotelBooking(id){
 
 function clearHotelBookingForm(){
   document.getElementById('hbk-edit-id').value='';
-  ['hbk-name','hbk-phone','hbk-checkin','hbk-checkout','hbk-disc-reason','hbk-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['hbk-name','hbk-phone','hbk-checkin','hbk-checkout','hbk-disc-reason','hbk-notes','hbk-transport-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const ri=document.getElementById('hbk-rooms');if(ri)ri.value=1;
-  ['hbk-adults','hbk-children','hbk-disc','hbk-price-night'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=0;});
-  ['hbk-dest','hbk-hotel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['hbk-adults','hbk-children','hbk-disc','hbk-price-night','hbk-bus-seats','hbk-bus-seat-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=0;});
+  ['hbk-dest','hbk-hotel','hbk-pickup','hbk-dropoff'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const ss=document.getElementById('hbk-status');if(ss)ss.value='pending';
   document.getElementById('hbk-pay-cont').innerHTML='';
   const ce=document.getElementById('hbk-cancel-edit');if(ce)ce.style.display='none';
+  const tt=document.getElementById('hbk-transport-total');if(tt)tt.textContent='0 ج';
   calcHotelTotal();
 }
 </script>

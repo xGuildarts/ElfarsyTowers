@@ -1777,7 +1777,7 @@ function getConvoys(){
 const CONVOYS=getConvoys();
 function getConv(n){return CONVOYS.find(c=>c.num===n)}
 function activeBookings(){return bookings.filter(b=>b.status!=='cancelled');}
-function bookedApts(cn,excId){return activeBookings().filter(b=>b.convoy===cn&&b.id!==excId).flatMap(b=>b.apts)}
+function bookedApts(cn,excId){return activeBookings().filter(b=>b.convoy===cn&&b.id!==excId).flatMap(b=>b.apts).concat(activeBookings().filter(b=>b.convoy2===cn&&b.id!==excId).flatMap(b=>b.apts2||[]))}
 function aptSeats2(b){return(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);}
 // كراسي الفوج الأول فقط (للباص والحساب)
 function effSeats(b){return Math.max(0,(b.seats||0)+(b.extraSeats||0)-(b.seatDiscount||0))}
@@ -2543,7 +2543,7 @@ function renderBusLayout(cn,busIdx){
       ${returnClients.map(b=>{
         const conv1=getConv(b.convoy);
         const assignedCount=(b.seatAssign2||[]).filter(sa=>sa.seatNum).length;
-        const totalNeeded=effSeats(b);
+        const totalNeeded=aptSeats2(b);
         const hasAllSeats=assignedCount>=totalNeeded&&totalNeeded>0;
         const seatLabel=totalNeeded>1?(assignedCount+'/'+totalNeeded+' مقاعد'):(assignedCount>0?'✓ له مقعد':'بدون مقعد');
         return '<div draggable="true" ondragstart="poolDragInfo={bookingId:'+b.id+',assignIdx:'+assignedCount+',isReturn2:true};dragInfo=null;event.dataTransfer.effectAllowed=\'move\'" style="background:var(--pu);color:#fff;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:80px;border:2px solid #f9e79f;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
@@ -2599,7 +2599,7 @@ async function busDrop(e,cn,toSn){
       // Dropping a return-trip client (convoy2=cn) into a seat - use seatAssign2
       const b=bookings.find(x=>x.id===bookingId);if(!b)return;
       if(!b.seatAssign2)b.seatAssign2=[];
-      const totalNeeded=effSeats(b);
+      const totalNeeded=aptSeats2(b);
       // Check if seat already taken by another return client
       const occ2check={};
       activeBookings().filter(bb=>bb.convoy2===cn).forEach(bb=>{(bb.seatAssign2||[]).forEach(sa=>{if(sa.seatNum&&bb.id!==bookingId)occ2check[sa.seatNum]=true;});});
@@ -3809,6 +3809,7 @@ function printReceipt(id){
   const fmtTxt=t=>{if(!t)return'';if(/<[a-z]/i.test(t))return t;return t.replace(/\r/g,'').replace(/\n/g,'<br>');};
   const notesHtml=fmtTxt(settings.notes||m.notes||'');
   const aR=(b.apts||[]).map(a=>`<tr><td style="font-weight:700">${a}</td><td>${APTS[a]?.desc||''}</td><td style="font-weight:700;text-align:left">${((b.aptPrices||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
+  const aR2=(b.apts2||[]).map(a=>`<tr><td style="font-weight:700">${a}</td><td>${APTS[a]?.desc||''} <span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">فوج 2</span></td><td style="font-weight:700;text-align:left">${((b.aptPrices2||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
   const pR=(b.payments||[]).map(p=>`<tr><td>${p.date||'-'}</td><td style="font-weight:700">${p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center">—</td></tr>';
   const as=(b.seatAssign||[]).filter(s=>s.seatNum).map(s=>s.seatNum).join('، ');
   const baseS=b.seats||0;
@@ -3880,7 +3881,7 @@ table{table-layout:fixed;word-wrap:break-word}</style></head><body>
   ${as?`<div class="row"><span class="l">مقاعد الباص</span><span style="font-weight:700">${as}</span></div>`:''}
   <div class="row"><span class="l">المسؤول</span><span>${b.createdBy||'-'}</span></div>
 </div>
-${aR?`<div class="sec"><div class="st">الشقق المحجوزة</div><table><thead><tr><th>رقم الشقة</th><th>الوصف</th><th>السعر</th></tr></thead><tbody>${aR}</tbody></table></div>`:''}
+${(aR||aR2)?`<div class="sec"><div class="st">الشقق المحجوزة</div><table><thead><tr><th>رقم الشقة</th><th>الوصف</th><th>السعر</th></tr></thead><tbody>${aR}${aR2}</tbody></table></div>`:''}
 <div class="sec"><div class="st">تفاصيل الحساب</div><div class="tot">
   ${(b.aptsTotal||0)>0?`<div class="tr"><span>إجمالي الشقق</span><span style="font-weight:700">${(b.aptsTotal||0).toLocaleString()} ج</span></div>`:''}
   ${baseS>0?`<div class="tr" style="color:#4a6278"><span>كراسي مشمولة بالشقة (${baseS} × 0 ج)</span><span style="font-weight:700">0 ج</span></div>`:''}

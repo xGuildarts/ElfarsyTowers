@@ -2368,8 +2368,8 @@ function viewClient(id){
         ${as2?`<div style="font-size:11px;color:var(--wn)">مقاعد الباص (عودة): ${as2}</div>`:''}
         ${b.seatNote?`<div style="font-size:11px;background:var(--wnl);border-radius:5px;padding:2px 7px;color:var(--wn);display:inline-block;margin-top:2px">🪑 ${b.seatNote}</div>`:''}
         <div style="font-size:12px;color:var(--gd);font-weight:600">🚌 ${getBusNames(b.convoy)[b.busIdx||0]||'الباص الأول'}</div>
-        ${b.convoy2?`<div style="font-size:12px;background:var(--wnl);border:1px solid var(--wn);border-radius:6px;padding:3px 8px;margin-top:3px;font-weight:700;color:var(--wn)">⚠ واخد فوجين — هيرجع مع فوج ${getConv(b.convoy2)?.label||b.convoy2} مش الفوج الأول</div>`:''}        
-        ${(b.adults||0)>0||(b.children||0)>0?`<div style="font-size:12px;color:var(--pu)">الأفراد: ${b.adults||0} كبار${(b.children||0)>0?' · '+(b.children||0)+' أطفال':''}</div>`:''}
+        ${b.convoy2?`<div style="font-size:18px;background:var(--wnl);border:1px solid var(--wn);border-radius:6px;padding:3px 8px;margin-top:3px;font-weight:700;color:var(--wn)">⚠ واخد فوجين — هيرجع مع فوج ${getConv(b.convoy2)?.label||b.convoy2} مش الفوج الأول</div>`:''}        
+        ${(b.adults||0)>0||(b.children||0)>0?`<div style="font-size:18px;color:var(--pu)">الأفراد: ${b.adults||0} كبار${(b.children||0)>0?' · '+(b.children||0)+' أطفال':''}</div>`:''}
         <div style="font-size:11px;color:var(--tx3)">المسؤول: ${b.createdBy||'—'}</div>
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">

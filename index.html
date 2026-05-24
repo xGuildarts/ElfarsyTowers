@@ -1948,7 +1948,14 @@ function renderSelBar2(){
 function renderAptPrices2(){
   const sec=document.getElementById('apt-p-sec-2'),rows=document.getElementById('apt-p-rows-2');
   if(!sec||!rows)return;
-  if(!selApts2.length){sec.style.display='none';return;}
+  if(!selApts2.length){sec.style.display='none';
+    // أعد حساب الكراسي بدون فوج ثاني
+    const base1=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+    document.getElementById('f-seats').value=base1;
+    document.getElementById('f-base-seats-disp').textContent=base1;
+    document.getElementById('f-total-seats-disp').textContent=base1;
+    calcTotal();return;
+  }
   sec.style.display='block';
   const cn2=parseInt(document.getElementById('f-convoy2')?.value)||0;
   const c2=getConv(cn2);
@@ -1957,6 +1964,13 @@ function renderAptPrices2(){
     const def=ci2?aptP(ci2,APTS[a].type):0;
     return `<div class="apr"><span class="an">${a}</span><span class="ad" style="flex:1">${APTS[a]?.desc||''}</span><input type="number" class="apt2-price" data-ap2="${a}" value="${def}" min="0" oninput="calcTotal()" style="width:100px;flex:none"><span style="font-size:11px;color:var(--tx2);align-self:center">ج</span></div>`;
   }).join('');
+  // أعد حساب الكراسي مع الفوج الثاني
+  const base1=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+  const base2=selApts2.reduce((s,a)=>s+APTS[a].seats,0);
+  const base=base1+base2;
+  document.getElementById('f-seats').value=base;
+  document.getElementById('f-base-seats-disp').textContent=base+(base2>0?` (${base1}+${base2})`:'');
+  document.getElementById('f-total-seats-disp').textContent=base;
   calcTotal();
 }
 function getAptPrices2(){const p={};document.querySelectorAll('[data-ap2]').forEach(i=>{p[i.dataset.ap2]=parseFloat(i.value)||0;});return p;}
@@ -2000,10 +2014,12 @@ function renderAptPrices(){
     const ex2={};rows.querySelectorAll('[data-ap]').forEach(i=>{ex2[i.dataset.ap]=i.value;});
     const price=ex2[a]!==undefined?parseFloat(ex2[a])||def:def;
     return `<div class="apr"><span class="an">${a}</span><span class="ad" style="flex:1">${APTS[a]?.desc||''}</span><span style="font-weight:700;color:var(--pr);min-width:90px">${price.toLocaleString()} ج</span><input type="hidden" data-ap="${a}" value="${price}"></div>`;}).join('');
-  // Auto base seats
-  const base=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+  // Auto base seats — فوج أول + فوج ثاني
+  const base1=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+  const base2=selApts2.reduce((s,a)=>s+APTS[a].seats,0);
+  const base=base1+base2;
   document.getElementById('f-seats').value=base;
-  document.getElementById('f-base-seats-disp').textContent=base;
+  document.getElementById('f-base-seats-disp').textContent=base+(base2>0?` (${base1}+${base2})`:'' );
   document.getElementById('f-total-seats-disp').textContent=base;
   document.getElementById('f-extra-seats').value=0;
   calcTotal();
@@ -2012,10 +2028,12 @@ function getAptPrices(){const p={};document.querySelectorAll('[data-ap]').forEac
 function calcTotal(){
   const ap=getAptPrices(),at=Object.values(ap).reduce((s,v)=>s+v,0);
   const ap2=getAptPrices2(),at2=Object.values(ap2).reduce((s,v)=>s+v,0);
-  const base=parseFloat(document.getElementById('f-seats').value)||0;
+  const base=parseFloat(document.getElementById('f-seats').value)||0; // شامل فوج 1 + فوج 2
   const extra=parseFloat(document.getElementById('f-extra-seats').value)||0;
+  const base1=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+  const base2=selApts2.reduce((s,a)=>s+APTS[a].seats,0);
   const totalSeats=base+extra;
-  document.getElementById('f-base-seats-disp').textContent=base;
+  document.getElementById('f-base-seats-disp').textContent=base+(base2>0?` (${base1}+${base2})`:'');
   document.getElementById('f-total-seats-disp').textContent=totalSeats;
   const sp=parseFloat(document.getElementById('f-seatp').value)||0;
   const sd=parseFloat(document.getElementById('f-seatd').value)||0;const sda=sd*600;
@@ -2075,9 +2093,13 @@ async function saveBooking(){
     const conflict2=bookedApts(convoy2Val).filter(a=>selApts2.includes(a));
     if(conflict2.length){alert('الشقق محجوزة في الفوج الثاني: '+conflict2.join(', '));return;}
   }
-  const base=parseInt(document.getElementById('f-seats').value)||0;
+  // كراسي الفوج الأول فقط
+  const base1=selApts.reduce((s,a)=>s+APTS[a].seats,0);
+  // كراسي الفوج الثاني فقط
+  const base2=convoy2Val?selApts2.reduce((s,a)=>s+APTS[a].seats,0):0;
+  const base=base1+base2; // الإجمالي المعروض
   const extra=parseInt(document.getElementById('f-extra-seats').value)||0;
-  const totalSeats=base+extra;
+  const totalSeats=base1+extra; // الكراسي الفعلية للذهاب فقط
   const sd=parseFloat(document.getElementById('f-seatd').value)||0;
   const netSeats=totalSeats-sd;
   const isExtra=convEffSeats(cn)+netSeats>MAX_SEATS;
@@ -2095,16 +2117,17 @@ async function saveBooking(){
     if(amt>0)pays.push({amount:amt,date:row.querySelector('.pd').value||new Date().toISOString().split('T')[0],payMethod:row.querySelector('.pp').value,note:row.querySelector('.pn').value});
   });
   const paid=pays.reduce((s,p)=>s+p.amount,0);
+  // sa = مقاعد الذهاب (كراسي الفوج الأول + إضافي)
   const sa=[];for(let i=0;i<Math.max(0,Math.round(netSeats));i++)sa.push({seatNum:null,extra:isExtra});
   const supSel=document.getElementById('f-sup-sel');
   const supplierId=pt==='supplier'&&supSel?parseInt(supSel.value)||null:null;
   const busIdxVal=parseInt(document.getElementById('f-bus-sel')?.value)||0;
   // convoy2 already computed above
-  // كراسي العودة = نفس عدد كراسي الذهاب
-  const sa2=convoy2Val?[...Array(Math.max(0,Math.round(netSeats))).keys()].map(()=>({seatNum:null,extra:false})):[];
+  // sa2 = مقاعد العودة (كراسي الفوج الثاني)
+  const sa2=convoy2Val?[...Array(Math.max(0,base2)).keys()].map(()=>({seatNum:null,extra:false})):[];
   const ap2=convoy2Val?getAptPrices2():{};
   const at2=Object.values(ap2).reduce((s,v)=>s+v,0);
-  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
+  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();
   if(drVal&&!payload.notes) payload.notes='خصم: '+drVal;

@@ -470,6 +470,16 @@ tr:hover td{background:#f5f8fc}
     <label style="color:var(--wn);font-weight:700;font-size:12px">🔁 فوج ثاني (اختياري) — العميل هيرجع مع الفوج التاني مش الأول</label>
     <select id="f-convoy2" onchange="onConv2Chg()" style="margin-top:4px;border-color:var(--wn)"><option value="">-- بدون فوج ثاني --</option></select>
     <div id="conv2-info" style="font-size:10px;color:var(--wn);margin-top:3px"></div>
+    <!-- Convoy2 apartments -->
+    <div id="conv2-apt-wrap" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px dashed var(--wn)">
+      <label style="color:var(--wn);font-size:12px;font-weight:700;margin-bottom:5px;display:block">🏠 شقق الفوج الثاني (اختياري)</label>
+      <div id="apt-grid-2" class="apt-grid"></div>
+      <div class="sbar" id="sel-bar-2" style="margin-top:5px"><span style="font-size:11px;color:var(--tx3);align-self:center">لم تختر شقة للفوج الثاني</span></div>
+      <div id="apt-p-sec-2" style="display:none;margin-top:.5rem">
+        <label style="font-size:11px;color:var(--wn);font-weight:700">أسعار شقق الفوج الثاني</label>
+        <div id="apt-p-rows-2"></div>
+      </div>
+    </div>
   </div>
   <div class="fg" style="max-width:220px"><label>الباص</label><select id="f-bus-sel"><option value="0">الباص الأول</option></select></div>
   <div class="fg"><label>اختار الشقق</label>
@@ -764,7 +774,9 @@ tr:hover td{background:#f5f8fc}
         <div class="fg"><label>الفندق <span class="req">*</span></label>
           <select id="hbk-hotel" onchange="onHotelSelect()">
             <option value="">-- اختار الفندق --</option>
+            <option value="__new__">➕ فندق غير موجود — اكتب الاسم</option>
           </select>
+          <input type="text" id="hbk-hotel-custom" placeholder="اكتب اسم الفندق..." style="display:none;margin-top:5px;border:1.5px solid var(--wn)">
         </div>
       </div>
       <div class="g3">
@@ -1436,7 +1448,7 @@ async function initApp(){
 }
 
 // Mappers
-function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
+function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,apts2:r.apts2||[],aptPrices2:r.apt_prices2||{},seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
 function mHB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',dest:r.destination||'',hotelId:r.hotel_id||null,hotelName:r.hotel_name||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:r.nights||0,roomType:r.room_type||'single',rooms:r.rooms||1,pricePerNight:r.price_per_night||0,adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mS(r){
@@ -1895,25 +1907,69 @@ function onConvChg(){
   populateConvoy2Sel();
   renderGrid();renderSelBar();renderAptPrices();calcTotal();
 }
+let selApts2=[]; // شقق الفوج الثاني
 function onConv2Chg(){
   const sel2=document.getElementById('f-convoy2');
   const info2=document.getElementById('conv2-info');
+  const wrap=document.getElementById('conv2-apt-wrap');
   const v=sel2?sel2.value:'';
+  selApts2=[];
   if(v){
     const cn2=parseInt(v);
     const c=getConv(cn2);
     if(c&&info2)info2.textContent='الفوج الثاني: دخول '+c.checkin+' · خروج '+c.checkout+' — العميل هيعدي الليلة الأخيرة مع الفوج الثاني';
+    if(wrap)wrap.style.display='block';
+    renderGrid2(cn2);renderSelBar2();renderAptPrices2();
   } else {
     if(info2)info2.textContent='';
+    if(wrap)wrap.style.display='none';
   }
+  calcTotal();
 }
+function renderGrid2(cn2){
+  if(!cn2){cn2=parseInt(document.getElementById('f-convoy2')?.value)||0;}
+  if(!cn2)return;
+  const bk=bookedApts(cn2);
+  document.getElementById('apt-grid-2').innerHTML=APT_LIST.map(a=>{
+    const ib=bk.includes(a),is=selApts2.includes(a);
+    return `<button class="ab ${ib?'bkd':is?'sel':'av'}" onclick="toggleApt2('${a}')" ${ib?'disabled':''}>${a}<br><span style="font-size:9px;opacity:.7">${APTS[a].type==='single'?'غرفة':'غرفتين'}</span></button>`;
+  }).join('');
+}
+function toggleApt2(a){
+  const cn2=parseInt(document.getElementById('f-convoy2')?.value)||0;
+  if(!cn2){alert('اختار الفوج الثاني أولاً');return;}
+  const i=selApts2.indexOf(a);if(i>=0)selApts2.splice(i,1);else selApts2.push(a);
+  renderGrid2(cn2);renderSelBar2();renderAptPrices2();calcTotal();
+}
+function renderSelBar2(){
+  const b=document.getElementById('sel-bar-2');if(!b)return;
+  b.innerHTML=selApts2.length?selApts2.map(a=>`<span class="stag">${a}<button onclick="toggleApt2('${a}')">×</button></span>`).join(''):'<span style="font-size:11px;color:var(--tx3);align-self:center">لم تختر شقة للفوج الثاني</span>';
+}
+function renderAptPrices2(){
+  const sec=document.getElementById('apt-p-sec-2'),rows=document.getElementById('apt-p-rows-2');
+  if(!sec||!rows)return;
+  if(!selApts2.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  const cn2=parseInt(document.getElementById('f-convoy2')?.value)||0;
+  const c2=getConv(cn2);
+  const ci2=c2?c2.checkin:'';
+  rows.innerHTML=selApts2.map(a=>{
+    const def=ci2?aptP(ci2,APTS[a].type):0;
+    return `<div class="apr"><span class="an">${a}</span><span class="ad" style="flex:1">${APTS[a]?.desc||''}</span><input type="number" class="apt2-price" data-ap2="${a}" value="${def}" min="0" oninput="calcTotal()" style="width:100px;flex:none"><span style="font-size:11px;color:var(--tx2);align-self:center">ج</span></div>`;
+  }).join('');
+  calcTotal();
+}
+function getAptPrices2(){const p={};document.querySelectorAll('[data-ap2]').forEach(i=>{p[i.dataset.ap2]=parseFloat(i.value)||0;});return p;}
 function populateConvoy2Sel(){
   const sel=document.getElementById('f-convoy2');
   if(!sel)return;
   const cn1=parseInt(document.getElementById('f-convoy').value)||0;
   sel.innerHTML='<option value="">-- بدون فوج ثاني --</option>'+CONVOYS.map(c=>{
     if(c.num===cn1)return ''; // skip same convoy
-    return `<option value="${c.num}" data-ci="${c.checkin}" data-co="${c.checkout}">${c.label}</option>`;
+    const locked=isConvLocked(c.num);
+    const canBook=canBookConvoy(c.num);
+    const lockLabel=locked?(canBypassLock()?' 🔒':' 🔒 مقفول'):'';
+    return `<option value="${c.num}" data-ci="${c.checkin}" data-co="${c.checkout}" ${!canBook?'disabled style="color:var(--tx3)"':''}>${c.label}${lockLabel}</option>`;
   }).join('');
 }
 
@@ -1955,6 +2011,7 @@ function renderAptPrices(){
 function getAptPrices(){const p={};document.querySelectorAll('[data-ap]').forEach(i=>{p[i.dataset.ap]=parseFloat(i.value)||0;});return p;}
 function calcTotal(){
   const ap=getAptPrices(),at=Object.values(ap).reduce((s,v)=>s+v,0);
+  const ap2=getAptPrices2(),at2=Object.values(ap2).reduce((s,v)=>s+v,0);
   const base=parseFloat(document.getElementById('f-seats').value)||0;
   const extra=parseFloat(document.getElementById('f-extra-seats').value)||0;
   const totalSeats=base+extra;
@@ -1967,11 +2024,11 @@ function calcTotal(){
   const disc=parseFloat(document.getElementById('f-disc').value)||0;
   const tfee=parseFloat(document.getElementById('f-transfer-fee')?.value)||0;
   const st=extra*sp; // only extra seats charged
-  const total=at+st+intT+tfee-sda-disc;
+  const total=at+at2+st+intT+tfee-sda-disc;
   let pd=0;document.querySelectorAll('.pa').forEach(i=>pd+=parseFloat(i.value)||0);
   const intDisp=document.getElementById('int-tot-disp');
   if(intDisp)intDisp.textContent=intT>0?`= ${intT.toLocaleString()} ج`:'';
-  document.getElementById('ts-a').textContent=at.toLocaleString()+' ج';
+  document.getElementById('ts-a').textContent=(at+(at2?at2:0)).toLocaleString()+' ج';
   document.getElementById('ts-s').textContent=st.toLocaleString()+' ج';
   document.getElementById('ts-int').textContent=intT.toLocaleString()+' ج';
   const tfeeLbl=document.getElementById('ts-fee-lbl');const tfeeVal=document.getElementById('ts-fee');const tfeeRow=document.getElementById('ts-fee-row');
@@ -2009,8 +2066,15 @@ async function saveBooking(){
   document.getElementById('f-convoy').classList.remove('err');
   pickup=document.getElementById('f-pickup').value;
   const cn=parseInt(cnv);
+  const convoy2Val=parseInt(document.getElementById('f-convoy2')?.value)||null;
+  // تحقق من تقفيل الفوج الثاني
+  if(convoy2Val&&isConvLocked(convoy2Val)&&!canBypassLock()){alert('الفوج الثاني مقفول — لا يمكن الحجز');return;}
   const conflict=bookedApts(cn).filter(a=>selApts.includes(a));
-  if(conflict.length){alert('الشقق محجوزة: '+conflict.join(', '));return;}
+  if(conflict.length){alert('الشقق محجوزة في الفوج الأول: '+conflict.join(', '));return;}
+  if(convoy2Val&&selApts2.length){
+    const conflict2=bookedApts(convoy2Val).filter(a=>selApts2.includes(a));
+    if(conflict2.length){alert('الشقق محجوزة في الفوج الثاني: '+conflict2.join(', '));return;}
+  }
   const base=parseInt(document.getElementById('f-seats').value)||0;
   const extra=parseInt(document.getElementById('f-extra-seats').value)||0;
   const totalSeats=base+extra;
@@ -2035,9 +2099,12 @@ async function saveBooking(){
   const supSel=document.getElementById('f-sup-sel');
   const supplierId=pt==='supplier'&&supSel?parseInt(supSel.value)||null:null;
   const busIdxVal=parseInt(document.getElementById('f-bus-sel')?.value)||0;
-  const convoy2Val=parseInt(document.getElementById('f-convoy2')?.value)||null;
+  // convoy2 already computed above
+  // كراسي العودة = نفس عدد كراسي الذهاب
   const sa2=convoy2Val?[...Array(Math.max(0,Math.round(netSeats))).keys()].map(()=>({seatNum:null,extra:false})):[];
-  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at,seats:base,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
+  const ap2=convoy2Val?getAptPrices2():{};
+  const at2=Object.values(ap2).reduce((s,v)=>s+v,0);
+  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();
   if(drVal&&!payload.notes) payload.notes='خصم: '+drVal;
@@ -2058,6 +2125,7 @@ async function saveBooking(){
   }catch(e){alert('فشل: '+e.message)}
 }
 function resetForm(){
+  selApts=[];selApts2=[];
   document.getElementById('f-name').value='';document.getElementById('f-phone').value='';
   document.getElementById('f-notes').value='';document.getElementById('f-convoy').value='';
   document.getElementById('f-pickup').value='';document.getElementById('f-party').value='client';
@@ -2071,7 +2139,13 @@ function resetForm(){
   ['f-seats','f-extra-seats','f-seatp','f-seatd','f-int-seats','f-int-seatp','f-disc'].forEach(id=>document.getElementById(id).value='0');
   document.getElementById('pay-cont').innerHTML='';document.getElementById('conv-info').textContent='';
   document.getElementById('f-name').style.display='block';document.getElementById('f-sup-sel').style.display='none';
-  selApts=[];renderGrid();renderSelBar();renderAptPrices();calcTotal();
+  selApts=[];renderGrid();renderSelBar();renderAptPrices();
+  selApts2=[];
+  const w2=document.getElementById('conv2-apt-wrap');if(w2)w2.style.display='none';
+  const g2=document.getElementById('apt-grid-2');if(g2)g2.innerHTML='';
+  const sb2=document.getElementById('sel-bar-2');if(sb2)sb2.innerHTML='<span style="font-size:11px;color:var(--tx3);align-self:center">لم تختر شقة للفوج الثاني</span>';
+  const ps2=document.getElementById('apt-p-sec-2');if(ps2)ps2.style.display='none';
+  calcTotal();
 }
 
 // ============================================================
@@ -2433,12 +2507,15 @@ function renderBusLayout(cn,busIdx){
       <div style="display:flex;flex-wrap:wrap;gap:6px">
       ${returnClients.map(b=>{
         const conv1=getConv(b.convoy);
-        const hasReturnSeat=(b.seatAssign2||[]).some(sa=>sa.seatNum);
-        return '<div draggable="true" ondragstart="poolDragInfo={bookingId:'+b.id+',assignIdx:0,isReturn2:true};dragInfo=null;event.dataTransfer.effectAllowed=\'move\'" style="background:var(--pu);color:#fff;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:80px;border:2px solid #f9e79f;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
+        const assignedCount=(b.seatAssign2||[]).filter(sa=>sa.seatNum).length;
+        const totalNeeded=effSeats(b);
+        const hasAllSeats=assignedCount>=totalNeeded&&totalNeeded>0;
+        const seatLabel=totalNeeded>1?(assignedCount+'/'+totalNeeded+' مقاعد'):(assignedCount>0?'✓ له مقعد':'بدون مقعد');
+        return '<div draggable="true" ondragstart="poolDragInfo={bookingId:'+b.id+',assignIdx:'+assignedCount+',isReturn2:true};dragInfo=null;event.dataTransfer.effectAllowed=\'move\'" style="background:var(--pu);color:#fff;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:80px;border:2px solid #f9e79f;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
           +'<div style="font-size:12px">'+b.name.split(' ').slice(0,2).join(' ')+'</div>'
           +'<div style="font-size:9px;opacity:.9;margin-top:1px">من فوج '+(conv1?conv1.label:b.convoy)+'</div>'
           +'<div style="font-size:9px;opacity:.9">'+(b.phone?'📱 '+b.phone.slice(-4):'')+'</div>'
-          +'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">'+(hasReturnSeat?'✓ له مقعد':'بدون مقعد')+'</div>'
+          +'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">'+seatLabel+'</div>'
           +'</div>';
       }).join('')}
       </div>
@@ -2485,11 +2562,18 @@ async function busDrop(e,cn,toSn){
       // Dropping a return-trip client (convoy2=cn) into a seat - use seatAssign2
       const b=bookings.find(x=>x.id===bookingId);if(!b)return;
       if(!b.seatAssign2)b.seatAssign2=[];
-      // Clear any existing seat_assign2 entry for this client at toSn
-      const existing=b.seatAssign2.find(sa=>sa.seatNum===toSn);
-      if(existing){alert('هذا المقعد مأخوذ لعميل عودة آخر');return;}
-      if(b.seatAssign2.length===0)b.seatAssign2.push({seatNum:toSn});
-      else b.seatAssign2[0].seatNum=toSn;
+      const totalNeeded=effSeats(b);
+      // Check if seat already taken by another return client
+      const occ2check={};
+      activeBookings().filter(bb=>bb.convoy2===cn).forEach(bb=>{(bb.seatAssign2||[]).forEach(sa=>{if(sa.seatNum&&bb.id!==bookingId)occ2check[sa.seatNum]=true;});});
+      if(occ2check[toSn]){alert('هذا المقعد مأخوذ لعميل عودة آخر');return;}
+      // Check if already assigned this seat
+      if(b.seatAssign2.some(sa=>sa.seatNum===toSn)){alert('هذا المقعد محجوز بالفعل لنفس العميل');return;}
+      // Find first unassigned slot
+      const emptyIdx=b.seatAssign2.findIndex(sa=>!sa.seatNum);
+      if(emptyIdx>=0){b.seatAssign2[emptyIdx].seatNum=toSn;}
+      else if(b.seatAssign2.length<totalNeeded){b.seatAssign2.push({seatNum:toSn});}
+      else{alert('العميل ده مش محتاج مقاعد تانية — عدد مقاعده ('+totalNeeded+') اتضاف كله');return;}
       await sbFetch('mtr_bookings','PATCH',{seat_assign2:b.seatAssign2},`?id=eq.${bookingId}`);
       renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();return;
     }
@@ -6581,16 +6665,25 @@ function filterHotelsByDest(){
   const dest=document.getElementById('hbk-dest')?.value||'';
   const sel=document.getElementById('hbk-hotel');if(!sel)return;
   const filtered=dest?hotels.filter(h=>h.destination===dest):hotels;
-  sel.innerHTML='<option value="">-- اختار الفندق --</option>'+filtered.map(h=>{
-    const stars='⭐'.repeat(h.stars||0);
-    return `<option value="${h.id}" data-ps="${h.price_single||0}" data-pd="${h.price_double||0}">${stars} ${h.name}</option>`;
-  }).join('');
+  sel.innerHTML='<option value="">-- اختار الفندق --</option>'
+    +'<option value="__new__">➕ فندق غير موجود — اكتب الاسم</option>'
+    +filtered.map(h=>{
+      const stars='⭐'.repeat(h.stars||0);
+      return `<option value="${h.id}" data-ps="${h.price_single||0}" data-pd="${h.price_double||0}">${stars} ${h.name}</option>`;
+    }).join('');
+  const customEl=document.getElementById('hbk-hotel-custom');if(customEl)customEl.style.display='none';
   populateHotelTransportCities(dest);
   calcHotelTotal();
 }
 
 function onHotelSelect(){
   const sel=document.getElementById('hbk-hotel');if(!sel)return;
+  const customEl=document.getElementById('hbk-hotel-custom');
+  if(sel.value==='__new__'){
+    if(customEl){customEl.style.display='block';customEl.focus();}
+    return;
+  }
+  if(customEl)customEl.style.display='none';
   const opt=sel.options[sel.selectedIndex];if(!opt||!opt.dataset.ps)return;
   const rtype=document.getElementById('hbk-room-type')?.value||'single';
   const price=rtype==='double'?parseFloat(opt.dataset.pd||0):parseFloat(opt.dataset.ps||0);
@@ -6769,7 +6862,9 @@ async function saveHotelBooking(){
   const dest=document.getElementById('hbk-dest')?.value||'';
   const hotelSel=document.getElementById('hbk-hotel');
   const hotelId=hotelSel?.value||null;
-  const hotelName=hotelSel?.options[hotelSel.selectedIndex]?.text||'';
+  const customHotelEl=document.getElementById('hbk-hotel-custom');
+  const isCustom=hotelId==='__new__';
+  const hotelName=isCustom?(customHotelEl?.value?.trim()||'فندق غير محدد'):hotelSel?.options[hotelSel.selectedIndex]?.text||'';
   const ci=document.getElementById('hbk-checkin')?.value||'';
   const co=document.getElementById('hbk-checkout')?.value||'';
   const rtype=document.getElementById('hbk-room-type')?.value||'single';
@@ -6797,7 +6892,7 @@ async function saveHotelBooking(){
   const transportNote=(document.getElementById('hbk-transport-note')?.value||'').trim();
   const total=Math.max(0,nights*priceN*rooms-disc)+transportTotal;
   const remaining=Math.max(0,total-paid);
-  const payload={name,phone,destination:dest,hotel_id:hotelId?parseInt(hotelId):null,hotel_name:hotelName.replace(/^-- اختار الفندق --/,''),checkin:ci,checkout:co,nights,room_type:rtype,rooms,price_per_night:priceN,adults,children,disc,disc_reason:discReason,total,paid,remaining,payments,status,notes,sales_rep:salesRep,created_by:currentUser?.name||'',bus_seats:busSeats,bus_seat_price:busSeatPrice,transport_total:transportTotal,pickup,dropoff,transport_note:transportNote};
+  const payload={name,phone,destination:dest,hotel_id:(!isCustom&&hotelId)?parseInt(hotelId):null,hotel_name:hotelName.replace(/^-- اختار الفندق --|➕ فندق غير موجود — اكتب الاسم/g,'').trim(),checkin:ci,checkout:co,nights,room_type:rtype,rooms,price_per_night:priceN,adults,children,disc,disc_reason:discReason,total,paid,remaining,payments,status,notes,sales_rep:salesRep,created_by:currentUser?.name||'',bus_seats:busSeats,bus_seat_price:busSeatPrice,transport_total:transportTotal,pickup,dropoff,transport_note:transportNote};
   try{
     let savedBk=null;
     if(editId){

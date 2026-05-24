@@ -386,6 +386,7 @@ tr:hover td{background:#f5f8fc}
   <div class="step"><strong>1. supabase.com → New Project</strong>انتظر حتى يكتمل المشروع</div>
   <div class="step"><strong>2. Settings → API</strong>انسخ الـ Project URL والـ anon key</div>
   <div class="step"><strong>3. SQL Editor</strong>شغّل ملف supabase_setup.sql</div>
+  <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:10px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
   <div class="cfg-err" id="cfg-err"></div>
   <div class="cfg-ok" id="cfg-ok"></div>
   <div class="fg"><label>Project URL</label><input type="text" id="sb-url" placeholder="https://xxxx.supabase.co"></div>
@@ -463,6 +464,12 @@ tr:hover td{background:#f5f8fc}
   <div class="g2">
     <div class="fg"><label><span class="req">*</span>الفوج <span id="conv-info" style="font-weight:400;color:var(--tx3);font-size:10px"></span></label><select id="f-convoy" onchange="onConvChg()"><option value="">--</option></select></div>
     <div class="fg"><label>مكان الركوب</label><select id="f-pickup"><option value="">--</option></select></div>
+  </div>
+  <!-- Second convoy -->
+  <div class="fg" style="background:var(--wnl);border:1.5px solid var(--wn);border-radius:var(--r);padding:.65rem .875rem;margin-bottom:8px">
+    <label style="color:var(--wn);font-weight:700;font-size:12px">🔁 فوج ثاني (اختياري) — العميل هيرجع مع الفوج التاني مش الأول</label>
+    <select id="f-convoy2" onchange="onConv2Chg()" style="margin-top:4px;border-color:var(--wn)"><option value="">-- بدون فوج ثاني --</option></select>
+    <div id="conv2-info" style="font-size:10px;color:var(--wn);margin-top:3px"></div>
   </div>
   <div class="fg" style="max-width:220px"><label>الباص</label><select id="f-bus-sel"><option value="0">الباص الأول</option></select></div>
   <div class="fg"><label>اختار الشقق</label>
@@ -1429,7 +1436,7 @@ async function initApp(){
 }
 
 // Mappers
-function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
+function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
 function mHB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',dest:r.destination||'',hotelId:r.hotel_id||null,hotelName:r.hotel_name||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:r.nights||0,roomType:r.room_type||'single',rooms:r.rooms||1,pricePerNight:r.price_per_night||0,adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mS(r){
@@ -1788,6 +1795,7 @@ function populateConvoys(){
     const lockLabel=locked?(canBypassLock()?' 🔒':' 🔒 مقفول'):'';
     return `<option value="${c.num}" data-ci="${c.checkin}" data-co="${c.checkout}" ${!canBook?'disabled style="color:var(--tx3)"':''}>${c.label}${lockLabel}</option>`;
   }).join('');
+  populateConvoy2Sel();
 }
 function populateSupSel(){
   const sel=document.getElementById('f-sup-sel');
@@ -1847,7 +1855,7 @@ function renderDash(){
   const tb=document.getElementById('dash-tbl');
   if(!bookings.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد حجوزات</td></tr>';return;}
   tb.innerHTML=bookings.slice(0,15).map(b=>`<tr>
-    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}</td>
+    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')||'-'}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
@@ -1884,8 +1892,31 @@ function onConvChg(){
   const cn=parseInt(document.getElementById('f-convoy').value)||0;
   const busSel=document.getElementById('f-bus-sel');
   if(busSel&&cn){const names=getBusNames(cn);busSel.innerHTML=names.map((n,i)=>`<option value="${i}">${n}</option>`).join('');}
+  populateConvoy2Sel();
   renderGrid();renderSelBar();renderAptPrices();calcTotal();
 }
+function onConv2Chg(){
+  const sel2=document.getElementById('f-convoy2');
+  const info2=document.getElementById('conv2-info');
+  const v=sel2?sel2.value:'';
+  if(v){
+    const cn2=parseInt(v);
+    const c=getConv(cn2);
+    if(c&&info2)info2.textContent='الفوج الثاني: دخول '+c.checkin+' · خروج '+c.checkout+' — العميل هيعدي الليلة الأخيرة مع الفوج الثاني';
+  } else {
+    if(info2)info2.textContent='';
+  }
+}
+function populateConvoy2Sel(){
+  const sel=document.getElementById('f-convoy2');
+  if(!sel)return;
+  const cn1=parseInt(document.getElementById('f-convoy').value)||0;
+  sel.innerHTML='<option value="">-- بدون فوج ثاني --</option>'+CONVOYS.map(c=>{
+    if(c.num===cn1)return ''; // skip same convoy
+    return `<option value="${c.num}" data-ci="${c.checkin}" data-co="${c.checkout}">${c.label}</option>`;
+  }).join('');
+}
+
 function renderGrid(){
   const cn=parseInt(document.getElementById('f-convoy').value)||0;
   const bk=cn?bookedApts(cn):[];
@@ -2004,7 +2035,9 @@ async function saveBooking(){
   const supSel=document.getElementById('f-sup-sel');
   const supplierId=pt==='supplier'&&supSel?parseInt(supSel.value)||null:null;
   const busIdxVal=parseInt(document.getElementById('f-bus-sel')?.value)||0;
-  const payload={name,phone,pickup,convoy:cn,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at,seats:base,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
+  const convoy2Val=parseInt(document.getElementById('f-convoy2')?.value)||null;
+  const sa2=convoy2Val?[...Array(Math.max(0,Math.round(netSeats))).keys()].map(()=>({seatNum:null,extra:false})):[];
+  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at,seats:base,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();
   if(drVal&&!payload.notes) payload.notes='خصم: '+drVal;
@@ -2028,6 +2061,8 @@ function resetForm(){
   document.getElementById('f-name').value='';document.getElementById('f-phone').value='';
   document.getElementById('f-notes').value='';document.getElementById('f-convoy').value='';
   document.getElementById('f-pickup').value='';document.getElementById('f-party').value='client';
+  const c2El=document.getElementById('f-convoy2');if(c2El)c2El.value='';
+  const c2InfoEl=document.getElementById('conv2-info');if(c2InfoEl)c2InfoEl.textContent='';
   const drEl=document.getElementById('f-disc-reason');if(drEl)drEl.value='';
   const tfEl=document.getElementById('f-transfer-fee');if(tfEl)tfEl.value='0';
   const tfnEl=document.getElementById('f-transfer-fee-note');if(tfnEl)tfnEl.value='';
@@ -2055,7 +2090,7 @@ function renderClients(){
   const tb=document.getElementById('cl-tbl');
   if(!f.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد نتائج</td></tr>';return;}
   tb.innerHTML=f.map(b=>`<tr>
-    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}</td>
+    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')||'-'}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
@@ -2087,6 +2122,7 @@ function viewClient(id){
         ${b.pickup?`<div style="font-size:12px;color:var(--ac);font-weight:600">مكان الركوب: ${b.pickup}</div>`:''}
         ${as?`<div style="font-size:11px;color:var(--tx2)">مقاعد الباص: ${as}</div>`:''}
         <div style="font-size:12px;color:var(--gd);font-weight:600">🚌 ${getBusNames(b.convoy)[b.busIdx||0]||'الباص الأول'}</div>
+        ${b.convoy2?`<div style="font-size:12px;background:var(--wnl);border:1px solid var(--wn);border-radius:6px;padding:3px 8px;margin-top:3px;font-weight:700;color:var(--wn)">⚠ واخد فوجين — هيرجع مع فوج ${getConv(b.convoy2)?.label||b.convoy2} مش الفوج الأول</div>`:''}        
         ${(b.adults||0)>0||(b.children||0)>0?`<div style="font-size:12px;color:var(--pu)">الأفراد: ${b.adults||0} كبار${(b.children||0)>0?' · '+(b.children||0)+' أطفال':''}</div>`:''}
         <div style="font-size:11px;color:var(--tx3)">المسؤول: ${b.createdBy||'—'}</div>
       </div>
@@ -2306,14 +2342,39 @@ function renderBusLayout(cn,busIdx){
   const pickupCount={};
   bks.forEach(b=>{const p=b.pickup||'—';pickupCount[p]=(pickupCount[p]||0)+effSeats(b);});
   document.getElementById('pickup-summary').innerHTML=Object.entries(pickupCount).map(([p,c])=>`<div class="pickup-tag">من <span>${p}</span>: <span>${c}</span> مقعد</div>`).join('');
+  // Clients with dual convoy: their seats go on return bus of convoy2
+  // When viewing convoy cn: 
+  //   - clients whose convoy=cn AND convoy2 is set → they board this convoy but return with convoy2's bus
+  //   - clients whose convoy2=cn → they are RETURNING with this convoy's bus (don't show in go-bus, show in return-bus)
+  //
+  // LOGIC: The bus that goes to convoy N brings BACK convoy (N-1). So:
+  //   - clients with convoy2=cn should appear in THIS bus's seat layout (they return on this convoy's bus)
+  //   - in the go-trip view of convoy cn, these dual-convoy clients should be flagged
+  //
+  // For dual-convoy clients (convoy=cn, has convoy2): mark them in the seat with a "⚠ فوجين" badge
+  // For return-trip clients (convoy2=cn): show them in a separate section as returnees
+
+  // Clients that RETURN with convoy cn (their convoy2=cn)
+  const returnClients=activeBookings().filter(b=>b.convoy2===cn&&effSeats(b)>0);
+
   // Occupied seats for this bus
   const occ={};
-  bks.forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx};});});
+  bks.forEach(b=>{
+    const isDouble=b.convoy2!=null;
+    (b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx,isDouble,convoy2:b.convoy2};});
+  });
+  // Also show return clients (convoy2=cn) in seats (using seat_assign2)
+  const occ2={}; // return seats for convoy2=cn clients
+  returnClients.forEach(b=>{
+    (b.seatAssign2||[]).forEach((sa,idx)=>{if(sa.seatNum)occ2[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx,isReturn:true,fromConvoy:b.convoy};});
+  });
+
   // Pool (unassigned) for this bus ONLY - clients already in another bus won't appear here
   const pool={};
   bks.forEach(b=>{
     const p=b.pickup||'غير محدد';if(!pool[p])pool[p]=[];
-    (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn)});});
+    const isDouble=b.convoy2!=null;
+    (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn),isDouble,convoy2:b.convoy2});});
   });
   // Unassigned clients (not in any bus yet) - only show if multiple buses
   const unassignedBks = busCount>1 ? allBks.filter(b=>{
@@ -2334,7 +2395,7 @@ function renderBusLayout(cn,busIdx){
       poolHtml+=`<div style="margin-bottom:.65rem;padding:.5rem;background:var(--sf);border-radius:var(--r);border:1px solid var(--bd)">
         <div style="font-size:11px;font-weight:700;color:var(--ac);margin-bottom:.4rem">📍 ${place} (${people.length})</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">`;
-      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:2px solid rgba(255,255,255,.3);box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div></div>`).join('');
+      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:${p.isDouble?'3px solid #f9e79f':'2px solid rgba(255,255,255,.3)'};box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div>${p.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 3px;margin-top:2px">⚠ فوجين</div>':''}</div>`).join('');
       poolHtml+=`</div></div>`;
     });
     poolHtml+=`<div style="font-size:10px;color:var(--tx3);margin-top:.4rem;text-align:center">↕ اسحب لتخصيص مقعد في الباص</div></div>`;
@@ -2364,15 +2425,48 @@ function renderBusLayout(cn,busIdx){
       poolHtml+=`</div>`;
     }
   }
+  // Return clients section (convoy2=cn people)
+  if(returnClients.length){
+    poolHtml+=`<div style="margin-bottom:1rem;padding:.875rem;background:var(--pul);border:2px solid var(--pu);border-radius:var(--rl)">
+      <div style="font-size:13px;font-weight:700;color:var(--pu);margin-bottom:.65rem">↩ ينتظرون مقعد عودة في هذا الباص (واخدين فوجين)</div>
+      <div style="font-size:11px;color:var(--pu);margin-bottom:.65rem;opacity:.8">هؤلاء العملاء جاءوا مع فوج سابق وبيرجعوا مع باصنا ده</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${returnClients.map(b=>{
+        const conv1=getConv(b.convoy);
+        const hasReturnSeat=(b.seatAssign2||[]).some(sa=>sa.seatNum);
+        return '<div draggable="true" ondragstart="poolDragInfo={bookingId:'+b.id+',assignIdx:0,isReturn2:true};dragInfo=null;event.dataTransfer.effectAllowed=\'move\'" style="background:var(--pu);color:#fff;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:80px;border:2px solid #f9e79f;box-shadow:0 2px 6px rgba(0,0,0,.3)">'
+          +'<div style="font-size:12px">'+b.name.split(' ').slice(0,2).join(' ')+'</div>'
+          +'<div style="font-size:9px;opacity:.9;margin-top:1px">من فوج '+(conv1?conv1.label:b.convoy)+'</div>'
+          +'<div style="font-size:9px;opacity:.9">'+(b.phone?'📱 '+b.phone.slice(-4):'')+'</div>'
+          +'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">'+(hasReturnSeat?'✓ له مقعد':'بدون مقعد')+'</div>'
+          +'</div>';
+      }).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--pu);margin-top:.5rem;opacity:.8">↕ اسحب لتخصيص مقعد عودة</div>
+    </div>`;
+  }
+
   function ms(sn){
+    // Check if this seat has a return client (convoy2=cn)
+    if(occ2[sn]){
+      const o2=occ2[sn];
+      const conv1=getConv(o2.fromConvoy);
+      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:9px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
+    }
     const o=occ[sn];
-    if(o){const col=cColor(o.bookingId,cn);return `<div class="seat taken" style="background:${col}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span></div>`;}
+    if(o){
+      const col=cColor(o.bookingId,cn);
+      const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
+      return `<div class="seat taken" style="background:${col};${o.isDouble?'border:3px solid #f9e79f':''}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}${o.isDouble?' · واخد فوجين':''}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span>${doubleBadge}</div>`;
+    }
     return `<div class="seat empty" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})"><span class="snum">${sn}</span></div>`;
   }
   let busHtml=`<div class="bus-wrap"><div class="bus-top">🚌 ${busName} · ${conv.label} · دخول ${conv.checkin} 9-11 ص · خروج ${conv.checkout} 5-7 ص</div><div class="bus-driver">سائق</div>`;
   let sc=1;for(let r=0;r<12;r++){busHtml+=`<div class="bus-row">`;for(let c=0;c<4;c++){if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;busHtml+=ms(sc++);}busHtml+=`</div>`;}
   busHtml+=`<div class="bus-row"><div class="seat" style="opacity:0;pointer-events:none"></div>${ms(49)}<div class="bus-aisle">│</div><div class="seat" style="opacity:0;pointer-events:none"></div></div>`;
-  busHtml+=`<div class="bus-legend">${bks.map((b,i)=>`<span><span class="ldot" style="background:${SEAT_COLORS[i%SEAT_COLORS.length]}"></span>${b.name.split(' ').slice(0,2).join(' ')} · ${b.pickup||'-'}</span>`).join('')}</div>`;
+  busHtml+=`<div class="bus-legend">${bks.map((b,i)=>`<span><span class="ldot" style="background:${SEAT_COLORS[i%SEAT_COLORS.length]}"></span>${b.name.split(' ').slice(0,2).join(' ')} · ${b.pickup||'-'}${b.convoy2?' ⚠فوجين':''}</span>`).join('')}</div>`;
+  // Add return clients to legend
+  if(returnClients.length){busHtml+=`<div class="bus-legend" style="margin-top:4px">${returnClients.map(b=>`<span style="color:var(--pu)"><span class="ldot" style="background:var(--pu)"></span>${b.name.split(' ').slice(0,2).join(' ')} ↩راجع · ${b.pickup||'-'}</span>`).join('')}</div>`;}
   busHtml+=`<div style="font-size:11px;text-align:center;color:var(--tx3);margin-top:.5rem">اسحب من البركة → مقعد · اسحب مقعد → نقل · دبل كليك → إلغاء</div></div>`;
   document.getElementById('bus-layout').innerHTML=poolHtml+busHtml;
   // Add print button after render
@@ -2386,7 +2480,19 @@ function renderBusLayout(cn,busIdx){
 async function busDrop(e,cn,toSn){
   e.preventDefault();
   if(poolDragInfo){
-    const{bookingId,assignIdx}=poolDragInfo;poolDragInfo=null;
+    const{bookingId,assignIdx,isReturn2}=poolDragInfo;poolDragInfo=null;
+    if(isReturn2){
+      // Dropping a return-trip client (convoy2=cn) into a seat - use seatAssign2
+      const b=bookings.find(x=>x.id===bookingId);if(!b)return;
+      if(!b.seatAssign2)b.seatAssign2=[];
+      // Clear any existing seat_assign2 entry for this client at toSn
+      const existing=b.seatAssign2.find(sa=>sa.seatNum===toSn);
+      if(existing){alert('هذا المقعد مأخوذ لعميل عودة آخر');return;}
+      if(b.seatAssign2.length===0)b.seatAssign2.push({seatNum:toSn});
+      else b.seatAssign2[0].seatNum=toSn;
+      await sbFetch('mtr_bookings','PATCH',{seat_assign2:b.seatAssign2},`?id=eq.${bookingId}`);
+      renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();return;
+    }
     const occ={};activeBookings().filter(b=>b.convoy===cn).forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={bookingId:b.id,assignIdx:idx};});});
     if(occ[toSn]){const bTo=bookings.find(x=>x.id===occ[toSn].bookingId);bTo.seatAssign[occ[toSn].assignIdx].seatNum=null;await sbFetch('mtr_bookings','PATCH',{seat_assign:bTo.seatAssign},`?id=eq.${bTo.id}`);}
     const b=bookings.find(x=>x.id===bookingId);if(!b)return;
@@ -3232,6 +3338,13 @@ function editBooking(id){
     }</select></div>
     </div>
     <div class="fg" style="max-width:220px"><label>الباص</label><select id="edit-bus-sel">${getBusNames(b.convoy).map((n,i)=>`<option value="${i}" ${i===(b.busIdx||0)?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="fg" style="background:var(--wnl);border:1.5px solid var(--wn);border-radius:var(--r);padding:.65rem .875rem;margin-bottom:8px">
+      <label style="color:var(--wn);font-weight:700;font-size:12px">🔁 فوج ثاني (اختياري) - العميل هيرجع مع الفوج التاني</label>
+      <select id="edit-convoy2" style="margin-top:4px;border-color:var(--wn)">
+        <option value="">-- بدون فوج ثاني --</option>
+        ${CONVOYS.filter(cv=>cv.num!==b.convoy).map(cv=>`<option value="${cv.num}" ${cv.num===b.convoy2?'selected':''}>${cv.label}</option>`).join('')}
+      </select>
+    </div>
     <div class="fg" style="margin-top:.5rem"><label>المسؤول / مسؤول المبيعات</label>
       <select id="edit-sales-rep" style="max-width:280px">
         ${users.map(u=>`<option value="${u.name}" ${u.name===b.createdBy?'selected':''}>${u.name} (${u.username})</option>`).join('')}
@@ -3400,10 +3513,12 @@ async function saveEditBooking(id){
     seat_assign:newSA,
     disc_reason:discReason,
     created_by:newCreatedBy,
+    convoy2:parseInt(document.getElementById('edit-convoy2')?.value)||null,
     status:document.getElementById('edit-status')?.value||b.status||'active',
     last_edit_by:currentUser?.name||'—',
     last_edit_at:new Date().toLocaleDateString('ar-EG')
   };
+  const newConvoy2=parseInt(document.getElementById('edit-convoy2')?.value)||null;
 
   try{
     const newStatus=document.getElementById('edit-status')?.value||b.status||'active';
@@ -3411,7 +3526,7 @@ async function saveEditBooking(id){
     const nowCancelled=newStatus==='cancelled';
     await sbFetch('mtr_bookings','PATCH',payload,`?id=eq.${id}`);
     // bus_idx في PATCH منفصل عشان لو العمود مش موجود في schema cache متأثرش على الحفظ الأساسي
-    try{await sbFetch('mtr_bookings','PATCH',{bus_idx:newBusIdx},`?id=eq.${id}`);}catch(_){}
+    try{await sbFetch('mtr_bookings','PATCH',{bus_idx:newBusIdx,convoy2:newConvoy2},`?id=eq.${id}`);}catch(_){}
     Object.assign(b,{
       name,phone,pickup,
       convoy:newConvNum,
@@ -3425,6 +3540,7 @@ async function saveEditBooking(id){
       adults:adultsVal, children:childrenVal, seatAssign:newSA,
       createdBy:newCreatedBy,
       busIdx:newBusIdx,
+      convoy2:newConvoy2,
       status:newStatus,
       lastEditBy:currentUser?.name||'—',
       lastEditAt:new Date().toLocaleDateString('ar-EG')

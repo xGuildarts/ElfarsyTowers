@@ -1213,7 +1213,13 @@ try{customRoles=JSON.parse(localStorage.getItem('mtr_custom_roles')||'{}');}catc
 let customRoleLabels={};
 try{customRoleLabels=JSON.parse(localStorage.getItem('mtr_role_labels')||'{}');}catch(e){}
 function getAllRoles(){return{...ROLE_DEFAULTS,...customRoles};}
-function saveCustomRoles(){try{localStorage.setItem('mtr_custom_roles',JSON.stringify(customRoles));}catch(e){}}
+function saveCustomRoles(){
+  try{localStorage.setItem('mtr_custom_roles',JSON.stringify(customRoles));}catch(e){}
+  try{localStorage.setItem('mtr_role_labels',JSON.stringify(customRoleLabels));}catch(e){}
+  if(typeof sbFetch==='function'){
+    sbFetch('mtr_settings','PATCH',{custom_roles:JSON.stringify({roles:customRoles,labels:customRoleLabels})},'?id=eq.1').catch(()=>{});
+  }
+}
 function getRoleLabel(role){
   if(customRoleLabels[role])return customRoleLabels[role];
   var defaults={admin:'أدمن',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'};
@@ -1330,7 +1336,7 @@ async function doVoucherAction(bookingId, type, action){
         description:(note||'إذن استلام')+' - '+b.name,
         client_name:b.name,category:'',
         booking_ref:String(b.id),
-        booking_pay_ref:'vch_rcv_'+b.id+'_'+Date.now(),
+        booking_pay_ref:String(b.id)+'_'+(b.payments.length), // matches payIdx of the new payment
         supplier_id:supplierId
       },'');
       if(accR&&accR[0])accEntries.push(mA(accR[0]));
@@ -1346,10 +1352,14 @@ async function doVoucherAction(bookingId, type, action){
         description:(note||'إذن صرف')+' - '+b.name,
         client_name:b.name,category:isExpense?accName:'',
         booking_ref:String(b.id),
-        booking_pay_ref:'vch_pay_'+b.id+'_'+Date.now(),
+        booking_pay_ref:String(b.id)+'_'+(b.payments.length), // matches payIdx of disbursement
         supplier_id:supplierId
       },'');
       if(accR&&accR[0])accEntries.push(mA(accR[0]));
+      // أضف الصرف في كشف حساب العميل كمبلغ مسترد (قيمة سالبة)
+      const npD=[...b.payments,{amount:-amt,date:dt,payMethod:accName,note:(note||'إذن صرف')}];
+      await sbFetch('mtr_bookings','PATCH',{payments:npD,paid:b.paid-amt,remaining:b.remaining+amt},`?id=eq.${b.id}`);
+      b.payments=npD;b.paid-=amt;b.remaining+=amt;
       await addLog(`إذن صرف: ${b.name} - ${amt.toLocaleString()} ج من ${accName}`,'edit',`فوج ${b.convoy}`);
       voucherSaved=true;
     }
@@ -1592,6 +1602,13 @@ function mS(r){
   }
   loadLocks(r);
   loadBusNames(r);
+  if(r.custom_roles){
+    try{
+      const cr=JSON.parse(r.custom_roles);
+      if(cr&&cr.roles&&typeof cr.roles==='object'){Object.assign(customRoles,cr.roles);try{localStorage.setItem('mtr_custom_roles',JSON.stringify(customRoles));}catch(e){}}
+      if(cr&&cr.labels&&typeof cr.labels==='object'){Object.assign(customRoleLabels,cr.labels);try{localStorage.setItem('mtr_role_labels',JSON.stringify(customRoleLabels));}catch(e){}}
+    }catch(e){console.warn('custom_roles parse:',e);}
+  }
   return{name:r.resort_name||'مصيف مطروح 2026',company:r.company_name||'',contact:r.contact||'',license:r.license_num||'',logo:r.logo||'',notes:r.notes||'',notesHtml:r.notes_html||'',hotelTerms:r.hotel_terms||''}
 }
 
@@ -1687,8 +1704,8 @@ function switchUsersTab(tab){
   const bu=document.getElementById('utab-users'),br=document.getElementById('utab-roles');
   if(bu)bu.style.cssText=tab==='users'?'background:var(--pr);color:#fff;border-color:var(--pr)':'';
   if(br)br.style.cssText=tab==='roles'?'background:var(--pr);color:#fff;border-color:var(--pr)':'';
-  if(tab==='roles')renderRoles();
-  if(tab==='users')renderUsers();
+  renderRoles();
+  renderUsers();
 }
 
 function populateNuRole(){
@@ -1953,6 +1970,7 @@ function showTab(t){
   const sc=document.getElementById(t);if(sc)sc.classList.add('active');
   if(t==='dash')renderDash();
   if(t==='clients')renderClients();
+  if(t==='users'){renderUsers();renderRoles();}
   if(t==='bus')renderBusTab();
   if(t==='accs'){renderAccs();fillAccSel('deb-sec','deb-type');fillAccSel('cred-sec','cred-type');}
   if(t==='sched')renderSched();
@@ -2332,7 +2350,7 @@ function viewClient(id){
   showTab('clients');
   document.getElementById('cl-list').style.display='none';
   document.getElementById('cl-det').style.display='block';
-  const pR=b.payments.length?b.payments.map(p=>`<tr><td>${p.date||'-'}</td><td style="font-weight:700">${p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--tx3)">لا توجد دفعات</td></tr>';
+  const pR=b.payments.length?b.payments.map(p=>{const isDisburs=p.amount<0;return`<tr><td>${p.date||'-'}</td><td style="font-weight:700;color:${isDisburs?'var(--dn)':'var(--ac)'}">${isDisburs?'↓ مسترد '+Math.abs(p.amount).toLocaleString():'↑ '+p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td></tr>`;}).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--tx3)">لا توجد دفعات</td></tr>';
   const aR=(b.apts||[]).map(a=>`<tr><td><span class="badge b-bl">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''}</td><td style="font-weight:700">${((b.aptPrices||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
   const aR2=(b.apts2||[]).map(a=>`<tr><td><span class="badge b-wn">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''} <span style="background:var(--wnl);color:var(--wn);border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">فوج 2</span></td><td style="font-weight:700">${((b.aptPrices2||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
   const base2seats=aptSeats2(b);
@@ -2867,12 +2885,15 @@ function renderAccs(){
   // Pending
   // Build set of confirmed refs - check both bookingPayRef formats
   // Build confirmed set from bookingPayRef which stores "bookingId_payIdx"
+  // Build confirmed set from accEntries that have a bookingPayRef in format id_payIdx
   const conf=new Set(accEntries
     .filter(e=>e.bookingPayRef && (/^\d+_\d+$/.test(e.bookingPayRef)||/^htl_\d+_\d+$/.test(e.bookingPayRef)))
     .map(e=>e.bookingPayRef)
   );
   const pend=[];
   bookings.forEach(b=>b.payments.forEach((p,pi)=>{
+    // Skip disbursements (negative) - they are vouchers already confirmed in accounts
+    if((p.amount||0)<=0)return;
     const ref=String(b.id)+'_'+pi;
     if(!conf.has(ref)) pend.push({...p,clientName:b.name,bookingId:b.id,payIdx:pi,ref,isHotel:false});
   }));

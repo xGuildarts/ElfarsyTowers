@@ -3812,8 +3812,14 @@ function printReceipt(id){
   const aR2=(b.apts2||[]).map(a=>`<tr><td style="font-weight:700">${a}</td><td>${APTS[a]?.desc||''} <span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">فوج 2</span></td><td style="font-weight:700;text-align:left">${((b.aptPrices2||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
   const pR=(b.payments||[]).map(p=>`<tr><td>${p.date||'-'}</td><td style="font-weight:700">${p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center">—</td></tr>';
   const as=(b.seatAssign||[]).filter(s=>s.seatNum).map(s=>s.seatNum).join('، ');
+  const as2=(b.seatAssign2||[]).filter(s=>s.seatNum).map(s=>s.seatNum).join('، ');
   const baseS=b.seats||0;
   const extraS=b.extraSeats||0;const discS=b.seatDiscount||0;const sp=b.seatPrice||0;
+  const seatsF1=(b.apts||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const seatsF2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const totalGoSeats=seatsF1+seatsF2+(b.extraSeats||0)-(b.seatDiscount||0);
+  const conv2Obj=b.convoy2?getConv(b.convoy2):null;
+  const checkoutDisplay=conv2Obj?conv2Obj.checkout:(b.checkout||'-');
   const logo=m.logo?`<img src="${m.logo}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.9);margin-bottom:12px" onerror="this.style.display='none'">`:'';
   const rH=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>إيصال - ${b.name}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -3877,14 +3883,16 @@ table{table-layout:fixed;word-wrap:break-word}</style></head><body>
   ${b.pickup?`<div class="row"><span class="l">مكان الركوب</span><span style="font-weight:700;color:#117a65">${b.pickup}</span></div>`:''}
   ${((b.adults||0)>0||(b.children||0)>0)?('<div class="row"><span class="l">عدد الأفراد</span><span style="font-weight:700">'+(b.adults||0)+' كبار'+((b.children||0)>0?' · '+(b.children||0)+' أطفال':'')+'</span></div>'):''}
   <div class="row"><span class="l">تاريخ الدخول</span><span>${b.checkin||'-'} · 9-11 صباحاً</span></div>
-  <div class="row"><span class="l">تاريخ الخروج</span><span>${b.checkout||'-'} · 5-7 صباحاً</span></div>
-  ${as?`<div class="row"><span class="l">مقاعد الباص</span><span style="font-weight:700">${as}</span></div>`:''}
+  <div class="row"><span class="l">تاريخ الخروج</span><span>${checkoutDisplay} · 5-7 صباحاً${conv2Obj?' <span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:10px;padding:1px 5px;font-weight:700">خروج فوج 2</span>':''}</span></div>
+  ${totalGoSeats>0?`<div class="row" style="background:#e8f8f5"><span class="l" style="font-weight:700;color:#117a65">كراسي الذهاب (فوج ${b.convoy})</span><span style="font-weight:800;color:#117a65">${totalGoSeats} كرسي${as?' · مقاعد: '+as:' · لم تخصص بعد'}</span></div>`:''}
+  ${(b.convoy2&&totalGoSeats>0)?`<div class="row" style="background:#f5eef8"><span class="l" style="font-weight:700;color:#7d3c98">كراسي العودة (فوج ${b.convoy2})</span><span style="font-weight:800;color:#7d3c98">${totalGoSeats} كرسي${as2?' · مقاعد: '+as2:' · لم تخصص بعد'}</span></div>`:(totalGoSeats>0&&!b.convoy2?`<div class="row" style="background:#fef9e7"><span class="l" style="font-weight:700;color:#d68910">ملاحظة العودة</span><span style="font-weight:700;color:#d68910">مش هيرجع مع الفوج التاني</span></div>`:'')}
   <div class="row"><span class="l">المسؤول</span><span>${b.createdBy||'-'}</span></div>
 </div>
 ${(aR||aR2)?`<div class="sec"><div class="st">الشقق المحجوزة</div><table><thead><tr><th>رقم الشقة</th><th>الوصف</th><th>السعر</th></tr></thead><tbody>${aR}${aR2}</tbody></table></div>`:''}
 <div class="sec"><div class="st">تفاصيل الحساب</div><div class="tot">
   ${(b.aptsTotal||0)>0?`<div class="tr"><span>إجمالي الشقق</span><span style="font-weight:700">${(b.aptsTotal||0).toLocaleString()} ج</span></div>`:''}
-  ${baseS>0?`<div class="tr" style="color:#4a6278"><span>كراسي مشمولة بالشقة (${baseS} × 0 ج)</span><span style="font-weight:700">0 ج</span></div>`:''}
+  ${seatsF1>0?`<div class="tr" style="color:#117a65"><span>كراسي شقق فوج 1 (${seatsF1} كرسي)</span><span style="font-weight:700">مشمولة</span></div>`:''}
+  ${seatsF2>0?`<div class="tr" style="color:#7d3c98"><span>كراسي شقق فوج 2 (${seatsF2} كرسي)</span><span style="font-weight:700">مشمولة</span></div>`:''}
   ${extraS>0?`<div class="tr"><span>كراسي إضافية (${extraS} × ${sp} ج)</span><span style="font-weight:700">${(extraS*sp).toLocaleString()} ج</span></div>`:''}
   ${(b.intSeats||0)>0?`<div class="tr" style="color:#7d3c98"><span>كراسي داخلية (${b.intSeats} × ${b.intSeatPrice||0} ج)</span><span style="font-weight:700">${(b.intTotal||0).toLocaleString()} ج</span></div>`:''}
   ${(b.transferFee||0)>0?`<div class="tr" style="color:#d68910"><span>${b.transferFeeNote||'عمولة تحويل'}</span><span style="font-weight:700">${(b.transferFee||0).toLocaleString()} ج</span></div>`:''}

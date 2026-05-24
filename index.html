@@ -405,7 +405,7 @@ tr:hover td{background:#f5f8fc}
   <div class="step"><strong>1. supabase.com → New Project</strong>انتظر حتى يكتمل المشروع</div>
   <div class="step"><strong>2. Settings → API</strong>انسخ الـ Project URL والـ anon key</div>
   <div class="step"><strong>3. SQL Editor</strong>شغّل ملف supabase_setup.sql</div>
-  <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:15px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
+  <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:18px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
   <div class="cfg-err" id="cfg-err"></div>
   <div class="cfg-ok" id="cfg-ok"></div>
   <div class="fg"><label>Project URL</label><input type="text" id="sb-url" placeholder="https://xxxx.supabase.co"></div>
@@ -2010,7 +2010,7 @@ function renderDash(){
   const tb=document.getElementById('dash-tbl');
   if(!bookings.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد حجوزات</td></tr>';return;}
   tb.innerHTML=bookings.slice(0,15).map(b=>`<tr>
-    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
+    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:15px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
@@ -2330,7 +2330,7 @@ function renderClients(){
   const tb=document.getElementById('cl-tbl');
   if(!f.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد نتائج</td></tr>';return;}
   tb.innerHTML=f.map(b=>`<tr>
-    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
+    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:15px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
@@ -2701,7 +2701,7 @@ function renderBusLayout(cn,busIdx){
     if(occ2[sn]){
       const o2=occ2[sn];
       const conv1=getConv(o2.fromConvoy);
-      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:9px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
+      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:15px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
     }
     const o=occ[sn];
     if(o){

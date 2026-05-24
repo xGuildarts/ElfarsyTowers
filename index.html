@@ -2701,7 +2701,7 @@ function renderBusLayout(cn,busIdx){
     if(occ2[sn]){
       const o2=occ2[sn];
       const conv1=getConv(o2.fromConvoy);
-      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:15px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:18px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
+      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:18px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:18px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
     }
     const o=occ[sn];
     if(o){

@@ -2641,7 +2641,7 @@ function renderBusLayout(cn,busIdx){
       poolHtml+=`<div style="margin-bottom:.65rem;padding:.5rem;background:var(--sf);border-radius:var(--r);border:1px solid var(--bd)">
         <div style="font-size:11px;font-weight:700;color:var(--ac);margin-bottom:.4rem">📍 ${place} (${people.length})</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">`;
-      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:${p.isDouble?'3px solid #f9e79f':'2px solid rgba(255,255,255,.3)'};box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div>${p.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 3px;margin-top:2px">⚠ فوجين</div>':''}${p.seatNote?`<div style="background:rgba(255,255,255,.25);border-radius:3px;font-size:8px;padding:2px 4px;margin-top:3px;max-width:90px;white-space:normal;line-height:1.3">📝 ${p.seatNote}</div>`:''}</div>`).join('');
+      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:${p.isDouble?'3px solid #f9e79f':'2px solid rgba(255,255,255,.3)'};box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div>${p.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:15px;font-weight:900;padding:1px 3px;margin-top:2px">⚠ فوجين</div>':''}${p.seatNote?`<div style="background:rgba(255,255,255,.25);border-radius:3px;font-size:8px;padding:2px 4px;margin-top:3px;max-width:90px;white-space:normal;line-height:1.3">📝 ${p.seatNote}</div>`:''}</div>`).join('');
       poolHtml+=`</div></div>`;
     });
     poolHtml+=`<div style="font-size:10px;color:var(--tx3);margin-top:.4rem;text-align:center">↕ اسحب لتخصيص مقعد في الباص</div></div>`;
@@ -2674,7 +2674,7 @@ function renderBusLayout(cn,busIdx){
   // Return clients section (convoy2=cn people)
   if(returnClients.length){
     poolHtml+=`<div style="margin-bottom:1rem;padding:.875rem;background:var(--pul);border:2px solid var(--pu);border-radius:var(--rl)">
-      <div style="font-size:13px;font-weight:700;color:var(--pu);margin-bottom:.65rem">↩ ينتظرون مقعد عودة في هذا الباص (واخدين فوجين)</div>
+      <div style="font-size:15px;font-weight:700;color:var(--pu);margin-bottom:.65rem">↩ ينتظرون مقعد عودة في هذا الباص (واخدين فوجين)</div>
       <div style="font-size:11px;color:var(--pu);margin-bottom:.65rem;opacity:.8">هؤلاء العملاء جاءوا مع فوج سابق وبيرجعوا مع باصنا ده</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
       ${returnClients.map(b=>{
@@ -2701,7 +2701,7 @@ function renderBusLayout(cn,busIdx){
     if(occ2[sn]){
       const o2=occ2[sn];
       const conv1=getConv(o2.fromConvoy);
-      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:15px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
+      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:15px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:18px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
     }
     const o=occ[sn];
     if(o){

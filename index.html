@@ -2111,6 +2111,8 @@ async function saveBooking(){
   if(isExtra&&!confirm('تحذير: الباص ممتلئ. تكمل؟'))return;
   const conv=getConv(cn);
   const ap=getAptPrices(),at=Object.values(ap).reduce((s,v)=>s+v,0);
+  const ap2=convoy2Val?getAptPrices2():{};
+  const at2=Object.values(ap2).reduce((s,v)=>s+v,0);
   const sp=parseFloat(document.getElementById('f-seatp').value)||0;
   const sda=sd*600,disc=parseFloat(document.getElementById('f-disc').value)||0;
   const intS=parseFloat(document.getElementById('f-int-seats').value)||0;
@@ -2127,11 +2129,8 @@ async function saveBooking(){
   const supSel=document.getElementById('f-sup-sel');
   const supplierId=pt==='supplier'&&supSel?parseInt(supSel.value)||null:null;
   const busIdxVal=parseInt(document.getElementById('f-bus-sel')?.value)||0;
-  // convoy2 already computed above
   // sa2 = مقاعد العودة (كراسي الفوج الثاني)
   const sa2=convoy2Val?[...Array(Math.max(0,base2)).keys()].map(()=>({seatNum:null,extra:false})):[];
-  const ap2=convoy2Val?getAptPrices2():{};
-  const at2=Object.values(ap2).reduce((s,v)=>s+v,0);
   const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_note:document.getElementById('f-seat-note')?.value?.trim()||'',seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();

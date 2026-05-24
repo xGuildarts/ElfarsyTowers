@@ -405,7 +405,7 @@ tr:hover td{background:#f5f8fc}
   <div class="step"><strong>1. supabase.com → New Project</strong>انتظر حتى يكتمل المشروع</div>
   <div class="step"><strong>2. Settings → API</strong>انسخ الـ Project URL والـ anon key</div>
   <div class="step"><strong>3. SQL Editor</strong>شغّل ملف supabase_setup.sql</div>
-  <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:10px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
+  <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:15px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
   <div class="cfg-err" id="cfg-err"></div>
   <div class="cfg-ok" id="cfg-ok"></div>
   <div class="fg"><label>Project URL</label><input type="text" id="sb-url" placeholder="https://xxxx.supabase.co"></div>
@@ -486,7 +486,7 @@ tr:hover td{background:#f5f8fc}
   </div>
   <!-- Second convoy -->
   <div class="fg" style="background:var(--wnl);border:1.5px solid var(--wn);border-radius:var(--r);padding:.65rem .875rem;margin-bottom:8px">
-    <label style="color:var(--wn);font-weight:700;font-size:12px">🔁 فوج ثاني (اختياري) — العميل هيرجع مع الفوج التاني مش الأول</label>
+    <label style="color:var(--wn);font-weight:700;font-size:14px">🔁 فوج ثاني (اختياري) — العميل هيرجع مع الفوج التاني مش الأول</label>
     <select id="f-convoy2" onchange="onConv2Chg()" style="margin-top:4px;border-color:var(--wn)"><option value="">-- بدون فوج ثاني --</option></select>
     <div id="conv2-info" style="font-size:10px;color:var(--wn);margin-top:3px"></div>
     <!-- Convoy2 apartments -->
@@ -2706,8 +2706,8 @@ function renderBusLayout(cn,busIdx){
     const o=occ[sn];
     if(o){
       const col=cColor(o.bookingId,cn);
-      const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
-      const noteBadge=o.seatNote?`<span style="background:rgba(255,255,255,.25);border-radius:3px;font-size:8px;padding:1px 4px;margin-top:1px;white-space:normal;line-height:1.3">📝 ${o.seatNote}</span>`:'';
+      const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:11px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
+      const noteBadge=o.seatNote?`<span style="background:rgba(255,255,255,.25);border-radius:3px;font-size:11px;padding:1px 4px;margin-top:1px;white-space:normal;line-height:1.3">📝 ${o.seatNote}</span>`:'';
       return `<div class="seat taken" style="background:${col};${o.isDouble?'border:3px solid #f9e79f':''}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}${o.isDouble?' · واخد فوجين':''}${o.seatNote?' · 📝 '+o.seatNote:''}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span>${doubleBadge}${noteBadge}</div>`;
     }
     return `<div class="seat empty" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})"><span class="snum">${sn}</span></div>`;

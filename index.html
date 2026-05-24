@@ -323,7 +323,7 @@ tr:hover td{background:#f5f8fc}
 .bus-driver{width:54px;height:32px;background:var(--pr);color:#fff;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto .45rem}
 .bus-row{display:flex;gap:5px;align-items:center;justify-content:center;margin-bottom:5px}
 .bus-aisle{width:16px;flex-shrink:0;text-align:center;font-size:9px;color:var(--tx3)}
-.seat{width:200px;height:120px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--sf);padding:6px;transition:all .15s;flex-shrink:0;user-select:none}
+.seat{width:200px;height:130px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--sf);padding:6px;transition:all .15s;flex-shrink:0;user-select:none}
 .seat.empty{border-style:dashed}
 .seat.empty:hover{border-color:var(--pr);background:var(--prl)}
 .seat.taken{cursor:grab;border-color:transparent}
@@ -1874,7 +1874,7 @@ function renderDash(){
   tb.innerHTML=bookings.slice(0,15).map(b=>`<tr>
     <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
-    <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')||'-'}</td>
+    <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
     <td><span class="badge b-gd" style="font-size:10px">${getBusNames(b.convoy)[b.busIdx||0]||'—'}</span></td>
     <td style="font-size:11px;color:var(--ac)">${b.pickup||'-'}</td>
@@ -2194,7 +2194,7 @@ function renderClients(){
   tb.innerHTML=f.map(b=>`<tr>
     <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
-    <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')||'-'}</td>
+    <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
     <td><span class="badge b-bl">${effSeatsTotal(b)}</span></td>
     <td><span class="badge b-pu">${b.intSeats||0}</span></td>
@@ -2387,9 +2387,9 @@ function printBusLayout(cn,busIdx){
     const o=occ[sn];
     const col=o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===sn))%COLORS.length]:'#f0f4f8';
     const textCol=o?'#fff':'#aaa';
-    return `<td style="border:1px solid #ccc;width:56px;height:52px;text-align:center;vertical-align:middle;background:${col};color:${textCol};font-size:10px;padding:2px;font-weight:700">
-      <div style="font-size:9px;opacity:.7">${sn}</div>
-      ${o?`<div style="font-size:10px;font-weight:700;overflow:hidden;line-height:1.2">${o.name.split(' ').slice(0,3).join(' ')}</div><div style="font-size:8px;opacity:.85">${o.phone?o.phone.slice(-4):''}</div><div style="font-size:8px;opacity:.85;overflow:hidden">${o.pickup.slice(0,6)}</div>`:'<div style="font-size:9px;color:#aaa">فارغ</div>'}
+    return `<td style="border:1.5px solid #ccc;width:80px;height:72px;text-align:center;vertical-align:middle;background:${col};color:${textCol};font-size:11px;padding:3px;font-weight:700;border-radius:4px">
+      <div style="font-size:10px;opacity:.75;font-weight:800">${sn}</div>
+      ${o?`<div style="font-size:11px;font-weight:800;overflow:hidden;line-height:1.3;margin-top:1px">${o.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.9;margin-top:1px">${o.phone?'📱'+o.phone.slice(-4):''}</div><div style="font-size:10px;opacity:.9;overflow:hidden;margin-top:1px">${o.pickup.slice(0,8)}</div>`:'<div style="font-size:10px;color:#bbb;margin-top:6px">فارغ</div>'}
     </td>`;
   }
   let rows='',sc=1;
@@ -3073,7 +3073,32 @@ function genReport(){
     </tbody></table>`;
   }
   if(type==='bookings'){let bks=allBks.filter(b=>inR(b.checkin));title='تقرير الحجوزات';total=bks.reduce((s,b)=>s+b.total,0);count=bks.length;html=bkTable(bks);}
-  else if(type==='convoy'){const cn=filter?parseInt(filter):null;const conv=cn?CONVOYS.find(c=>c.num===cn):null;let bks=allBks.filter(b=>(!cn||b.convoy===cn)&&inR(b.checkin));title=`فوج: ${conv?conv.label:'الكل'}`;total=bks.reduce((s,b)=>s+b.total,0);count=bks.length;html=bkTable(bks);}
+  else if(type==='convoy'){
+    const cn=filter?parseInt(filter):null;
+    const conv=cn?CONVOYS.find(c=>c.num===cn):null;
+    if(!cn){
+      // الكل — عرض عادي
+      let bks=allBks.filter(b=>inR(b.checkin));
+      title='فوج: الكل';total=bks.reduce((s,b)=>s+b.total,0);count=bks.length;html=bkTable(bks);
+    } else {
+      // فوج محدد — عرض مخصص: العميل فوجين يظهر بشقوق هذا الفوج فقط
+      // العملاء الأساسيين (convoy=cn)
+      const bks1=allBks.filter(b=>b.convoy===cn&&inR(b.checkin));
+      // العملاء العائدين (convoy2=cn) — يظهرون في هذا الفوج بشقوق ف2 فقط
+      const bks2=allBks.filter(b=>b.convoy2===cn&&inR(b.checkin));
+      // دمج بتمثيل مخصص لكل عميل
+      const rows=[
+        ...bks1.map(b=>({...b, _displayApts:b.apts||[], _displayCheckin:b.checkin, _isReturn:false})),
+        ...bks2.map(b=>({...b, _displayApts:b.apts2||[], _displayCheckin:conv?.checkin||b.checkin, _isReturn:true}))
+      ];
+      title=`فوج: ${conv?conv.label:''}`;
+      total=bks1.reduce((s,b)=>s+b.total,0); // المالي من العملاء الأساسيين فقط
+      count=rows.length;
+      html=`<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>كراسي</th><th>أفراد</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
+      ${rows.map(b=>`<tr style="${b._isReturn?'background:var(--pul)':''}"><td style="font-weight:700">${b.name}${b._isReturn?'<span class="badge b-pu" style="font-size:9px;margin-right:3px">↩ عودة</span>':''}</td><td>${b.phone||'-'}</td><td>${(b._displayApts||[]).join('، ')||'-'}</td><td style="font-size:11px">${b._displayCheckin||b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td>${effSeats(b)}</td><td>${(b.adults||0)+(b.children||0)}</td><td style="font-weight:700">${b._isReturn?'-':b.total.toLocaleString()+' ج'}</td><td style="color:var(--ac)">${b._isReturn?'-':b.paid.toLocaleString()+' ج'}</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b._isReturn?'-':b.remaining.toLocaleString()+' ج'}</td><td>${b._isReturn?'<span class="badge b-pu">عودة</span>':b.remaining<=0?'مكتمل':'باقي'}</td></tr>`).join('')}
+      </tbody></table>`;
+    }
+  }
   else if(type==='rep'){let bks=allBks.filter(b=>(!filter||b.createdBy===filter)&&inR(b.checkin));title=`مسؤول: ${filter||'الكل'}`;total=bks.reduce((s,b)=>s+b.total,0);count=bks.length;html=bkTable(bks);}
   else if(type==='remaining'){let bks=allBks.filter(b=>b.remaining>0&&inR(b.checkin));title='العملاء بهم متبقي';total=bks.reduce((s,b)=>s+b.remaining,0);count=bks.length;html=bkTable(bks);}
   else if(type==='accounts'){let ents=allAcc.filter(e=>(!filter||e.type===filter)&&!e.supplierId&&inR(e.date));title=`كشف حساب: ${filter||'الكل'}`;const{inn,out}=getBal(ents);total=inn-out;count=ents.length;html=accTable(ents,'accounts');}

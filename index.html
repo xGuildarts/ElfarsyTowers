@@ -1778,7 +1778,11 @@ const CONVOYS=getConvoys();
 function getConv(n){return CONVOYS.find(c=>c.num===n)}
 function activeBookings(){return bookings.filter(b=>b.status!=='cancelled');}
 function bookedApts(cn,excId){return activeBookings().filter(b=>b.convoy===cn&&b.id!==excId).flatMap(b=>b.apts)}
-function effSeats(b){return(b.seats||0)+(b.extraSeats||0)-(b.seatDiscount||0)}
+function aptSeats2(b){return(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);}
+// كراسي الفوج الأول فقط (للباص والحساب)
+function effSeats(b){return Math.max(0,(b.seats||0)+(b.extraSeats||0)-(b.seatDiscount||0))}
+// إجمالي الكراسي للعميل (فوج 1 + فوج 2) — للعرض في الجداول
+function effSeatsTotal(b){return effSeats(b)+aptSeats2(b)}
 function convEffSeats(cn){return activeBookings().filter(b=>b.convoy===cn).reduce((s,b)=>s+effSeats(b),0)}
 function cColor(bid,cn){const ids=activeBookings().filter(b=>b.convoy===cn).map(b=>b.id);return SEAT_COLORS[ids.indexOf(bid)%SEAT_COLORS.length]}
 function aptP(ci,type){return(PRICE_MAP[ci]||{single:9400,double:12800})[type]}
@@ -2111,7 +2115,7 @@ async function saveBooking(){
   const sda=sd*600,disc=parseFloat(document.getElementById('f-disc').value)||0;
   const intS=parseFloat(document.getElementById('f-int-seats').value)||0;
   const intP=parseFloat(document.getElementById('f-int-seatp').value)||0;const intT=intS*intP;
-  const st=extra*sp;const total=at+st+intT-sda-disc;
+  const st=extra*sp;const total=at+at2+st+intT-sda-disc;
   let pays=[];
   document.querySelectorAll('.pr-row').forEach(row=>{
     const amt=parseFloat(row.querySelector('.pa').value);
@@ -2193,7 +2197,7 @@ function renderClients(){
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')||'-'}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
-    <td><span class="badge b-bl">${effSeats(b)}</span></td>
+    <td><span class="badge b-bl">${effSeatsTotal(b)}</span></td>
     <td><span class="badge b-pu">${b.intSeats||0}</span></td>
     <td style="font-size:11px;color:var(--ac)">${b.pickup||'-'}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.createdBy||'—'}</span></td>
@@ -2211,7 +2215,11 @@ function viewClient(id){
   document.getElementById('cl-det').style.display='block';
   const pR=b.payments.length?b.payments.map(p=>`<tr><td>${p.date||'-'}</td><td style="font-weight:700">${p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--tx3)">لا توجد دفعات</td></tr>';
   const aR=(b.apts||[]).map(a=>`<tr><td><span class="badge b-bl">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''}</td><td style="font-weight:700">${((b.aptPrices||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
+  const aR2=(b.apts2||[]).map(a=>`<tr><td><span class="badge b-wn">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''} <span style="background:var(--wnl);color:var(--wn);border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">فوج 2</span></td><td style="font-weight:700">${((b.aptPrices2||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
+  const base2seats=aptSeats2(b);
+  const effS1=(b.seats||0)+(b.extraSeats||0)-(b.seatDiscount||0);
   const as=(b.seatAssign||[]).filter(s=>s.seatNum).map(s=>s.seatNum).join('، ');
+  const as2=(b.seatAssign2||[]).filter(s=>s.seatNum).map(s=>s.seatNum).join('، ');
   document.getElementById('cl-content').innerHTML=`<div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:.875rem;flex-wrap:wrap">
       <div style="width:42px;height:42px;border-radius:50%;background:var(--pr);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${b.name.charAt(0)}</div>
@@ -2219,7 +2227,9 @@ function viewClient(id){
         <div style="font-size:15px;font-weight:700;color:var(--pr)">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:6px;font-size:10px">مورد</span>':''}</div>
         <div style="font-size:11px;color:var(--tx2)">${b.phone||''} · فوج ${b.convoy} · ${b.checkin} → ${b.checkout}</div>
         ${b.pickup?`<div style="font-size:12px;color:var(--ac);font-weight:600">مكان الركوب: ${b.pickup}</div>`:''}
-        ${as?`<div style="font-size:11px;color:var(--tx2)">مقاعد الباص: ${as}</div>`:''}
+        ${as?`<div style="font-size:11px;color:var(--tx2)">مقاعد الباص (ذهاب): ${as}</div>`:''}
+        ${as2?`<div style="font-size:11px;color:var(--wn)">مقاعد الباص (عودة): ${as2}</div>`:''}
+        ${b.seatNote?`<div style="font-size:11px;background:var(--wnl);border-radius:5px;padding:2px 7px;color:var(--wn);display:inline-block;margin-top:2px">🪑 ${b.seatNote}</div>`:''}
         <div style="font-size:12px;color:var(--gd);font-weight:600">🚌 ${getBusNames(b.convoy)[b.busIdx||0]||'الباص الأول'}</div>
         ${b.convoy2?`<div style="font-size:12px;background:var(--wnl);border:1px solid var(--wn);border-radius:6px;padding:3px 8px;margin-top:3px;font-weight:700;color:var(--wn)">⚠ واخد فوجين — هيرجع مع فوج ${getConv(b.convoy2)?.label||b.convoy2} مش الفوج الأول</div>`:''}        
         ${(b.adults||0)>0||(b.children||0)>0?`<div style="font-size:12px;color:var(--pu)">الأفراد: ${b.adults||0} كبار${(b.children||0)>0?' · '+(b.children||0)+' أطفال':''}</div>`:''}
@@ -2239,9 +2249,10 @@ function viewClient(id){
     </div>
     <div class="hr"></div>
     <div class="ctitle" style="font-size:12px">الشقق</div>
-    <div class="tbl-wrap" style="margin-bottom:.75rem"><table><thead><tr><th>رقم</th><th>الوصف</th><th>السعر</th></tr></thead><tbody>${aR}</tbody></table></div>
+    <div class="tbl-wrap" style="margin-bottom:.75rem"><table><thead><tr><th>رقم</th><th>الوصف</th><th>السعر</th></tr></thead><tbody>${aR}${aR2}</tbody></table></div>
     <div style="font-size:12px;margin-bottom:.65rem">
-      ${b.seats>0?`<div class="trow"><span>كراسي مشمولة بالشقة (${b.seats} × 0)</span><span>0 ج</span></div>`:''}
+      ${effS1>0?`<div class="trow"><span>كراسي فوج 1 (${b.seats||0}${(b.extraSeats||0)>0?' + '+b.extraSeats+' إضافي':''}${(b.seatDiscount||0)>0?' - '+b.seatDiscount+' خصم':''} = ${effS1})</span><span>مشمولة</span></div>`:''}
+      ${base2seats>0?`<div class="trow"><span>كراسي فوج 2 (${base2seats} عودة)</span><span>مشمولة</span></div>`:''}
       ${(b.extraSeats||0)>0?`<div class="trow"><span>كراسي إضافية (${b.extraSeats} × ${b.seatPrice} ج)</span><span style="font-weight:700">${((b.extraSeats||0)*(b.seatPrice||0)).toLocaleString()} ج</span></div>`:''}
       ${(b.intSeats||0)>0?`<div class="trow"><span>كراسي داخلية (${b.intSeats} × ${b.intSeatPrice} ج)</span><span style="font-weight:700">${(b.intTotal||0).toLocaleString()} ج</span></div>`:''}
       ${b.seatDiscount>0?`<div class="trow disc"><span>خصم ${b.seatDiscount} كرسي × 600</span><span>- ${(b.seatDiscount*600).toLocaleString()} ج</span></div>`:''}
@@ -3052,7 +3063,7 @@ function genReport(){
   function bkTable(bks){
     if(!bks.length)return '<div style="text-align:center;color:var(--tx3);padding:2rem">لا توجد بيانات</div>';
     return `<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>باص</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
-    ${bks.map(b=>`<tr><td style="font-weight:700">${b.name}</td><td>${b.phone||'-'}</td><td>${(b.apts||[]).join('، ')}</td><td style="font-size:11px">${b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td>${effSeats(b)}</td><td>${b.intSeats||0}</td><td>${b.adults||0}</td><td>${b.children||0}</td><td style="font-weight:700">${b.total.toLocaleString()} ج</td><td style="color:var(--ac)">${b.paid.toLocaleString()} ج</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b.remaining.toLocaleString()} ج</td><td>${b.remaining<=0?'مكتمل':'باقي'}</td></tr>`).join('')}
+    ${bks.map(b=>`<tr><td style="font-weight:700">${b.name}</td><td>${b.phone||'-'}</td><td>${(b.apts||[]).join('، ')}${(b.apts2||[]).length?' / '+b.apts2.join('، ')+'(ف2)':''}</td><td style="font-size:11px">${b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td>${effSeatsTotal(b)}</td><td>${b.intSeats||0}</td><td>${b.adults||0}</td><td>${b.children||0}</td><td style="font-weight:700">${b.total.toLocaleString()} ج</td><td style="color:var(--ac)">${b.paid.toLocaleString()} ج</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b.remaining.toLocaleString()} ج</td><td>${b.remaining<=0?'مكتمل':'باقي'}</td></tr>`).join('')}
     </tbody></table>`;
   }
   function accTable(ents,mode){
@@ -3501,6 +3512,7 @@ function editBooking(id){
       <div class="fg"><label>عدد الأفراد الكبار</label><input type="number" id="edit-adults" value="${b.adults||0}" min="0"></div>
       <div class="fg"><label>عدد الأطفال</label><input type="number" id="edit-children" value="${b.children||0}" min="0"></div>
     </div>
+    <div class="fg"><label>🪑 ملاحظة الكرسي <span style="font-weight:400;color:var(--tx3);font-size:11px">(بتظهر في تابة الباص)</span></label><input type="text" id="edit-seat-note" value="${b.seatNote||''}" placeholder="مثال: لا يجلس في آخر الباص · يفضل جنب الشباك..."></div>
     <div class="fg"><label>ملاحظات</label><textarea id="edit-notes" style="min-height:60px">${b.notes||''}</textarea></div>
     <div class="g2" style="margin-top:.75rem">
       <div class="fg"><label>حالة الحجز</label>
@@ -3530,6 +3542,8 @@ function calcEditTotal(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
   const curApts=editSelApts[id]||b.apts||[];
   let at=0;curApts.forEach(a=>{const el=document.getElementById('edit-apt-'+a);if(el)at+=parseFloat(el.value)||0;});
+  // Convoy2 apartment prices (preserved, read-only)
+  const at2=Object.values(b.aptPrices2||{}).reduce((s,v)=>s+v,0);
   // Update seats display
   const baseS1=curApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
   const baseS2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
@@ -3539,7 +3553,7 @@ function calcEditTotal(id){
   const extraEl=document.getElementById('edit-extra-seats');
   const totEl=document.getElementById('edit-seats-tot');
   const extra=parseFloat(extraEl?.value)||0;
-  if(bdEl) bdEl.textContent=baseS;
+  if(bdEl) bdEl.textContent=baseS+(baseS2>0?` (${baseS1}+${baseS2} فوج2)`:'');
   if(seatsEl) seatsEl.value=baseS;
   if(totEl) totEl.textContent=baseS+extra;
   const sp=parseFloat(document.getElementById('edit-seatp')?.value)||0;
@@ -3549,11 +3563,11 @@ function calcEditTotal(id){
   const disc=parseFloat(document.getElementById('edit-disc')?.value)||0;
   const tfee=parseFloat(document.getElementById('edit-transfer-fee')?.value)||0;
   const st=extra*sp;const intT=intS*intP;const sda=sd*600;
-  const total=at+st+intT+tfee-sda-disc;
-  const totSeats=baseS+extra;
-  const discWarn=sd>totSeats?`<div style="background:var(--dnl);border:1px solid var(--dn);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--dn);margin-top:4px">⚠️ الكراسي المخصومة (${sd}) تتجاوز إجمالي كراسي العميل (${totSeats})</div>`:'';
+  const total=at+at2+st+intT+tfee-sda-disc;
+  const maxDisc=baseS1+extra;
+  const discWarn=sd>maxDisc?`<div style="background:var(--dnl);border:1px solid var(--dn);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--dn);margin-top:4px">⚠️ الكراسي المخصومة (${sd}) تتجاوز كراسي الفوج الأول (${maxDisc})</div>`:'';
   const el=document.getElementById('edit-total-display');
-  if(el)el.innerHTML=`<div class="trow"><span>الشقق</span><span>${at.toLocaleString()} ج</span></div><div class="trow"><span>كراسي إضافية</span><span>${st.toLocaleString()} ج</span></div><div class="trow"><span>داخلية</span><span>${intT.toLocaleString()} ج</span></div><div class="trow disc"><span>خصومات</span><span>- ${(sda+disc).toLocaleString()} ج</span></div><div class="trow big"><span>الإجمالي الجديد</span><span>${total.toLocaleString()} ج</span></div>${discWarn}`;
+  if(el)el.innerHTML=`<div class="trow"><span>شقق فوج 1</span><span>${at.toLocaleString()} ج</span></div>${at2>0?`<div class="trow"><span>شقق فوج 2</span><span>${at2.toLocaleString()} ج</span></div>`:''}<div class="trow"><span>كراسي إضافية</span><span>${st.toLocaleString()} ج</span></div><div class="trow"><span>داخلية</span><span>${intT.toLocaleString()} ج</span></div><div class="trow disc"><span>خصومات</span><span>- ${(sda+disc).toLocaleString()} ج</span></div><div class="trow big"><span>الإجمالي الجديد</span><span>${total.toLocaleString()} ج</span></div>${discWarn}`;
 }
 async function saveEditBooking(id){
   const b=bookings.find(x=>x.id===id);
@@ -3578,23 +3592,28 @@ async function saveEditBooking(id){
   });
   const at=Object.values(newAptPrices).reduce((s,v)=>s+v,0);
 
+  // Preserve convoy2 apts and their prices (not editable in this form)
+  const keptApts2=b.apts2||[];
+  const keptAptPrices2=b.aptPrices2||{};
+  const at2=Object.values(keptAptPrices2).reduce((s,v)=>s+v,0);
+
   // Seats - include both convoy1 (apts) and convoy2 (apts2) base seats
   const newBase1=newApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
-  const newBase2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const newBase2=keptApts2.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
   const newBase=newBase1+newBase2;
   const newExtra=parseFloat(document.getElementById('edit-extra-seats')?.value)||0;
-  // Validation: extra seats cannot exceed what client booked
-  const maxAllowed=newBase; // cannot add more than base seats
-  if(newExtra>maxAllowed){
-    alert(`⚠️ الكراسي الإضافية (${newExtra}) لا يمكن أن تتجاوز عدد الكراسي المشمولة بالشقق (${maxAllowed}). يرجى تصحيح العدد.`);
+  // Validation: extra seats cannot exceed what client booked (base seats only)
+  if(newExtra>newBase){
+    alert(`⚠️ الكراسي الإضافية (${newExtra}) لا يمكن أن تتجاوز عدد الكراسي المشمولة بالشقق (${newBase}). يرجى تصحيح العدد.`);
     return;
   }
   const newTotal=newBase+newExtra;
   const sp=parseFloat(document.getElementById('edit-seatp')?.value)||b.seatPrice||0;
   const sd=parseFloat(document.getElementById('edit-seatd')?.value)||b.seatDiscount||0;
-  // Validation: seat discount cannot exceed total seats
-  if(sd>newTotal){
-    alert(`⚠️ الكراسي المخصومة (${sd}) أكبر من إجمالي كراسي العميل (${newTotal}). يرجى تصحيح الخصم.`);
+  // Validation: seat discount cannot exceed convoy1 seats (discount only applies to convoy1 bus)
+  const maxDiscount=newBase1+newExtra;
+  if(sd>maxDiscount){
+    alert(`⚠️ الكراسي المخصومة (${sd}) أكبر من كراسي الفوج الأول (${maxDiscount}). يرجى تصحيح الخصم.`);
     return;
   }
   const intS=parseFloat(document.getElementById('edit-int-seats')?.value)||b.intSeats||0;
@@ -3602,6 +3621,7 @@ async function saveEditBooking(id){
   const disc=parseFloat(document.getElementById('edit-disc')?.value)||0;
   const tfee=parseFloat(document.getElementById('edit-transfer-fee')?.value)||b.transferFee||0;
   const notes=document.getElementById('edit-notes')?.value||b.notes||'';
+  const seatNote=document.getElementById('edit-seat-note')?.value?.trim()||b.seatNote||'';
   const discReason=document.getElementById('edit-disc-reason')?.value||b.discReason||'';
   const adultsVal=parseInt(document.getElementById('edit-adults')?.value)||0;
   const childrenVal=parseInt(document.getElementById('edit-children')?.value)||0;
@@ -3610,13 +3630,13 @@ async function saveEditBooking(id){
   const sda=sd*600;
   const intT=intS*intP;
   const st=newExtra*sp;
-  const total=at+st+intT+tfee-sda-disc;
+  // total = convoy1 apts + convoy2 apts + extra seats - seat discount - general discount
+  const total=at+at2+st+intT+tfee-sda-disc;
   const remaining=total-b.paid;
 
-  // Rebuild seat assignments: only convoy1 net seats go into seat_assign
-  // convoy2 seats stay in seat_assign2 (untouched here)
+  // Rebuild seat assignments: convoy1 net seats = (base1 + extra - discount)
   const oldSA=[...(b.seatAssign||[])];
-  const netSeats1=Math.max(0,(newBase1+newExtra)-sd); // net seats for convoy1 bus
+  const netSeats1=Math.max(0,(newBase1+newExtra)-sd);
   const newSA=[];
   for(let i=0;i<netSeats1;i++){
     newSA.push({seatNum:oldSA[i]?.seatNum||null});
@@ -3625,6 +3645,7 @@ async function saveEditBooking(id){
   const oldSA2=[...(b.seatAssign2||[])];
 
   const newBusIdx=parseInt(document.getElementById('edit-bus-sel')?.value)||0;
+  const newConvoy2=parseInt(document.getElementById('edit-convoy2')?.value)||null;
   const payload={
     name, phone, pickup,
     convoy:newConvNum,
@@ -3632,7 +3653,9 @@ async function saveEditBooking(id){
     checkout:newConv?.checkout||b.checkout,
     apts:newApts,
     apt_prices:newAptPrices,
-    apts_total:at,
+    apts2:keptApts2,
+    apt_prices2:keptAptPrices2,
+    apts_total:at+at2,
     seats:newBase1,
     extra_seats:newExtra,
     seat_price:sp,
@@ -3643,17 +3666,17 @@ async function saveEditBooking(id){
     int_total:intT,
     transfer_fee:tfee,
     disc, total, remaining, notes,
+    seat_note:seatNote,
     adults:adultsVal, children:childrenVal,
     seat_assign:newSA,
     seat_assign2:oldSA2,
     disc_reason:discReason,
     created_by:newCreatedBy,
-    convoy2:parseInt(document.getElementById('edit-convoy2')?.value)||null,
+    convoy2:newConvoy2,
     status:document.getElementById('edit-status')?.value||b.status||'active',
     last_edit_by:currentUser?.name||'—',
     last_edit_at:new Date().toLocaleDateString('ar-EG')
   };
-  const newConvoy2=parseInt(document.getElementById('edit-convoy2')?.value)||null;
 
   try{
     const newStatus=document.getElementById('edit-status')?.value||b.status||'active';
@@ -3667,11 +3690,11 @@ async function saveEditBooking(id){
       convoy:newConvNum,
       checkin:newConv?.checkin||b.checkin,
       checkout:newConv?.checkout||b.checkout,
-      apts:newApts, aptPrices:newAptPrices, aptsTotal:at,
+      apts:newApts, aptPrices:newAptPrices, apts2:keptApts2, aptPrices2:keptAptPrices2, aptsTotal:at+at2,
       seats:newBase1, extraSeats:newExtra,
       seatPrice:sp, seatDiscount:sd, seatDiscAmt:sda,
       intSeats:intS, intSeatPrice:intP, intTotal:intT,
-      transferFee:tfee, disc, discReason, total, remaining, notes,
+      transferFee:tfee, disc, discReason, total, remaining, notes, seatNote,
       adults:adultsVal, children:childrenVal, seatAssign:newSA, seatAssign2:oldSA2,
       createdBy:newCreatedBy,
       busIdx:newBusIdx,

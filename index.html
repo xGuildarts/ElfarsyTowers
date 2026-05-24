@@ -349,7 +349,7 @@ tr:hover td{background:#f5f8fc}
 .seat.taken:hover{opacity:.85}
 .seat.taken.drag-over{outline:3px solid rgba(255,255,255,.8);outline-offset:-3px}
 .seat.dragging{opacity:.3}
-.snum{font-size:13px;font-weight:700;margin-bottom:2px}
+.snum{font-size:18px;font-weight:700;margin-bottom:2px}
 .seat.empty .snum{color:var(--bd2);font-size:22px}
 .seat.taken .snum{color:rgba(255,255,255,.7)}
 .sname{font-size:18px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
@@ -2706,8 +2706,8 @@ function renderBusLayout(cn,busIdx){
     const o=occ[sn];
     if(o){
       const col=cColor(o.bookingId,cn);
-      const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:11px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
-      const noteBadge=o.seatNote?`<span style="background:rgba(255,255,255,.25);border-radius:3px;font-size:11px;padding:1px 4px;margin-top:1px;white-space:normal;line-height:1.3">📝 ${o.seatNote}</span>`:'';
+      const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:15px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
+      const noteBadge=o.seatNote?`<span style="background:rgba(255,255,255,.25);border-radius:3px;font-size:15px;padding:1px 4px;margin-top:1px;white-space:normal;line-height:1.3">📝 ${o.seatNote}</span>`:'';
       return `<div class="seat taken" style="background:${col};${o.isDouble?'border:3px solid #f9e79f':''}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}${o.isDouble?' · واخد فوجين':''}${o.seatNote?' · 📝 '+o.seatNote:''}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span>${doubleBadge}${noteBadge}</div>`;
     }
     return `<div class="seat empty" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})"><span class="snum">${sn}</span></div>`;

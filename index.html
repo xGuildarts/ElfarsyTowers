@@ -547,6 +547,7 @@ tr:hover td{background:#f5f8fc}
   <div id="pay-cont"></div>
   <button class="btn btn-sm" onclick="addPayRow()" style="margin-bottom:8px">+ دفعة</button>
   <div class="fg"><label>ملاحظات</label><textarea id="f-notes"></textarea></div>
+  <div class="fg"><label>🪑 ملاحظة الكرسي <span style="font-weight:400;color:var(--tx3);font-size:11px">(بتظهر في تابة الباص)</span></label><input type="text" id="f-seat-note" placeholder="مثال: لا يجلس في آخر الباص · يفضل جنب الشباك..."></div>
   <div class="hr"></div>
   <button class="btn btn-p" onclick="saveBooking()">حفظ الحجز</button>
 </div></div>
@@ -1448,7 +1449,7 @@ async function initApp(){
 }
 
 // Mappers
-function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,apts2:r.apts2||[],aptPrices2:r.apt_prices2||{},seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
+function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,apts2:r.apts2||[],aptPrices2:r.apt_prices2||{},seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatNote:r.seat_note||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):'',busIdx:r.bus_idx||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
 function mHB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',dest:r.destination||'',hotelId:r.hotel_id||null,hotelName:r.hotel_name||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:r.nights||0,roomType:r.room_type||'single',rooms:r.rooms||1,pricePerNight:r.price_per_night||0,adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('ar-EG'):''}}
 function mS(r){
@@ -2127,7 +2128,7 @@ async function saveBooking(){
   const sa2=convoy2Val?[...Array(Math.max(0,base2)).keys()].map(()=>({seatNum:null,extra:false})):[];
   const ap2=convoy2Val?getAptPrices2():{};
   const at2=Object.values(ap2).reduce((s,v)=>s+v,0);
-  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
+  const payload={name,phone,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_note:document.getElementById('f-seat-note')?.value?.trim()||'',seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();
   if(drVal&&!payload.notes) payload.notes='خصم: '+drVal;
@@ -2164,6 +2165,7 @@ function resetForm(){
   document.getElementById('f-name').style.display='block';document.getElementById('f-sup-sel').style.display='none';
   selApts=[];renderGrid();renderSelBar();renderAptPrices();
   selApts2=[];
+  const snEl=document.getElementById('f-seat-note');if(snEl)snEl.value='';
   const w2=document.getElementById('conv2-apt-wrap');if(w2)w2.style.display='none';
   const g2=document.getElementById('apt-grid-2');if(g2)g2.innerHTML='';
   const sb2=document.getElementById('sel-bar-2');if(sb2)sb2.innerHTML='<span style="font-size:11px;color:var(--tx3);align-self:center">لم تختر شقة للفوج الثاني</span>';
@@ -2458,7 +2460,7 @@ function renderBusLayout(cn,busIdx){
   const occ={};
   bks.forEach(b=>{
     const isDouble=b.convoy2!=null;
-    (b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx,isDouble,convoy2:b.convoy2};});
+    (b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',bookingId:b.id,assignIdx:idx,isDouble,convoy2:b.convoy2,seatNote:b.seatNote||''};})
   });
   // Also show return clients (convoy2=cn) in seats (using seat_assign2)
   const occ2={}; // return seats for convoy2=cn clients
@@ -2471,7 +2473,7 @@ function renderBusLayout(cn,busIdx){
   bks.forEach(b=>{
     const p=b.pickup||'غير محدد';if(!pool[p])pool[p]=[];
     const isDouble=b.convoy2!=null;
-    (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn),isDouble,convoy2:b.convoy2});});
+    (b.seatAssign||[]).forEach((sa,idx)=>{if(!sa.seatNum)pool[p].push({name:b.name,phone:b.phone||'',bookingId:b.id,assignIdx:idx,color:cColor(b.id,cn),isDouble,convoy2:b.convoy2,seatNote:b.seatNote||''});});
   });
   // Unassigned clients (not in any bus yet) - only show if multiple buses
   const unassignedBks = busCount>1 ? allBks.filter(b=>{
@@ -2492,7 +2494,7 @@ function renderBusLayout(cn,busIdx){
       poolHtml+=`<div style="margin-bottom:.65rem;padding:.5rem;background:var(--sf);border-radius:var(--r);border:1px solid var(--bd)">
         <div style="font-size:11px;font-weight:700;color:var(--ac);margin-bottom:.4rem">📍 ${place} (${people.length})</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">`;
-      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:${p.isDouble?'3px solid #f9e79f':'2px solid rgba(255,255,255,.3)'};box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div>${p.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 3px;margin-top:2px">⚠ فوجين</div>':''}</div>`).join('');
+      poolHtml+=people.map(p=>`<div draggable="true" ondragstart="poolDragInfo={bookingId:${p.bookingId},assignIdx:${p.assignIdx}};dragInfo=null;event.dataTransfer.effectAllowed='move'" style="background:${p.color};color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:grab;text-align:center;min-width:78px;border:${p.isDouble?'3px solid #f9e79f':'2px solid rgba(255,255,255,.3)'};box-shadow:0 2px 6px rgba(0,0,0,.2)"><div style="font-size:12px">${p.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.85;margin-top:1px">${p.phone?'📱 '+p.phone.slice(-4):''}</div>${p.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 3px;margin-top:2px">⚠ فوجين</div>':''}${p.seatNote?`<div style="background:rgba(255,255,255,.25);border-radius:3px;font-size:8px;padding:2px 4px;margin-top:3px;max-width:90px;white-space:normal;line-height:1.3">📝 ${p.seatNote}</div>`:''}</div>`).join('');
       poolHtml+=`</div></div>`;
     });
     poolHtml+=`<div style="font-size:10px;color:var(--tx3);margin-top:.4rem;text-align:center">↕ اسحب لتخصيص مقعد في الباص</div></div>`;
@@ -2539,6 +2541,7 @@ function renderBusLayout(cn,busIdx){
           +'<div style="font-size:9px;opacity:.9;margin-top:1px">من فوج '+(conv1?conv1.label:b.convoy)+'</div>'
           +'<div style="font-size:9px;opacity:.9">'+(b.phone?'📱 '+b.phone.slice(-4):'')+'</div>'
           +'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">'+seatLabel+'</div>'
+          +(b.seatNote?'<div style="background:rgba(255,255,255,.2);border-radius:3px;font-size:8px;padding:2px 4px;margin-top:3px;white-space:normal;line-height:1.3">📝 '+b.seatNote+'</div>':'')
           +'</div>';
       }).join('')}
       </div>
@@ -2557,7 +2560,8 @@ function renderBusLayout(cn,busIdx){
     if(o){
       const col=cColor(o.bookingId,cn);
       const doubleBadge=o.isDouble?`<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">⚠ فوجين · مش هيرجع معنا</span>`:'';
-      return `<div class="seat taken" style="background:${col};${o.isDouble?'border:3px solid #f9e79f':''}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}${o.isDouble?' · واخد فوجين':''}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span>${doubleBadge}</div>`;
+      const noteBadge=o.seatNote?`<span style="background:rgba(255,255,255,.25);border-radius:3px;font-size:8px;padding:1px 4px;margin-top:1px;white-space:normal;line-height:1.3">📝 ${o.seatNote}</span>`:'';
+      return `<div class="seat taken" style="background:${col};${o.isDouble?'border:3px solid #f9e79f':''}" draggable="true" ondragstart="dragInfo={cn:${cn},sn:${sn}};poolDragInfo=null;event.dataTransfer.effectAllowed='move';setTimeout(()=>event.target.classList.add('dragging'),0)" ondragend="event.target.classList.remove('dragging')" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})" ondblclick="clearSeat(${cn},${sn})" title="${o.name} · ${o.pickup}${o.isDouble?' · واخد فوجين':''}${o.seatNote?' · 📝 '+o.seatNote:''}"><span class="snum">${sn}</span><span class="sname">${o.name}</span><span class="sphone">${o.phone}</span><span class="splace">${o.pickup}</span>${doubleBadge}${noteBadge}</div>`;
     }
     return `<div class="seat empty" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})"><span class="snum">${sn}</span></div>`;
   }
@@ -3426,7 +3430,9 @@ function toggleLang(){
 function editBooking(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
   // Pre-calculate base seats for template
-  const _bSeats=(b.apts||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const _bSeats1=(b.apts||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const _bSeats2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const _bSeats=_bSeats1+_bSeats2;
   const _totSeats=_bSeats+(b.extraSeats||0);
   const conv=getConv(b.convoy);
   document.getElementById('edit-modal').style.display='block';
@@ -3466,6 +3472,7 @@ function editBooking(id){
       </div>
     </div>
     <div class="fg" style="margin-top:.75rem"><label>أسعار الشقق (قابلة للتعديل)</label><div id="edit-apt-rows">${aR}</div></div>
+    ${_bSeats2>0?`<div style="background:var(--wnl);border:1px solid var(--wn);border-radius:var(--r);padding:.5rem .75rem;margin-bottom:6px;font-size:12px;color:var(--wn);font-weight:700">⚠ واخد فوجين — كراسي الفوج الأول: ${_bSeats1} · كراسي الفوج الثاني: ${_bSeats2} · الإجمالي: ${_bSeats} كرسي (الخصم يُطبَّق على كراسي الفوج الأول فقط)</div>`:''}
     <div class="g3" style="margin-top:.75rem">
       <div class="fg"><label>كراسي الباص</label>
         <div style="display:flex;gap:5px;align-items:center;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:.5rem;flex-wrap:wrap">
@@ -3474,7 +3481,7 @@ function editBooking(id){
           <input type="hidden" id="edit-seats" value="${_bSeats}">
           <span style="color:var(--tx3);font-size:13px">+</span>
           <span style="font-size:11px;color:var(--tx2)">إضافي:</span>
-          <input type="number" id="edit-extra-seats" value="${b.extraSeats||0}" min="0" oninput="calcEditTotal(${id})" style="width:65px;flex:none">
+          <input type="number" id="edit-extra-seats" value="${b.extraSeats||0}" min="0" max="${_bSeats}" oninput="calcEditTotal(${id})" style="width:65px;flex:none">
           <span style="font-size:12px;font-weight:700;color:var(--pr)">=<span id="edit-seats-tot">${_totSeats}</span> كرسي</span>
         </div>
       </div>
@@ -3524,7 +3531,9 @@ function calcEditTotal(id){
   const curApts=editSelApts[id]||b.apts||[];
   let at=0;curApts.forEach(a=>{const el=document.getElementById('edit-apt-'+a);if(el)at+=parseFloat(el.value)||0;});
   // Update seats display
-  const baseS=curApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const baseS1=curApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const baseS2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const baseS=baseS1+baseS2;
   const bdEl=document.getElementById('edit-base-seats-disp');
   const seatsEl=document.getElementById('edit-seats');
   const extraEl=document.getElementById('edit-extra-seats');
@@ -3541,8 +3550,10 @@ function calcEditTotal(id){
   const tfee=parseFloat(document.getElementById('edit-transfer-fee')?.value)||0;
   const st=extra*sp;const intT=intS*intP;const sda=sd*600;
   const total=at+st+intT+tfee-sda-disc;
+  const totSeats=baseS+extra;
+  const discWarn=sd>totSeats?`<div style="background:var(--dnl);border:1px solid var(--dn);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--dn);margin-top:4px">⚠️ الكراسي المخصومة (${sd}) تتجاوز إجمالي كراسي العميل (${totSeats})</div>`:'';
   const el=document.getElementById('edit-total-display');
-  if(el)el.innerHTML=`<div class="trow"><span>الشقق</span><span>${at.toLocaleString()} ج</span></div><div class="trow"><span>كراسي إضافية</span><span>${st.toLocaleString()} ج</span></div><div class="trow"><span>داخلية</span><span>${intT.toLocaleString()} ج</span></div><div class="trow disc"><span>خصومات</span><span>- ${(sda+disc).toLocaleString()} ج</span></div><div class="trow big"><span>الإجمالي الجديد</span><span>${total.toLocaleString()} ج</span></div>`;
+  if(el)el.innerHTML=`<div class="trow"><span>الشقق</span><span>${at.toLocaleString()} ج</span></div><div class="trow"><span>كراسي إضافية</span><span>${st.toLocaleString()} ج</span></div><div class="trow"><span>داخلية</span><span>${intT.toLocaleString()} ج</span></div><div class="trow disc"><span>خصومات</span><span>- ${(sda+disc).toLocaleString()} ج</span></div><div class="trow big"><span>الإجمالي الجديد</span><span>${total.toLocaleString()} ج</span></div>${discWarn}`;
 }
 async function saveEditBooking(id){
   const b=bookings.find(x=>x.id===id);
@@ -3567,12 +3578,25 @@ async function saveEditBooking(id){
   });
   const at=Object.values(newAptPrices).reduce((s,v)=>s+v,0);
 
-  // Seats
-  const newBase=newApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  // Seats - include both convoy1 (apts) and convoy2 (apts2) base seats
+  const newBase1=newApts.reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const newBase2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
+  const newBase=newBase1+newBase2;
   const newExtra=parseFloat(document.getElementById('edit-extra-seats')?.value)||0;
+  // Validation: extra seats cannot exceed what client booked
+  const maxAllowed=newBase; // cannot add more than base seats
+  if(newExtra>maxAllowed){
+    alert(`⚠️ الكراسي الإضافية (${newExtra}) لا يمكن أن تتجاوز عدد الكراسي المشمولة بالشقق (${maxAllowed}). يرجى تصحيح العدد.`);
+    return;
+  }
   const newTotal=newBase+newExtra;
   const sp=parseFloat(document.getElementById('edit-seatp')?.value)||b.seatPrice||0;
   const sd=parseFloat(document.getElementById('edit-seatd')?.value)||b.seatDiscount||0;
+  // Validation: seat discount cannot exceed total seats
+  if(sd>newTotal){
+    alert(`⚠️ الكراسي المخصومة (${sd}) أكبر من إجمالي كراسي العميل (${newTotal}). يرجى تصحيح الخصم.`);
+    return;
+  }
   const intS=parseFloat(document.getElementById('edit-int-seats')?.value)||b.intSeats||0;
   const intP=parseFloat(document.getElementById('edit-int-seatp')?.value)||b.intSeatPrice||0;
   const disc=parseFloat(document.getElementById('edit-disc')?.value)||0;
@@ -3589,13 +3613,16 @@ async function saveEditBooking(id){
   const total=at+st+intT+tfee-sda-disc;
   const remaining=total-b.paid;
 
-  // Rebuild seat assignments for new total
+  // Rebuild seat assignments: only convoy1 net seats go into seat_assign
+  // convoy2 seats stay in seat_assign2 (untouched here)
   const oldSA=[...(b.seatAssign||[])];
-  const netSeats=Math.max(0,newTotal-sd);
+  const netSeats1=Math.max(0,(newBase1+newExtra)-sd); // net seats for convoy1 bus
   const newSA=[];
-  for(let i=0;i<netSeats;i++){
+  for(let i=0;i<netSeats1;i++){
     newSA.push({seatNum:oldSA[i]?.seatNum||null});
   }
+  // Keep seat_assign2 as-is (convoy2 seats not editable here)
+  const oldSA2=[...(b.seatAssign2||[])];
 
   const newBusIdx=parseInt(document.getElementById('edit-bus-sel')?.value)||0;
   const payload={
@@ -3606,7 +3633,7 @@ async function saveEditBooking(id){
     apts:newApts,
     apt_prices:newAptPrices,
     apts_total:at,
-    seats:newBase,
+    seats:newBase1,
     extra_seats:newExtra,
     seat_price:sp,
     seat_discount:sd,
@@ -3618,6 +3645,7 @@ async function saveEditBooking(id){
     disc, total, remaining, notes,
     adults:adultsVal, children:childrenVal,
     seat_assign:newSA,
+    seat_assign2:oldSA2,
     disc_reason:discReason,
     created_by:newCreatedBy,
     convoy2:parseInt(document.getElementById('edit-convoy2')?.value)||null,
@@ -3640,11 +3668,11 @@ async function saveEditBooking(id){
       checkin:newConv?.checkin||b.checkin,
       checkout:newConv?.checkout||b.checkout,
       apts:newApts, aptPrices:newAptPrices, aptsTotal:at,
-      seats:newBase, extraSeats:newExtra,
+      seats:newBase1, extraSeats:newExtra,
       seatPrice:sp, seatDiscount:sd, seatDiscAmt:sda,
       intSeats:intS, intSeatPrice:intP, intTotal:intT,
       transferFee:tfee, disc, discReason, total, remaining, notes,
-      adults:adultsVal, children:childrenVal, seatAssign:newSA,
+      adults:adultsVal, children:childrenVal, seatAssign:newSA, seatAssign2:oldSA2,
       createdBy:newCreatedBy,
       busIdx:newBusIdx,
       convoy2:newConvoy2,

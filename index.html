@@ -424,12 +424,12 @@ tr:hover td{background:#f5f8fc}
     <div id="login-logo-ph" class="logo-ph">🏖</div>
     <img id="login-logo-img" style="display:none;width:72px;height:72px;border-radius:50%;object-fit:cover">
   </div>
-  <div class="login-title" id="login-title">نظام حجوزات مطروح 2026</div>
+  <div class="login-title" id="login-title">Adriaska Tourss Matrouh 2026</div>
   <div class="login-sub">سجل الدخول للمتابعة</div>
   <div class="login-err" id="login-err">اسم المستخدم أو كلمة المرور غلط</div>
   <div class="fg"><label>اسم المستخدم</label><input type="text" id="login-user" placeholder="username"></div>
   <div class="fg"><label>كلمة المرور</label><input type="password" id="login-pass" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-  <button class="btn btn-p" style="width:100%;margin-top:.5rem" onclick="doLogin()">دخول</button>
+  <button class="btn btn-p" style="width:100%;margin-top:.5rem" onclick="doLogin()">Log IN</button>
 </div>
 </div>
 
@@ -447,7 +447,7 @@ tr:hover td{background:#f5f8fc}
     <div class="user-pill" id="hdr-user">—</div>
     <button class="hbtn" onclick="toggleDark()" id="dark-btn">🌙</button>
     <button class="hbtn" onclick="toggleLang()" id="lang-btn">EN</button>
-    <button class="hbtn" onclick="doLogout()">خروج</button>
+    <button class="hbtn" onclick="doLogout()">Log Out</button>
   </div>
 </div>
 <div class="tabs" id="tabs-bar">
@@ -1623,7 +1623,7 @@ async function doLogin(){
   const f=users.find(x=>x.username===u&&x.password===p);
   if(!f){document.getElementById('login-err').style.display='block';return;}
   document.getElementById('login-err').style.display='none';
-  await addLog('تسجيل دخول','login',`${f.name} · دور: ${{admin:'أدمن',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]||f.role}`);
+  await addLog('تسجيل دخول','login',`${f.name} · دور: ${{admin:'GM',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]||f.role}`);
   loginUser(f);
 }
 function loginUser(f){
@@ -1632,9 +1632,9 @@ function loginUser(f){
   // Read lastTab BEFORE applyPerms (applyPerms no longer calls showTab)
   const lastTab=localStorage.getItem('mtr_last_tab')||'dash';
   hideAll();show('app');
-  document.getElementById('hdr-user').textContent=f.name+' · '+(ROLE_DEFAULTS[f.role]?{admin:'أدمن',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]:f.role);
+  document.getElementById('hdr-user').textContent=f.name+' · '+(ROLE_DEFAULTS[f.role]?{admin:'GM',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]:f.role);
   document.getElementById('dark-btn').textContent=document.body.classList.contains('dark')?'☀️':'🌙';
-  document.getElementById('lang-btn').textContent=lang==='ar'?'EN':'ع';
+  document.getElementById('lang-btn').textContent=lang==='ar'?'EN':'AR';
   applyPerms();updateLogoDsp();
   populateConvoys();populateCities();populateSalesReps();renderGrid();
   document.getElementById('acc-date').value=new Date().toISOString().split('T')[0];

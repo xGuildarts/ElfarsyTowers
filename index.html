@@ -342,19 +342,19 @@ tr:hover td{background:#f5f8fc}
 .bus-driver{width:54px;height:32px;background:var(--pr);color:#fff;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto .45rem}
 .bus-row{display:flex;gap:5px;align-items:stretch;justify-content:center;margin-bottom:5px}
 .bus-aisle{width:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--tx3)}
-.seat{width:130px;min-height:110px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;background:var(--sf);padding:8px 6px;transition:all .15s;flex-shrink:0;user-select:none}
+.seat{width:155px;min-height:135px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;background:var(--sf);padding:10px 8px;transition:all .15s;flex-shrink:0;user-select:none}
 .seat.empty{border-style:dashed}
 .seat.empty:hover{border-color:var(--pr);background:var(--prl)}
 .seat.taken{cursor:grab;border-color:transparent}
 .seat.taken:hover{opacity:.85}
 .seat.taken.drag-over{outline:3px solid rgba(255,255,255,.8);outline-offset:-3px}
 .seat.dragging{opacity:.3}
-.snum{font-size:11px;font-weight:700;margin-bottom:3px}
-.seat.empty .snum{color:var(--bd2);font-size:20px}
+.snum{font-size:13px;font-weight:700;margin-bottom:4px}
+.seat.empty .snum{color:var(--bd2);font-size:24px}
 .seat.taken .snum{color:rgba(255,255,255,.7)}
-.sname{font-size:14px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
-.sphone{font-size:12px;color:rgba(255,255,255,.9)}
-.splace{font-size:11px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
+.sname{font-size:15px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
+.sphone{font-size:13px;color:rgba(255,255,255,.9)}
+.splace{font-size:12px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
 .bus-legend{display:flex;gap:8px;justify-content:center;margin-top:.65rem;font-size:11px;flex-wrap:wrap;color:var(--tx2)}
 .pickup-summary{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.65rem}
 .pickup-tag{background:var(--sf);border:1px solid var(--bd2);border-radius:var(--r);padding:4px 9px;font-size:12px}
@@ -387,12 +387,12 @@ tr:hover td{background:#f5f8fc}
   table{width:100%!important;font-size:12px!important}
   .tbl-wrap{overflow:visible!important}
   .stat{break-inside:avoid}
-  .seat{width:100px!important;min-height:90px!important;font-size:11px!important}
-  .sname{font-size:12px!important}
-  .sphone{font-size:10px!important}
-  .splace{font-size:10px!important}
-  .snum{font-size:10px!important}
-  .seat.empty .snum{font-size:16px!important}
+  .seat{width:130px!important;min-height:115px!important;font-size:12px!important}
+  .sname{font-size:14px!important}
+  .sphone{font-size:12px!important}
+  .splace{font-size:11px!important}
+  .snum{font-size:12px!important}
+  .seat.empty .snum{font-size:20px!important}
   .bus-wrap{overflow:visible!important}
   .bus-row{flex-wrap:nowrap!important}
   .bus-aisle{width:16px!important}
@@ -2584,20 +2584,20 @@ function printBusLayout(cn,busIdx){
   // في الباص: صفوف اليمين = 1,3 (أو홀) وصفوف الشمال = 2,4 (أو زوجي) حسب الترتيب الفعلي
   // الترتيب الصح في الباص الحقيقي بالعربي (RTL): 2 1 | ممر | 4 3
   function makeSeatDiv(sn){
-    if(!sn) return `<div style="width:105px;flex-shrink:0"></div>`;
+    if(!sn) return `<div style="width:130px;flex-shrink:0"></div>`;
     const isRet=!!occ2[sn];
     const o=isRet?occ2[sn]:occ[sn];
     const col=isRet?'#7d3c98':(o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===sn))%COLORS.length]:'#eef2f7');
     const txtCol=o?'#fff':'#aaa';
     const brd=o?(isRet?'3px solid #f9e79f':'2px solid '+col):'2px dashed #ccd4de';
-    return `<div style="width:105px;min-height:90px;flex-shrink:0;background:${col};color:${txtCol};border:${brd};border-radius:8px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-family:'Cairo',sans-serif">
-      <div style="font-size:12px;font-weight:900;opacity:${o?.8:.5};margin-bottom:2px">${sn}</div>
-      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.35;word-break:break-word">${o.name.split(' ').slice(0,3).join(' ')}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:3px">${o.phone||''}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:2px">${(o.pickup||'').slice(0,10)}</div>
-      ${isRet?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-top:3px">↩ عودة</div>':
-        (o.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-top:3px">⚠ فوجين</div>':'')}`
-      :`<div style="font-size:11px;color:#c0c8d4;margin-top:10px">فارغ</div>`}
+    return `<div style="width:130px;min-height:115px;flex-shrink:0;background:${col};color:${txtCol};border:${brd};border-radius:10px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-family:'Cairo',sans-serif">
+      <div style="font-size:13px;font-weight:900;opacity:${o?.8:.5};margin-bottom:3px">${sn}</div>
+      ${o?`<div style="font-size:14px;font-weight:900;line-height:1.4;word-break:break-word">${o.name.split(' ').slice(0,3).join(' ')}</div>
+      <div style="font-size:12px;opacity:.9;margin-top:4px">${o.phone||''}</div>
+      <div style="font-size:12px;opacity:.9;margin-top:3px">${(o.pickup||'').slice(0,12)}</div>
+      ${isRet?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:10px;font-weight:900;padding:1px 6px;margin-top:4px">↩ عودة</div>':
+        (o.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:10px;font-weight:900;padding:1px 6px;margin-top:4px">⚠ فوجين</div>':'')}`
+      :`<div style="font-size:12px;color:#c0c8d4;margin-top:14px">فارغ</div>`}
     </div>`;
   }
   // ممر المحور
@@ -2667,12 +2667,16 @@ function printBusLayout(cn,busIdx){
 body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12px;background:#fff;font-size:13px}
 *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 @media print{
-  @page{margin:8mm;size:A4 landscape}
+  @page{margin:6mm;size:A4 landscape}
   body{padding:0;font-size:12px}
   .no-print{display:none!important}
+  .print-page{page-break-after:always;page-break-inside:avoid}
+  .print-page:last-child{page-break-after:avoid}
 }
 </style>
 </head><body>
+<!-- صفحة 1: الهيدر + خريطة الباص -->
+<div class="print-page">
 <!-- هيدر -->
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #d6eaf8">
   <div>
@@ -2686,7 +2690,7 @@ body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12
   </div>
 </div>
 <!-- رسمة الباص -->
-<div style="margin:0 auto 16px;max-width:700px">
+<div style="margin:0 auto 16px;max-width:900px">
   <div style="font-size:15px;font-weight:900;color:#1a5276;text-align:center;margin-bottom:10px">🚌 خريطة مقاعد الباص</div>
   <div style="background:#f8fafc;border:2px solid #d6eaf8;border-radius:12px;padding:14px">
     <!-- سائق -->
@@ -2703,12 +2707,20 @@ body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12
     ${returnClients.map(b=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#7d3c98;border:2px solid #f9e79f;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif">↩ ${b.name.split(' ').slice(0,3).join(' ')} · عودة</span>`).join('')}
   </div>
 </div>
+</div><!-- نهاية صفحة 1 -->
+
+<!-- صفحة 2: قائمة الركاب حسب التجمع -->
+<div class="print-page">
 <!-- قائمة الركاب -->
 <div style="border-top:2px solid #d6eaf8;padding-top:12px;margin-bottom:14px">
   <div style="font-size:16px;font-weight:900;color:#1a5276;margin-bottom:8px">📋 الركاب حسب نقطة التجمع</div>
   ${pickupList||'<div style="color:#999;font-size:13px">لا يوجد مقاعد محجوزة</div>'}
   ${returnList}
 </div>
+</div><!-- نهاية صفحة 2 -->
+
+<!-- صفحة 3: جدول تفصيلي -->
+<div class="print-page">
 <!-- جدول تفصيلي -->
 <div>
   <div style="font-size:16px;font-weight:900;color:#1a5276;margin-bottom:8px">📊 جدول الركاب التفصيلي</div>
@@ -2749,6 +2761,7 @@ body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12
     </tbody>
   </table>
 </div>
+</div><!-- نهاية صفحة 3 -->
 <script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script>
 </body></html>`;
   const blob=new Blob([h],{type:'text/html;charset=utf-8'});

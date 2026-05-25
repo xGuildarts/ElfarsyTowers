@@ -1463,8 +1463,8 @@ function getBusCount(cn){return getBusNames(cn).length;}
 // ============================================================
 const SB_URL_KEY='mtr_sb_url',SB_KEY_KEY='mtr_sb_key';
 function sbH(){return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'}}
-function setSyncing(v){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot'+(v?' s':'');if(t)t.textContent=v?'مزامنة...':'متصل'}
-function setSyncErr(){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot e';if(t)t.textContent='خطأ'}
+function setSyncing(v){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot'+(v?' s':'');if(t)t.textContent=v?'Connecting...':'Connected'}
+function setSyncErr(){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot e';if(t)t.textContent='Error'}
 
 async function sbFetch(table,method='GET',body=null,query=''){
   setSyncing(true);
@@ -5266,8 +5266,8 @@ window.renderAccDetail = function(key){
 
 // 1. ROLE NAME EDITING + CUSTOM ROLES
 const ROLE_LABELS = {
-  admin:'أدمن',bookings:'حجوزات',accounts:'حسابات',
-  operations:'عمليات',viewer:'مشاهد'
+  admin:'GM',bookings:'Bokkings',accounts:'Acountant',
+  operations:'Operations',viewer:'Viewer'
 };
 // NOTE: customRoleLabels already defined above — just extend it, don't redefine
 try{

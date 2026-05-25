@@ -963,9 +963,9 @@ tr:hover td{background:#f5f8fc}
       <div class="hr"></div>
       <div class="ctitle" style="font-size:13px">➕ Add Roles  </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end">
-        <div class="fg" style="margin-bottom:0;flex:1;min-width:160px"><label>اسم الدور (عربي للعرض)</label><input type="text" id="nr-label" placeholder="مثال: مشرف الباص"></div>
-        <div class="fg" style="margin-bottom:0;flex:1;min-width:140px"><label>معرف الدور (انجليزي)</label><input type="text" id="nr-id" placeholder="مثال: bus_supervisor"></div>
-        <button class="btn btn-p" onclick="addCustomRole()" style="white-space:nowrap">➕ إضافة دور</button>
+        <div class="fg" style="margin-bottom:0;flex:1;min-width:160px"><label>Role Name  (عربي للعرض)</label><input type="text" id="nr-label" placeholder="مثال: مشرف الباص"></div>
+        <div class="fg" style="margin-bottom:0;flex:1;min-width:140px"><label>Role Expression (انجليزي)</label><input type="text" id="nr-id" placeholder="مثال: bus_supervisor"></div>
+        <button class="btn btn-p" onclick="addCustomRole()" style="white-space:nowrap">➕ Add Role</button>
       </div>
     </div>
   </div>
@@ -5946,7 +5946,7 @@ document.addEventListener('DOMContentLoaded', function(){
     card.className='card';
     card.style.marginBottom='.875rem';
     card.innerHTML=`
-      <div class="ctitle">إدارة الأدوار (Roles)</div>
+      <div class="ctitle"> Roles Management (Roles)</div>
       <div id="roles-list" style="margin-bottom:.875rem"></div>
       <div class="card" style="background:var(--prl)">
         <div style="font-size:13px;font-weight:700;color:var(--pr);margin-bottom:.65rem">إضافة دور جديد</div>

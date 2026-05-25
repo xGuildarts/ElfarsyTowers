@@ -934,8 +934,8 @@ tr:hover td{background:#f5f8fc}
   <!-- TABS for users section -->
   <div class="card" style="margin-bottom:.75rem;padding:.5rem .75rem">
     <div style="display:flex;gap:4px;flex-wrap:wrap">
-      <button class="btn" id="utab-users" onclick="switchUsersTab('users')" style="background:var(--pr);color:#fff;border-color:var(--pr)">👥 المستخدمين</button>
-      <button class="btn" id="utab-roles" onclick="switchUsersTab('roles')">🔑 الأدوار والصلاحيات</button>
+      <button class="btn" id="utab-users" onclick="switchUsersTab('users')" style="background:var(--pr);color:#fff;border-color:var(--pr)">👥 Users</button>
+      <button class="btn" id="utab-roles" onclick="switchUsersTab('roles')">🔑 Roles & Permissions</button>
     </div>
   </div>
   <!-- Users list panel -->
@@ -957,11 +957,11 @@ tr:hover td{background:#f5f8fc}
   <!-- Roles panel -->
   <div id="upanel-roles" style="display:none">
     <div class="card">
-      <div class="ctitle">🔑 الأدوار والصلاحيات</div>
+      <div class="ctitle">🔑 Roles & Permissions</div>
       <div class="info-box" style="font-size:12px">يمكنك إنشاء أدوار مخصصة وتحديد صلاحياتها بحرية. الأدوار الأساسية (admin, bookings, accounts, operations, viewer) ثابتة ولكن يمكن تعديل اسمها.</div>
       <div id="roles-list"></div>
       <div class="hr"></div>
-      <div class="ctitle" style="font-size:13px">➕ إضافة دور جديد</div>
+      <div class="ctitle" style="font-size:13px">➕ Add Roles  </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end">
         <div class="fg" style="margin-bottom:0;flex:1;min-width:160px"><label>اسم الدور (عربي للعرض)</label><input type="text" id="nr-label" placeholder="مثال: مشرف الباص"></div>
         <div class="fg" style="margin-bottom:0;flex:1;min-width:140px"><label>معرف الدور (انجليزي)</label><input type="text" id="nr-id" placeholder="مثال: bus_supervisor"></div>

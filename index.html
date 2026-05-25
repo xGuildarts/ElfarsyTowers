@@ -941,17 +941,17 @@ tr:hover td{background:#f5f8fc}
   <!-- Users list panel -->
   <div id="upanel-users">
     <div class="card">
-      <div class="ctitle">المستخدمين</div>
+      <div class="ctitle">Users</div>
       <div id="users-list"></div>
       <div class="hr"></div>
-      <div class="ctitle" style="font-size:13px">➕ إضافة مستخدم جديد</div>
+      <div class="ctitle" style="font-size:13px">➕ Add New User</div>
       <div class="g3">
-        <div class="fg"><label>اسم المستخدم <span class="req">*</span></label><input type="text" id="nu-user" placeholder="username (بالإنجليزية)"></div>
-        <div class="fg"><label>كلمة المرور <span class="req">*</span></label><input type="text" id="nu-pass" placeholder="كلمة المرور"></div>
-        <div class="fg"><label>الاسم الكامل <span class="req">*</span></label><input type="text" id="nu-name" placeholder="الاسم بالعربي"></div>
+        <div class="fg"><label>User Name <span class="req">*</span></label><input type="text" id="nu-user" placeholder="username (بالإنجليزية)"></div>
+        <div class="fg"><label>Password <span class="req">*</span></label><input type="text" id="nu-pass" placeholder="كلمة المرور"></div>
+        <div class="fg"><label>Full Name <span class="req">*</span></label><input type="text" id="nu-name" placeholder="الاسم بالعربي"></div>
       </div>
-      <div class="fg" style="max-width:280px"><label>الدور</label><select id="nu-role"></select></div>
-      <button class="btn btn-p" onclick="addUser()">➕ إضافة</button>
+      <div class="fg" style="max-width:280px"><label>Role</label><select id="nu-role"></select></div>
+      <button class="btn btn-p" onclick="addUser()">➕ Add Role</button>
     </div>
   </div>
   <!-- Roles panel -->
@@ -1623,7 +1623,7 @@ async function doLogin(){
   const f=users.find(x=>x.username===u&&x.password===p);
   if(!f){document.getElementById('login-err').style.display='block';return;}
   document.getElementById('login-err').style.display='none';
-  await addLog('تسجيل دخول','login',`${f.name} · دور: ${{admin:'GM',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]||f.role}`);
+  await addLog('تسجيل دخول','login',`${f.name} · دور: ${{admin:'GM',bookings:'Sales',accounts:'Actountant',operations:'Operation',viewer:'Viewer'}[f.role]||f.role}`);
   loginUser(f);
 }
 function loginUser(f){
@@ -1632,7 +1632,7 @@ function loginUser(f){
   // Read lastTab BEFORE applyPerms (applyPerms no longer calls showTab)
   const lastTab=localStorage.getItem('mtr_last_tab')||'dash';
   hideAll();show('app');
-  document.getElementById('hdr-user').textContent=f.name+' · '+(ROLE_DEFAULTS[f.role]?{admin:'GM',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'}[f.role]:f.role);
+  document.getElementById('hdr-user').textContent=f.name+' · '+(ROLE_DEFAULTS[f.role]?{admin:'GM',bookings:'Sales',accounts:'Actountant',operations:'Operation',viewer:'Viewer'}[f.role]:f.role);
   document.getElementById('dark-btn').textContent=document.body.classList.contains('dark')?'☀️':'🌙';
   document.getElementById('lang-btn').textContent=lang==='ar'?'EN':'AR';
   applyPerms();updateLogoDsp();

@@ -2629,12 +2629,12 @@ function printBusLayout(cn,busIdx){
   busRowsHtml+=`<div style="border-top:2px dashed #cbd5e1;margin:5px 0"></div>`;
 
   // صف 6: حمام (merge) | شمال = sc, sc+1
-  const WC_CELL=`<div style="width:292px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e8f4fd;border:2.5px solid #5dade2;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚻</span><span style="font-size:15px;font-weight:900;color:#1a5276">حمام</span></div>`;
+  const WC_CELL=`<div style="width:500px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e8f4fd;border:2.5px solid #5dade2;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚻</span><span style="font-size:15px;font-weight:900;color:#1a5276">حمام</span></div>`;
   busRowsHtml+=`<div style="display:flex;align-items:stretch;gap:4px;margin-bottom:5px;justify-content:center">${WC_CELL}${AISLE}${makeSeatDiv(sc)}${makeSeatDiv(sc+1)}</div>`;
   sc+=2;
 
   // صف 7: باب (merge) | شمال = sc, sc+1
-  const DOOR_CELL=`<div style="width:292px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fffbeb;border:2.5px dashed #d97706;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚪</span><span style="font-size:15px;font-weight:900;color:#b7770d">باب</span></div>`;
+  const DOOR_CELL=`<div style="width:500px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fffbeb;border:2.5px dashed #d97706;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚪</span><span style="font-size:15px;font-weight:900;color:#b7770d">باب</span></div>`;
   busRowsHtml+=`<div style="display:flex;align-items:stretch;gap:4px;margin-bottom:5px;justify-content:center">${DOOR_CELL}${AISLE}${makeSeatDiv(sc)}${makeSeatDiv(sc+1)}</div>`;
   sc+=2;
 
@@ -2952,16 +2952,16 @@ function renderBusLayout(cn,busIdx){
   // صف 6: يمين = حمام (merge كرسيين)، شمال = 21، 22
   const WC_MERGED=`<div style="width:500px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--prl);border:2.5px solid var(--pr2);border-radius:10px;min-height:135px;padding:8px;gap:4px;font-family:'Cairo',sans-serif">
     <span style="font-size:32px">🚻</span>
-    <span style="font-size:14px;font-weight:800;color:var(--pr)">حمام</span>
+    <span style="font-size:14px;font-weight:800;color:var(--pr)">WC</span>
   </div>`;
   const AISLE_THIN=`<div class="bus-aisle">│</div>`;
   busHtml+=`<div class="bus-row">${WC_MERGED}${AISLE_THIN}${ms(sc)}${ms(sc+1)}</div>`;
   sc+=2;
 
   // صف 7: يمين = باب (merge كرسيين)، شمال = 23، 24
-  const DOOR_MERGED=`<div style="width:314px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:10px;min-height:135px;padding:8px;gap:4px;font-family:'Cairo',sans-serif">
+  const DOOR_MERGED=`<div style="width:500px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:10px;min-height:135px;padding:8px;gap:4px;font-family:'Cairo',sans-serif">
     <span style="font-size:32px">🚪</span>
-    <span style="font-size:14px;font-weight:800;color:var(--wn)">باب</span>
+    <span style="font-size:14px;font-weight:800;color:var(--wn)">Door</span>
   </div>`;
   busHtml+=`<div class="bus-row">${DOOR_MERGED}${AISLE_THIN}${ms(sc)}${ms(sc+1)}</div>`;
   sc+=2;

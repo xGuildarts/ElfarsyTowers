@@ -2761,9 +2761,45 @@ function renderBusLayout(cn,busIdx){
     }
     return `<div class="seat empty" ondragover="event.preventDefault()" ondragenter="event.currentTarget.classList.add('drag-over')" ondragleave="event.currentTarget.classList.remove('drag-over')" ondrop="event.currentTarget.classList.remove('drag-over');busDrop(event,${cn},${sn})"><span class="snum">${sn}</span></div>`;
   }
-  let busHtml=`<div class="bus-wrap"><div class="bus-top">🚌 ${busName} · ${conv.label} · دخول ${conv.checkin} 9-11 ص · خروج ${conv.checkout} 5-7 ص</div><div class="bus-driver">سائق</div>`;
-  let sc=1;for(let r=0;r<12;r++){busHtml+=`<div class="bus-row">`;for(let c=0;c<4;c++){if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;busHtml+=ms(sc++);}busHtml+=`</div>`;}
-  busHtml+=`<div class="bus-row"><div class="seat" style="opacity:0;pointer-events:none"></div>${ms(49)}<div class="bus-aisle">│</div><div class="seat" style="opacity:0;pointer-events:none"></div></div>`;
+  let busHtml=`<div class="bus-wrap" style="overflow:visible"><div class="bus-top">🚌 ${busName} · ${conv.label} · دخول ${conv.checkin} 9-11 ص · خروج ${conv.checkout} 5-7 ص</div><div class="bus-driver">سائق</div>`;
+
+  // صفوف 1-4 (كراسي 1-16) عادية
+  let sc=1;
+  for(let r=0;r<4;r++){
+    busHtml+=`<div class="bus-row">`;
+    for(let c=0;c<4;c++){
+      if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
+      busHtml+=ms(sc++);
+    }
+    busHtml+=`</div>`;
+  }
+
+  // صف 5 (كراسي 17-20) — الباب على يمين (جنب 17 و18)
+  busHtml+=`<div style="display:flex;align-items:stretch;gap:0;position:relative;margin-right:60px">`;
+  busHtml+=`<div style="position:absolute;right:-64px;top:4px;bottom:4px;width:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2px dashed var(--wn);border-radius:10px;font-size:11px;font-weight:700;color:var(--wn);gap:3px;flex-shrink:0"><span style="font-size:20px">🚪</span><span>باب</span></div>`;
+  busHtml+=`<div class="bus-row" style="flex:1">`;
+  for(let c=0;c<4;c++){
+    if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
+    busHtml+=ms(sc++);
+  }
+  busHtml+=`</div></div>`;
+
+  // صفوف 6-11 (كراسي 21-44) عادية
+  for(let r=0;r<6;r++){
+    busHtml+=`<div class="bus-row">`;
+    for(let c=0;c<4;c++){
+      if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
+      busHtml+=ms(sc++);
+    }
+    busHtml+=`</div>`;
+  }
+
+  // صف الكنبة الأخير: 45 46 47 48 49 جنب بعض صف واحد
+  busHtml+=`<div style="margin-top:8px;border-top:2px dashed var(--bd2);padding-top:6px">`;
+  busHtml+=`<div style="text-align:center;font-size:11px;color:var(--tx3);margin-bottom:5px;font-weight:700">🛋 كنبة خلفية</div>`;
+  busHtml+=`<div style="display:flex;gap:6px;justify-content:center;align-items:center">`;
+  busHtml+=ms(45)+ms(46)+ms(47)+ms(48)+ms(49);
+  busHtml+=`</div></div>`;
   busHtml+=`<div class="bus-legend">${bks.map((b,i)=>`<span><span class="ldot" style="background:${SEAT_COLORS[i%SEAT_COLORS.length]}"></span>${b.name.split(' ').slice(0,2).join(' ')} · ${b.pickup||'-'}${b.convoy2?' ⚠فوجين':''}</span>`).join('')}</div>`;
   // Add return clients to legend
   if(returnClients.length){busHtml+=`<div class="bus-legend" style="margin-top:4px">${returnClients.map(b=>`<span style="color:var(--pu)"><span class="ldot" style="background:var(--pu)"></span>${b.name.split(' ').slice(0,2).join(' ')} ↩راجع · ${b.pickup||'-'}</span>`).join('')}</div>`;}

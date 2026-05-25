@@ -2221,18 +2221,19 @@ function addPayRow(){
 }
 async function saveBooking(){
   const pt=document.getElementById('f-party').value;
-  let name='',phone='',pickup='';
+  let name='',phone='',phone2='',pickup='';
   if(pt==='supplier'){
     const ss=document.getElementById('f-sup-sel');
     if(!ss.value){alert('اختار المورد');return;}
     const opt=ss.options[ss.selectedIndex];
     name=opt.dataset.name||opt.text;phone=document.getElementById('f-phone').value;
+    phone2=(document.getElementById('f-phone2')?.value||'').trim();
   }else{
     name=document.getElementById('f-name').value.trim();
     if(!name){document.getElementById('f-name').classList.add('err');return;}
     document.getElementById('f-name').classList.remove('err');
     phone=document.getElementById('f-phone').value.trim();
-  const phone2=(document.getElementById('f-phone2')?.value||'').trim();
+    phone2=(document.getElementById('f-phone2')?.value||'').trim();
   }
   const cnv=document.getElementById('f-convoy').value;
   if(!cnv){document.getElementById('f-convoy').classList.add('err');return;}

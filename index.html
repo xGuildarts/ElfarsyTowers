@@ -2618,18 +2618,31 @@ function printBusLayout(cn,busIdx){
   }
   let busRowsHtml='';
   let sc=1;
-  // صفوف 1-4: مقاعد 1-16
-  // الباص الحقيقي: الصف الأول = 1,2,3,4 حيث 1&2 يمين و 3&4 شمال
-  // بترتيب RTL (من اليمين): 2,1 | ممر | 3,4
-  for(let r=0;r<4;r++){
+
+  // صفوف 1-5 (كراسي 1-20)
+  for(let r=0;r<5;r++){
     const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
     busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]]);
   }
-  // صف 5: مقاعد 17-20 — الباب بدل الممر العادي
-  {const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
-   busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]],DOOR_ROW);}
-  // صفوف 6-11: مقاعد 21-44
-  for(let r=0;r<6;r++){
+
+  // فاصل
+  busRowsHtml+=`<div style="border-top:2px dashed #cbd5e1;margin:5px 0"></div>`;
+
+  // صف 6: حمام (merge) | شمال = sc, sc+1
+  const WC_CELL=`<div style="width:292px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e8f4fd;border:2.5px solid #5dade2;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚻</span><span style="font-size:15px;font-weight:900;color:#1a5276">حمام</span></div>`;
+  busRowsHtml+=`<div style="display:flex;align-items:stretch;gap:4px;margin-bottom:5px;justify-content:center">${WC_CELL}${AISLE}${makeSeatDiv(sc)}${makeSeatDiv(sc+1)}</div>`;
+  sc+=2;
+
+  // صف 7: باب (merge) | شمال = sc, sc+1
+  const DOOR_CELL=`<div style="width:292px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fffbeb;border:2.5px dashed #d97706;border-radius:10px;min-height:130px;padding:10px;gap:6px;font-family:'Cairo',sans-serif"><span style="font-size:36px">🚪</span><span style="font-size:15px;font-weight:900;color:#b7770d">باب</span></div>`;
+  busRowsHtml+=`<div style="display:flex;align-items:stretch;gap:4px;margin-bottom:5px;justify-content:center">${DOOR_CELL}${AISLE}${makeSeatDiv(sc)}${makeSeatDiv(sc+1)}</div>`;
+  sc+=2;
+
+  // فاصل
+  busRowsHtml+=`<div style="border-top:2px dashed #cbd5e1;margin:5px 0"></div>`;
+
+  // صفوف 8-12 (كراسي 25-44)
+  for(let r=0;r<5;r++){
     const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
     busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]]);
   }
@@ -2690,7 +2703,7 @@ body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12
   </div>
 </div>
 <!-- رسمة الباص -->
-<div style="margin:0 auto 16px;max-width:900px">
+<div style="margin:0 auto 16px;max-width:1000px">
   <div style="font-size:15px;font-weight:900;color:#1a5276;text-align:center;margin-bottom:10px">🚌 خريطة مقاعد الباص</div>
   <div style="background:#f8fafc;border:2px solid #d6eaf8;border-radius:12px;padding:14px">
     <!-- سائق -->
@@ -2927,24 +2940,42 @@ function renderBusLayout(cn,busIdx){
   }
 
   let sc=1;
-  // صفوف 1-4 (كراسي 1-16)
-  for(let r=0;r<4;r++){
+  // صفوف 1-5 (كراسي 1-20) — عادي
+  for(let r=0;r<5;r++){
     busHtml+=busRow([sc,sc+1,sc+2,sc+3]);
     sc+=4;
   }
 
-  // صف 5 (كراسي 17-20) — الباب فاصل بدل الممر
-  const doorAisle=`<div style="width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:8px;font-size:10px;font-weight:800;color:var(--wn);gap:2px;padding:4px"><span style="font-size:18px">🚪</span><span>باب</span></div>`;
-  busHtml+=busRow([sc,sc+1,sc+2,sc+3],doorAisle);
-  sc+=4;
+  // فاصل بصري قبل المنطقة الخاصة
+  busHtml+=`<div style="border-top:2px dashed var(--bd2);margin:4px 0"></div>`;
 
-  // صفوف 6-11 (كراسي 21-44)
-  for(let r=0;r<6;r++){
+  // صف 6: يمين = حمام (merge كرسيين)، شمال = 21، 22
+  const WC_MERGED=`<div style="width:314px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--prl);border:2.5px solid var(--pr2);border-radius:10px;min-height:135px;padding:8px;gap:4px;font-family:'Cairo',sans-serif">
+    <span style="font-size:32px">🚻</span>
+    <span style="font-size:14px;font-weight:800;color:var(--pr)">حمام</span>
+  </div>`;
+  const AISLE_THIN=`<div class="bus-aisle">│</div>`;
+  busHtml+=`<div class="bus-row">${WC_MERGED}${AISLE_THIN}${ms(sc)}${ms(sc+1)}</div>`;
+  sc+=2;
+
+  // صف 7: يمين = باب (merge كرسيين)، شمال = 23، 24
+  const DOOR_MERGED=`<div style="width:314px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:10px;min-height:135px;padding:8px;gap:4px;font-family:'Cairo',sans-serif">
+    <span style="font-size:32px">🚪</span>
+    <span style="font-size:14px;font-weight:800;color:var(--wn)">باب</span>
+  </div>`;
+  busHtml+=`<div class="bus-row">${DOOR_MERGED}${AISLE_THIN}${ms(sc)}${ms(sc+1)}</div>`;
+  sc+=2;
+
+  // فاصل بصري بعد المنطقة الخاصة
+  busHtml+=`<div style="border-top:2px dashed var(--bd2);margin:4px 0"></div>`;
+
+  // صفوف 8-12 (كراسي 25-44) — عادي
+  for(let r=0;r<5;r++){
     busHtml+=busRow([sc,sc+1,sc+2,sc+3]);
     sc+=4;
   }
 
-  // صف الكنبة الأخير: 45 46 47 48 49 جنب بعض صف واحد
+  // صف 13: الكنبة الخلفية 45-49
   busHtml+=`<div style="margin-top:10px;border-top:3px dashed var(--bd2);padding-top:8px">`;
   busHtml+=`<div style="text-align:center;font-size:14px;color:var(--tx2);margin-bottom:8px;font-weight:800;letter-spacing:1px">🛋&nbsp; الكنبة الخلفية &nbsp;🛋</div>`;
   busHtml+=`<div style="display:flex;gap:5px;justify-content:center;align-items:stretch;flex-wrap:nowrap">`;

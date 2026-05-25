@@ -443,7 +443,7 @@ tr:hover td{background:#f5f8fc}
   </div>
   <div id="viewer-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;z-index:999;class:viewer-banner">وضع المشاهدة فقط - لا يمكنك إجراء أي تعديلات</div>
 <div class="hdr-r">
-    <div class="sync"><div class="sdot" id="sdot"></div><span id="stxt">متصل</span></div>
+    <div class="sync"><div class="sdot" id="sdot"></div><span id="stxt">Online</span></div>
     <div class="user-pill" id="hdr-user">—</div>
     <button class="hbtn" onclick="toggleDark()" id="dark-btn">🌙</button>
     <button class="hbtn" onclick="toggleLang()" id="lang-btn">EN</button>
@@ -1224,7 +1224,7 @@ function saveCustomRoles(){
 }
 function getRoleLabel(role){
   if(customRoleLabels[role])return customRoleLabels[role];
-  var defaults={admin:'أدمن',bookings:'حجوزات',accounts:'حسابات',operations:'عمليات',viewer:'مشاهد'};
+  var defaults={admin:'GM',bookings:'Sales',accounts:'Actuntant',operations:'Operations',viewer:'Viewer'};
   return defaults[role]||role;
 }
 function renderBypassUsers(){
@@ -1643,7 +1643,7 @@ function loginUser(f){
   setTimeout(()=>{ showTab(lastTab); },350);
 }
 async function doLogout(){
-  await addLog('تسجيل خروج','login',currentUser?.name||'');
+  await addLog('Log Out','login',currentUser?.name||'');
   currentUser=null;sessionStorage.removeItem('mtr_sess');
   hideAll();show('login-pg');
   document.getElementById('login-user').value='';document.getElementById('login-pass').value='';

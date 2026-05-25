@@ -574,7 +574,7 @@ tr:hover td{background:#f5f8fc}
 <!-- CLIENTS -->
 <div id="clients" class="sec">
   <div id="cl-list">
-    <div style="display:flex;gap:7px;margin-bottom:.75rem;flex-wrap:wrap">
+    <div style="display:flex;gap:7px;margin-bottom:.75rem;flex-wrap:no-wrap">
       <input type="text" id="cl-q" placeholder="ابحث بالاسم أو شقة أو هاتف أو تاريخ أو المسؤول..." oninput="renderClients()" style="flex:1;min-width:180px">
       <select id="cl-status" onchange="renderClients()" style="max-width:130px"><option value="">كل الحالات</option><option value="done">مكتمل</option><option value="pending">باقي</option></select>
       <select id="cl-party-f" onchange="renderClients()" style="max-width:130px"><option value="">الكل</option><option value="client">عملاء</option><option value="supplier">موردين</option></select>

@@ -340,21 +340,21 @@ tr:hover td{background:#f5f8fc}
 .bus-wrap{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rl);padding:1rem;overflow-x:auto}
 .bus-top{text-align:center;margin-bottom:.65rem;font-size:13px;font-weight:700;color:var(--pr)}
 .bus-driver{width:54px;height:32px;background:var(--pr);color:#fff;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto .45rem}
-.bus-row{display:flex;gap:5px;align-items:center;justify-content:center;margin-bottom:5px}
-.bus-aisle{width:16px;flex-shrink:0;text-align:center;font-size:9px;color:var(--tx3)}
-.seat{width:200px;height:130px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--sf);padding:6px;transition:all .15s;flex-shrink:0;user-select:none}
+.bus-row{display:flex;gap:5px;align-items:stretch;justify-content:center;margin-bottom:5px}
+.bus-aisle{width:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--tx3)}
+.seat{width:130px;min-height:110px;border-radius:var(--r);border:2px solid var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;background:var(--sf);padding:8px 6px;transition:all .15s;flex-shrink:0;user-select:none}
 .seat.empty{border-style:dashed}
 .seat.empty:hover{border-color:var(--pr);background:var(--prl)}
 .seat.taken{cursor:grab;border-color:transparent}
 .seat.taken:hover{opacity:.85}
 .seat.taken.drag-over{outline:3px solid rgba(255,255,255,.8);outline-offset:-3px}
 .seat.dragging{opacity:.3}
-.snum{font-size:13px;font-weight:700;margin-bottom:2px}
-.seat.empty .snum{color:var(--bd2);font-size:22px}
+.snum{font-size:11px;font-weight:700;margin-bottom:3px}
+.seat.empty .snum{color:var(--bd2);font-size:20px}
 .seat.taken .snum{color:rgba(255,255,255,.7)}
-.sname{font-size:15px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
-.sphone{font-size:13px;color:rgba(255,255,255,.9)}
-.splace{font-size:12px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
+.sname{font-size:14px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
+.sphone{font-size:12px;color:rgba(255,255,255,.9)}
+.splace{font-size:11px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center}
 .bus-legend{display:flex;gap:8px;justify-content:center;margin-top:.65rem;font-size:11px;flex-wrap:wrap;color:var(--tx2)}
 .pickup-summary{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.65rem}
 .pickup-tag{background:var(--sf);border:1px solid var(--bd2);border-radius:var(--r);padding:4px 9px;font-size:12px}
@@ -387,15 +387,15 @@ tr:hover td{background:#f5f8fc}
   table{width:100%!important;font-size:12px!important}
   .tbl-wrap{overflow:visible!important}
   .stat{break-inside:avoid}
-  .seat{width:88px!important;height:80px!important;font-size:11px!important}
-  .sname{font-size:13px!important}
-  .sphone{font-size:11px!important}
-  .splace{font-size:11px!important}
-  .snum{font-size:11px!important}
-  .seat.empty .snum{font-size:18px!important}
+  .seat{width:100px!important;min-height:90px!important;font-size:11px!important}
+  .sname{font-size:12px!important}
+  .sphone{font-size:10px!important}
+  .splace{font-size:10px!important}
+  .snum{font-size:10px!important}
+  .seat.empty .snum{font-size:16px!important}
   .bus-wrap{overflow:visible!important}
   .bus-row{flex-wrap:nowrap!important}
-  .bus-aisle{width:18px!important}
+  .bus-aisle{width:16px!important}
 }
 </style>
 </head>
@@ -2573,195 +2573,188 @@ function printBusLayout(cn,busIdx){
   bks.forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',seatNote:b.seatNote||'',isDouble:b.convoy2!=null};});});
   const occ2={};
   returnClients.forEach(b=>{(b.seatAssign2||[]).forEach((sa,idx)=>{if(sa.seatNum)occ2[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',fromConvoy:b.convoy};});});
-  // Group by pickup for passenger list
   const byPickup={};
   bks.forEach(b=>{const p=b.pickup||'غير محدد';if(!byPickup[p])byPickup[p]=[];
     (b.seatAssign||[]).forEach(sa=>{if(sa.seatNum)byPickup[p].push({seatNum:sa.seatNum,name:b.name,phone:b.phone||'',seatNote:b.seatNote||''});});
   });
   const COLORS=['#1a5276','#117a65','#7d3c98','#c0392b','#d68910','#1abc9c','#e67e22','#2980b9','#8e44ad','#27ae60'];
-  function pSeatCell(sn,isAisle){
-    if(isAisle)return `<td style="width:22px;text-align:center;color:#bbb;font-size:14px;vertical-align:middle">│</td>`;
-    if(occ2[sn]){
-      const o2=occ2[sn];
-      return `<td style="border:2px solid #7d3c98;width:88px;height:80px;text-align:center;vertical-align:middle;background:#7d3c98;color:#fff;font-size:10px;padding:4px;border-radius:6px">
-        <div style="font-size:11px;font-weight:900;opacity:.7">${sn}</div>
-        <div style="font-size:12px;font-weight:900;line-height:1.3;margin-top:2px">${o2.name.split(' ').slice(0,3).join(' ')}</div>
-        <div style="font-size:10px;opacity:.85;margin-top:1px">${o2.phone?'📱'+o2.phone:''}</div>
-        <div style="font-size:10px;opacity:.85;margin-top:1px">${o2.pickup}</div>
-        <div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">↩ عودة</div>
-      </td>`;
-    }
-    const o=occ[sn];
-    const col=o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===sn))%COLORS.length]:'#f0f4f8';
-    const textCol=o?'#fff':'#999';
-    return `<td style="border:2px solid ${o?col+'aa':'#ddd'};width:88px;height:80px;text-align:center;vertical-align:middle;background:${col};color:${textCol};font-size:10px;padding:4px;font-weight:700;border-radius:6px">
-      <div style="font-size:11px;font-weight:900;${o?'opacity:.75':'color:#bbb'}">${sn}</div>
-      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.3;margin-top:2px">${o.name.split(' ').slice(0,3).join(' ')}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:2px">${o.phone?'📱 '+o.phone:''}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:1px">${o.pickup}</div>
-      ${o.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 4px;margin-top:2px">⚠ فوجين</div>':''}
-      ${o.seatNote?'<div style="background:rgba(255,255,255,.25);border-radius:3px;font-size:9px;padding:1px 4px;margin-top:1px">📝 '+o.seatNote+'</div>':''}`
-      :'<div style="font-size:11px;color:#ccc;margin-top:8px">فارغ</div>'}
-    </td>`;
-  }
-  // Build bus rows HTML
-  let busBodyRows='';
-  let sc=1;
-  // صفوف 1-4 (مقاعد 1-16)
-  for(let r=0;r<4;r++){
-    busBodyRows+=`<tr>`;
-    for(let c=0;c<4;c++){
-      if(c===2)busBodyRows+=pSeatCell(0,true);
-      busBodyRows+=pSeatCell(sc++);
-    }
-    busBodyRows+=`</tr>`;
-  }
-  // صف 5 (مقاعد 17-20) مع الباب
-  busBodyRows+=`<tr>`;
-  busBodyRows+=`<td colspan="6" style="padding:0">
-    <div style="display:flex;align-items:center;gap:5px">
-      <div style="width:70px;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fef9c3;border:2.5px dashed #d97706;border-radius:8px;font-size:13px;font-weight:900;color:#d97706;gap:3px;flex-shrink:0;padding:5px">
-        <span style="font-size:24px">🚪</span><span>باب</span>
-      </div>
-      <table style="border-collapse:separate;border-spacing:4px;flex:1"><tr>`;
-  for(let c=0;c<4;c++){
-    if(c===2)busBodyRows+=pSeatCell(0,true);
-    busBodyRows+=pSeatCell(sc++);
-  }
-  busBodyRows+=`</tr></table></div></td></tr>`;
-  // صفوف 6-11 (مقاعد 21-44)
-  for(let r=0;r<6;r++){
-    busBodyRows+=`<tr>`;
-    for(let c=0;c<4;c++){
-      if(c===2)busBodyRows+=pSeatCell(0,true);
-      busBodyRows+=pSeatCell(sc++);
-    }
-    busBodyRows+=`</tr>`;
-  }
-  // الكنبة الخلفية: مقاعد 45-49
-  busBodyRows+=`<tr><td colspan="6" style="padding:10px 0 4px">
-    <div style="border-top:3px dashed #cbd5e1;padding-top:10px">
-      <div style="text-align:center;font-size:14px;font-weight:900;color:#475569;margin-bottom:8px">🛋&nbsp; الكنبة الخلفية &nbsp;🛋</div>
-      <div style="display:flex;gap:5px;justify-content:center;align-items:stretch;flex-wrap:nowrap">`;
-  for(let s=45;s<=49;s++){
-    const o=occ[s]||occ2[s];
-    const isReturn=!!occ2[s];
-    const col=isReturn?'#7d3c98':(o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===s))%COLORS.length]:'#f0f4f8');
-    const textCol=o?'#fff':'#999';
-    busBodyRows+=`<div style="width:88px;min-height:80px;text-align:center;background:${col};color:${textCol};border:2px solid ${o?col+'aa':'#ddd'};border-radius:6px;padding:5px;font-weight:700;font-size:10px;display:flex;flex-direction:column;align-items:center;justify-content:center">
-      <div style="font-size:11px;font-weight:900;${o?'opacity:.7':'color:#bbb'}">${s}</div>
-      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.3;margin-top:2px">${o.name.split(' ').slice(0,3).join(' ')}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:2px">${o.phone?'📱 '+o.phone:''}</div>
-      <div style="font-size:11px;opacity:.9;margin-top:1px">${o.pickup||''}</div>
-      ${isReturn?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 4px;margin-top:2px">↩ عودة</div>':''}`
-      :'<div style="font-size:11px;color:#ccc;margin-top:8px">فارغ</div>'}
+
+  // بناء خلية المقعد — RTL: الكراسي من اليمين للشمال: يمين شمال | ممر | يمين شمال
+  // ترتيب الصف: [كرسي أيمن صف يمين] [كرسي أيسر صف يمين] | ممر | [كرسي أيمن صف شمال] [كرسي أيسر صف شمال]
+  // في الباص: صفوف اليمين = 1,3 (أو홀) وصفوف الشمال = 2,4 (أو زوجي) حسب الترتيب الفعلي
+  // الترتيب الصح في الباص الحقيقي بالعربي (RTL): 2 1 | ممر | 4 3
+  function makeSeatDiv(sn){
+    if(!sn) return `<div style="width:105px;flex-shrink:0"></div>`;
+    const isRet=!!occ2[sn];
+    const o=isRet?occ2[sn]:occ[sn];
+    const col=isRet?'#7d3c98':(o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===sn))%COLORS.length]:'#eef2f7');
+    const txtCol=o?'#fff':'#aaa';
+    const brd=o?(isRet?'3px solid #f9e79f':'2px solid '+col):'2px dashed #ccd4de';
+    return `<div style="width:105px;min-height:90px;flex-shrink:0;background:${col};color:${txtCol};border:${brd};border-radius:8px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-family:'Cairo',sans-serif">
+      <div style="font-size:12px;font-weight:900;opacity:${o?.8:.5};margin-bottom:2px">${sn}</div>
+      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.35;word-break:break-word">${o.name.split(' ').slice(0,3).join(' ')}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:3px">${o.phone||''}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:2px">${(o.pickup||'').slice(0,10)}</div>
+      ${isRet?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-top:3px">↩ عودة</div>':
+        (o.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-top:3px">⚠ فوجين</div>':'')}`
+      :`<div style="font-size:11px;color:#c0c8d4;margin-top:10px">فارغ</div>`}
     </div>`;
   }
-  busBodyRows+=`</div></div></td></tr>`;
-  // Passenger list by pickup
+  // ممر المحور
+  const AISLE=`<div style="width:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:16px;font-weight:300">│</div>`;
+  // فاصل الباب
+  const DOOR_ROW=`<div style="width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fffbeb;border:2.5px dashed #d97706;border-radius:8px;min-height:90px;padding:4px;color:#d97706;font-family:'Cairo',sans-serif;font-size:11px;font-weight:900;gap:2px"><span style="font-size:20px">🚪</span><span>باب</span></div>`;
+  // بناء صفوف الباص — RTL: الصف [c2, c1 | ممر | c4, c3]
+  // في الباص الكراسي: يمين (نافذة+ممر) | ممر سير | شمال (ممر+نافذة)
+  // بالعربي من اليمين: كرسي نافذة يمين | كرسي ممر يمين | ممر | كرسي ممر شمال | كرسي نافذة شمال
+  // الأرقام: صف 1: 1(نافذة ي) 2(ممر ي) | 3(ممر ش) 4(نافذة ش)  -- بالعربي: 2 1 | 3 4
+  function buildRow(seats, aisleEl){
+    // seats = [رقم_اليمين_نافذة, رقم_اليمين_ممر, رقم_الشمال_ممر, رقم_الشمال_نافذة]
+    // في RTL نعرض: نافذة_يمين ممر_يمين | ممر | ممر_شمال نافذة_شمال
+    const [a,b,c,d]=seats;
+    return `<div style="display:flex;align-items:stretch;gap:4px;margin-bottom:5px;justify-content:center">
+      ${makeSeatDiv(a)}${makeSeatDiv(b)}${aisleEl||AISLE}${makeSeatDiv(c)}${makeSeatDiv(d)}
+    </div>`;
+  }
+  let busRowsHtml='';
+  let sc=1;
+  // صفوف 1-4: مقاعد 1-16
+  // الباص الحقيقي: الصف الأول = 1,2,3,4 حيث 1&2 يمين و 3&4 شمال
+  // بترتيب RTL (من اليمين): 2,1 | ممر | 3,4
+  for(let r=0;r<4;r++){
+    const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
+    busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]]);
+  }
+  // صف 5: مقاعد 17-20 — الباب بدل الممر العادي
+  {const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
+   busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]],DOOR_ROW);}
+  // صفوف 6-11: مقاعد 21-44
+  for(let r=0;r<6;r++){
+    const s=[sc,sc+1,sc+2,sc+3]; sc+=4;
+    busRowsHtml+=buildRow([s[1],s[0],s[2],s[3]]);
+  }
+  // الكنبة الخلفية: 45-49
+  busRowsHtml+=`<div style="border-top:3px dashed #cbd5e1;margin-top:8px;padding-top:10px">
+    <div style="text-align:center;font-size:14px;font-weight:900;color:#475569;margin-bottom:8px;font-family:'Cairo',sans-serif">🛋 الكنبة الخلفية 🛋</div>
+    <div style="display:flex;gap:5px;justify-content:center;flex-wrap:nowrap">
+      ${[45,46,47,48,49].map(s=>makeSeatDiv(s)).join('')}
+    </div>
+  </div>`;
+
+  // قائمة الركاب حسب التجمع
   const pickupList=Object.entries(byPickup).sort((a,b)=>a[0].localeCompare(b[0])).map(([place,seats])=>`
-    <div style="margin-bottom:.6rem;padding:.6rem .75rem;background:#f0f4f8;border-radius:8px;border-right:4px solid #117a65">
-      <div style="font-weight:800;color:#117a65;font-size:13px;margin-bottom:4px">📍 ${place} — ${seats.length} مقعد</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">${seats.map(s=>`<span style="background:#fff;border:1px solid #d0e8ff;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:700">
-        <span style="color:#1a5276;font-weight:900">${s.seatNum}</span> — ${s.name.split(' ').slice(0,3).join(' ')}${s.phone?' · 📱'+s.phone:''}${s.seatNote?' · 📝'+s.seatNote:''}</span>`).join('')}</div>
+    <div style="margin-bottom:.6rem;padding:.6rem .875rem;background:#f0f4f8;border-radius:8px;border-right:4px solid #117a65;font-family:'Cairo',sans-serif">
+      <div style="font-weight:800;color:#117a65;font-size:14px;margin-bottom:5px">📍 ${place} — ${seats.length} مقعد</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${seats.map(s=>`<span style="background:#fff;border:1px solid #bcd8f0;border-radius:6px;padding:4px 10px;font-size:13px;font-weight:700">
+        <span style="color:#1a5276;font-weight:900">${s.seatNum}</span> — ${s.name.split(' ').slice(0,3).join(' ')}${s.phone?' · 📱'+s.phone:''}${s.seatNote?' · 📝'+s.seatNote:''}</span>`).join('')}
+      </div>
     </div>`).join('');
-  // Return clients list
   const returnList=returnClients.length?`
-    <div style="margin-top:.75rem;padding:.6rem .75rem;background:#f4ecf7;border-radius:8px;border-right:4px solid #7d3c98">
-      <div style="font-weight:800;color:#7d3c98;font-size:13px;margin-bottom:4px">↩ راجعين مع هذا الباص (فوجين)</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">${returnClients.map(b=>{
-        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(',');
-        return `<span style="background:#fff;border:1px solid #e8d5f5;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:700">
-          <span style="color:#7d3c98;font-weight:900">${seats2||'—'}</span> — ${b.name}${b.phone?' · 📱'+b.phone:''}</span>`;
+    <div style="margin-top:.75rem;padding:.6rem .875rem;background:#f4ecf7;border-radius:8px;border-right:4px solid #7d3c98;font-family:'Cairo',sans-serif">
+      <div style="font-weight:800;color:#7d3c98;font-size:14px;margin-bottom:5px">↩ راجعين مع هذا الباص (فوجين)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${returnClients.map(b=>{
+        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(' , ');
+        return `<span style="background:#fff;border:1px solid #dcc8f0;border-radius:6px;padding:4px 10px;font-size:13px;font-weight:700"><span style="color:#7d3c98;font-weight:900">${seats2||'—'}</span> — ${b.name}${b.phone?' · 📱'+b.phone:''}</span>`;
       }).join('')}</div>
-    </div>`:''  ;
-  // Full passenger table
+    </div>`:'' ;
   const totalOcc=Object.keys(occ).length+Object.keys(occ2).length;
   const setts=(typeof settings!=='undefined'?settings:{})||{};
   const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
-<title>قائمة الباص - ${conv.label} - ${busName}</title>
+<title>قائمة الباص — ${busName} — ${conv.label}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:10px;font-size:13px;background:#fff}
+body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:12px;background:#fff;font-size:13px}
 *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-@media print{@page{margin:8mm;size:A4 landscape}body{padding:0;font-size:12px}}
-table{border-collapse:separate;border-spacing:4px}
+@media print{
+  @page{margin:8mm;size:A4 landscape}
+  body{padding:0;font-size:12px}
+  .no-print{display:none!important}
+}
 </style>
 </head><body>
 <!-- هيدر -->
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:3px solid #d6eaf8">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #d6eaf8">
   <div>
-    <div style="font-size:22px;font-weight:900;color:#1a5276">${setts.name||'مصيف مطروح 2026'}</div>
-    <div style="font-size:14px;font-weight:700;color:#117a65;margin-top:3px">🚌 ${busName} &nbsp;·&nbsp; ${conv.label}</div>
-    <div style="font-size:13px;color:#4a6278;margin-top:2px">📅 دخول: ${conv.checkin} (9-11 ص) &nbsp;|&nbsp; خروج: ${conv.checkout} (5-7 ص)</div>
+    <div style="font-size:24px;font-weight:900;color:#1a5276">${setts.name||'مصيف مطروح 2026'}</div>
+    <div style="font-size:15px;font-weight:700;color:#117a65;margin-top:4px">🚌 ${busName} &nbsp;·&nbsp; ${conv.label}</div>
+    <div style="font-size:13px;color:#4a6278;margin-top:3px">📅 دخول: ${conv.checkin} (9-11 ص) &nbsp;|&nbsp; خروج: ${conv.checkout} (5-7 ص)</div>
   </div>
-  <div style="text-align:left;font-size:12px;color:#888;min-width:120px">
-    <div style="font-weight:700;color:#1a5276">المقاعد المحجوزة: ${totalOcc} / 49</div>
-    <div>طباعة: ${new Date().toLocaleDateString('ar-EG')} ${new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</div>
+  <div style="text-align:left;font-size:13px;color:#555;min-width:130px;line-height:1.8">
+    <div style="font-weight:800;color:#1a5276;font-size:15px">المحجوز: ${totalOcc} / 49 مقعد</div>
+    <div>${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</div>
   </div>
 </div>
 <!-- رسمة الباص -->
-<div style="margin:0 auto;overflow-x:auto">
-  <div style="font-size:14px;font-weight:800;color:#1a5276;text-align:center;margin-bottom:8px">🚌 خريطة مقاعد الباص</div>
-  <table style="margin:0 auto;direction:ltr">
-    <thead>
-      <tr>
-        <td colspan="6" style="text-align:center;background:#1a5276;color:#fff;padding:8px 16px;font-weight:900;font-size:15px;border-radius:6px 6px 0 0">🚗 سائق</td>
-      </tr>
-    </thead>
-    <tbody>${busBodyRows}</tbody>
-  </table>
+<div style="margin:0 auto 16px;max-width:700px">
+  <div style="font-size:15px;font-weight:900;color:#1a5276;text-align:center;margin-bottom:10px">🚌 خريطة مقاعد الباص</div>
+  <div style="background:#f8fafc;border:2px solid #d6eaf8;border-radius:12px;padding:14px">
+    <!-- سائق -->
+    <div style="background:#1a5276;color:#fff;text-align:center;padding:8px;border-radius:8px;font-size:15px;font-weight:900;margin-bottom:10px;font-family:'Cairo',sans-serif">🚗 سائق</div>
+    <!-- صفوف الكراسي -->
+    ${busRowsHtml}
+  </div>
 </div>
-<!-- فاصل -->
-<div style="border-top:2px solid #d6eaf8;margin:14px 0;padding-top:10px">
-  <div style="font-size:15px;font-weight:900;color:#1a5276;margin-bottom:8px">📋 قائمة الركاب حسب نقطة التجمع</div>
-  ${pickupList||'<div style="color:#999;font-size:12px">لا يوجد مقاعد محجوزة</div>'}
+<!-- مفتاح الألوان -->
+<div style="margin-bottom:14px;padding:8px 12px;background:#f8fafc;border-radius:8px;border:1px solid #dce6f0">
+  <div style="font-size:13px;font-weight:800;color:#1a5276;margin-bottom:6px">🎨 دليل الألوان</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    ${bks.map((b,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:${COLORS[i%COLORS.length]};color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif">${b.name.split(' ').slice(0,3).join(' ')} · ${b.pickup||'—'}${b.convoy2?' ⚠فوجين':''}</span>`).join('')}
+    ${returnClients.map(b=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#7d3c98;border:2px solid #f9e79f;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif">↩ ${b.name.split(' ').slice(0,3).join(' ')} · عودة</span>`).join('')}
+  </div>
+</div>
+<!-- قائمة الركاب -->
+<div style="border-top:2px solid #d6eaf8;padding-top:12px;margin-bottom:14px">
+  <div style="font-size:16px;font-weight:900;color:#1a5276;margin-bottom:8px">📋 الركاب حسب نقطة التجمع</div>
+  ${pickupList||'<div style="color:#999;font-size:13px">لا يوجد مقاعد محجوزة</div>'}
   ${returnList}
 </div>
 <!-- جدول تفصيلي -->
-<div style="margin-top:10px">
-  <div style="font-size:15px;font-weight:900;color:#1a5276;margin-bottom:8px">📊 جدول الركاب التفصيلي</div>
-  <table style="width:100%;border-collapse:collapse;font-size:12px">
+<div>
+  <div style="font-size:16px;font-weight:900;color:#1a5276;margin-bottom:8px">📊 جدول الركاب التفصيلي</div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Cairo',sans-serif">
     <thead>
       <tr style="background:#1a5276;color:#fff">
-        <th style="padding:7px 10px;text-align:right;font-size:13px">#</th>
-        <th style="padding:7px 10px;text-align:right;font-size:13px">الاسم</th>
-        <th style="padding:7px 10px;text-align:right;font-size:13px">📱 الهاتف</th>
-        <th style="padding:7px 10px;text-align:right;font-size:13px">📍 التجمع</th>
-        <th style="padding:7px 10px;text-align:right;font-size:13px">🪑 المقاعد</th>
-        <th style="padding:7px 10px;text-align:right;font-size:13px">ملاحظات</th>
+        <th style="padding:9px 12px;text-align:right">#</th>
+        <th style="padding:9px 12px;text-align:right">الاسم</th>
+        <th style="padding:9px 12px;text-align:right">📱 الهاتف</th>
+        <th style="padding:9px 12px;text-align:right">📍 التجمع</th>
+        <th style="padding:9px 12px;text-align:right">🪑 المقاعد</th>
+        <th style="padding:9px 12px;text-align:right">ملاحظات</th>
       </tr>
     </thead>
     <tbody>
       ${bks.map((b,i)=>{
-        const seats=(b.seatAssign||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(' , ');
+        const seats=(b.seatAssign||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).sort((a,z)=>a-z).join(' ، ');
         return `<tr style="background:${i%2===0?'#f8fafc':'#fff'};border-bottom:1px solid #e2e8f0">
-          <td style="padding:7px 10px;font-weight:800;color:#1a5276">${i+1}</td>
-          <td style="padding:7px 10px;font-weight:700;font-size:13px">${b.name}${b.convoy2?'<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-right:4px">فوجين</span>':''}</td>
-          <td style="padding:7px 10px;direction:ltr;text-align:right">${b.phone||'—'}</td>
-          <td style="padding:7px 10px">${b.pickup||'—'}</td>
-          <td style="padding:7px 10px;font-weight:800;color:#117a65;font-size:13px">${seats||'لم يُحدد'}</td>
-          <td style="padding:7px 10px;font-size:11px;color:#666">${b.seatNote||'—'}</td>
+          <td style="padding:8px 12px;font-weight:800;color:#1a5276">${i+1}</td>
+          <td style="padding:8px 12px;font-weight:700;font-size:14px">${b.name}${b.convoy2?' <span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 6px">فوجين</span>':''}</td>
+          <td style="padding:8px 12px;font-size:13px">${b.phone||'—'}</td>
+          <td style="padding:8px 12px">${b.pickup||'—'}</td>
+          <td style="padding:8px 12px;font-weight:800;color:#117a65;font-size:14px">${seats||'لم يُحدد'}</td>
+          <td style="padding:8px 12px;font-size:12px;color:#555">${b.seatNote||'—'}</td>
         </tr>`;
       }).join('')}
-      ${returnClients.length?returnClients.map((b,i)=>{
-        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(' , ');
+      ${returnClients.map((b,i)=>{
+        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).sort((a,z)=>a-z).join(' ، ');
         return `<tr style="background:#f9f0ff;border-bottom:1px solid #e2e8f0">
-          <td style="padding:7px 10px;font-weight:800;color:#7d3c98">↩</td>
-          <td style="padding:7px 10px;font-weight:700;font-size:13px;color:#7d3c98">${b.name} <span style="background:#7d3c98;color:#fff;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-right:4px">عودة</span></td>
-          <td style="padding:7px 10px;direction:ltr;text-align:right">${b.phone||'—'}</td>
-          <td style="padding:7px 10px">${b.pickup||'—'}</td>
-          <td style="padding:7px 10px;font-weight:800;color:#7d3c98;font-size:13px">${seats2||'لم يُحدد'}</td>
-          <td style="padding:7px 10px;font-size:11px;color:#666">${b.seatNote||'—'}</td>
+          <td style="padding:8px 12px;font-weight:800;color:#7d3c98">↩</td>
+          <td style="padding:8px 12px;font-weight:700;font-size:14px;color:#7d3c98">${b.name} <span style="background:#7d3c98;color:#fff;border-radius:3px;font-size:9px;font-weight:900;padding:1px 6px">عودة</span></td>
+          <td style="padding:8px 12px;font-size:13px">${b.phone||'—'}</td>
+          <td style="padding:8px 12px">${b.pickup||'—'}</td>
+          <td style="padding:8px 12px;font-weight:800;color:#7d3c98;font-size:14px">${seats2||'لم يُحدد'}</td>
+          <td style="padding:8px 12px;font-size:12px;color:#555">${b.seatNote||'—'}</td>
         </tr>`;
-      }).join(''):''}
+      }).join('')}
     </tbody>
   </table>
 </div>
 <script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script>
 </body></html>`;
-  const blob=new Blob([h],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),20000);
+  const blob=new Blob([h],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),20000);
 }
 function renderBusLayout(cn,busIdx){
   busIdx=busIdx||0;
@@ -2910,34 +2903,32 @@ function renderBusLayout(cn,busIdx){
   }
   let busHtml=`<div class="bus-wrap" style="overflow:visible"><div class="bus-top">🚌 ${busName} · ${conv.label} · دخول ${conv.checkin} 9-11 ص · خروج ${conv.checkout} 5-7 ص</div><div class="bus-driver">سائق</div>`;
 
-  // صفوف 1-4 (كراسي 1-16) عادية
+  // دالة بناء صف: [يمين_نافذة, يمين_ممر | فاصل | شمال_ممر, شمال_نافذة]
+  // في RTL: الكراسي من اليمين للشمال = مقعد أيمن (نافذة) ← مقعد أيسر (ممر) | ممر | مقعد أيمن (ممر) → مقعد أيسر (نافذة)
+  function busRow(seats, aisleInner){
+    // seats=[a,b,c,d] حيث a,b يمين الباص و c,d شماله
+    // عرض RTL: b a | ممر | c d  (أي: ممر_يمين, نافذة_يمين | ممر | ممر_شمال, نافذة_شمال)
+    const [a,b,c,d]=seats;
+    const aisle=aisleInner||`<div class="bus-aisle">│</div>`;
+    return `<div class="bus-row">${ms(b)}${ms(a)}${aisle}${ms(c)}${ms(d)}</div>`;
+  }
+
   let sc=1;
+  // صفوف 1-4 (كراسي 1-16)
   for(let r=0;r<4;r++){
-    busHtml+=`<div class="bus-row">`;
-    for(let c=0;c<4;c++){
-      if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
-      busHtml+=ms(sc++);
-    }
-    busHtml+=`</div>`;
+    busHtml+=busRow([sc,sc+1,sc+2,sc+3]);
+    sc+=4;
   }
 
-  // صف 5 (كراسي 17-20) — الباب على يمين
-  busHtml+=`<div style="display:flex;align-items:center;gap:5px;justify-content:center;margin-bottom:5px">`;
-  busHtml+=`<div style="width:60px;height:100%;min-height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:10px;font-size:13px;font-weight:800;color:var(--wn);gap:4px;flex-shrink:0;padding:6px"><span style="font-size:26px">🚪</span><span>باب</span></div>`;
-  for(let c=0;c<4;c++){
-    if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
-    busHtml+=ms(sc++);
-  }
-  busHtml+=`</div>`;
+  // صف 5 (كراسي 17-20) — الباب فاصل بدل الممر
+  const doorAisle=`<div style="width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:8px;font-size:10px;font-weight:800;color:var(--wn);gap:2px;padding:4px"><span style="font-size:18px">🚪</span><span>باب</span></div>`;
+  busHtml+=busRow([sc,sc+1,sc+2,sc+3],doorAisle);
+  sc+=4;
 
-  // صفوف 6-11 (كراسي 21-44) عادية
+  // صفوف 6-11 (كراسي 21-44)
   for(let r=0;r<6;r++){
-    busHtml+=`<div class="bus-row">`;
-    for(let c=0;c<4;c++){
-      if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
-      busHtml+=ms(sc++);
-    }
-    busHtml+=`</div>`;
+    busHtml+=busRow([sc,sc+1,sc+2,sc+3]);
+    sc+=4;
   }
 
   // صف الكنبة الأخير: 45 46 47 48 49 جنب بعض صف واحد

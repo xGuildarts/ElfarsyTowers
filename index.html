@@ -2026,7 +2026,7 @@ function renderDash(){
   const tb=document.getElementById('dash-tbl');
   if(!bookings.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد حجوزات</td></tr>';return;}
   tb.innerHTML=bookings.slice(0,15).map(b=>`<tr>
-    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
+    <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:4px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:15px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>

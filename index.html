@@ -445,7 +445,7 @@ tr:hover td{background:#f5f8fc}
   <div class="hdr-l">
     <div id="hdr-lph" class="hdr-logo-ph">🏖</div>
     <img id="hdr-limg" class="hdr-logo" style="display:none">
-    <div><div class="hdr-title" id="sys-name">Adriaska Tours Tanta</div><div class="hdr-sub">28 مايو ← 20 سبتمبر · 14 شقة · 23 فوج</div></div>
+    <div><div class="hdr-title" id="sys-name">Adriaska Tours Tanta</div><div class="hdr-sub">xReiOgami[GM]</div></div>
   </div>
   <div id="viewer-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;z-index:999;class:viewer-banner">وضع المشاهدة فقط - لا يمكنك إجراء أي تعديلات</div>
 <div class="hdr-r">
@@ -1477,7 +1477,7 @@ function getBusCount(cn){return getBusNames(cn).length;}
 // ============================================================
 const SB_URL_KEY='mtr_sb_url',SB_KEY_KEY='mtr_sb_key';
 function sbH(){return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'}}
-function setSyncing(v){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot'+(v?' s':'');if(t)t.textContent=v?'مزامنة...':'متصل'}
+function setSyncing(v){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot'+(v?' s':'');if(t)t.textContent=v?'Connecting...':'Connected'}
 function setSyncErr(){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot e';if(t)t.textContent='خطأ'}
 
 async function sbFetch(table,method='GET',body=null,query=''){

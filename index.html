@@ -294,8 +294,8 @@ textarea{resize:vertical;min-height:60px}
 .b-gy{background:var(--sf2);color:var(--tx2)}
 .b-pu{background:var(--pul);color:var(--pu)}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:right;padding:10px 11px;border-bottom:2px solid var(--prl);color:var(--pr);font-weight:700;font-size:13px;background:var(--sf2);white-space:nowrap}
-td{padding:9px 11px;border-bottom:1px solid var(--bd);color:var(--tx);vertical-align:middle}
+th{text-align:right;padding:10px 13px;border-bottom:2px solid var(--prl);color:var(--pr);font-weight:700;font-size:14px;background:var(--sf2);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--bd);color:var(--tx);vertical-align:middle;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#f5f8fc}
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--bd)}
@@ -2750,7 +2750,7 @@ function renderBusLayout(cn,busIdx){
     if(occ2[sn]){
       const o2=occ2[sn];
       const conv1=getConv(o2.fromConvoy);
-      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup}"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:9px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
+      return `<div class="seat taken" style="background:#7d3c98;border:3px solid #f9e79f;cursor:pointer" ondblclick="clearSeat2(${cn},${sn})" title="${o2.name} · راجع من فوج ${o2.fromConvoy} · ${o2.pickup} · دبل كليك للإلغاء"><span class="snum" style="color:rgba(255,255,255,.7)">${sn}</span><span class="sname">${o2.name}</span><span class="sphone" style="font-size:9px">↩ راجع من فوج ${conv1?conv1.label:o2.fromConvoy}</span><span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:1px">فوجين</span></div>`;
     }
     const o=occ[sn];
     if(o){
@@ -2767,7 +2767,7 @@ function renderBusLayout(cn,busIdx){
   busHtml+=`<div class="bus-legend">${bks.map((b,i)=>`<span><span class="ldot" style="background:${SEAT_COLORS[i%SEAT_COLORS.length]}"></span>${b.name.split(' ').slice(0,2).join(' ')} · ${b.pickup||'-'}${b.convoy2?' ⚠فوجين':''}</span>`).join('')}</div>`;
   // Add return clients to legend
   if(returnClients.length){busHtml+=`<div class="bus-legend" style="margin-top:4px">${returnClients.map(b=>`<span style="color:var(--pu)"><span class="ldot" style="background:var(--pu)"></span>${b.name.split(' ').slice(0,2).join(' ')} ↩راجع · ${b.pickup||'-'}</span>`).join('')}</div>`;}
-  busHtml+=`<div style="font-size:11px;text-align:center;color:var(--tx3);margin-top:.5rem">اسحب من البركة → مقعد · اسحب مقعد → نقل · دبل كليك → إلغاء</div></div>`;
+  busHtml+=`<div style="font-size:11px;text-align:center;color:var(--tx3);margin-top:.5rem">اسحب من البركة → مقعد · اسحب مقعد → نقل · دبل كليك على أي مقعد → إلغاء التخصيص (يشمل كراسي العودة 🟣)</div></div>`;
   document.getElementById('bus-layout').innerHTML=poolHtml+busHtml;
   // Add print button after render
   const printBusBtn=document.createElement('button');
@@ -2823,6 +2823,14 @@ async function clearSeat(cn,sn){
   const b=bookings.find(bb=>bb.convoy===cn&&(bb.seatAssign||[]).some(s=>s.seatNum===sn));if(!b)return;
   b.seatAssign.forEach((sa,i)=>{if(sa.seatNum===sn)b.seatAssign[i].seatNum=null;});
   await sbFetch('mtr_bookings','PATCH',{seat_assign:b.seatAssign},`?id=eq.${b.id}`);
+  renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();
+}
+
+async function clearSeat2(cn,sn){
+  if(!confirm('إلغاء تخصيص كرسي العودة؟'))return;
+  const b=bookings.find(bb=>bb.convoy2===cn&&(bb.seatAssign2||[]).some(s=>s.seatNum===sn));if(!b)return;
+  b.seatAssign2.forEach((sa,i)=>{if(sa.seatNum===sn)b.seatAssign2[i].seatNum=null;});
+  await sbFetch('mtr_bookings','PATCH',{seat_assign2:b.seatAssign2},`?id=eq.${b.id}`);
   renderBusLayout(activeBusConv,activeBusIdx);renderBusTab();
 }
 

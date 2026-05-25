@@ -387,9 +387,15 @@ tr:hover td{background:#f5f8fc}
   table{width:100%!important;font-size:12px!important}
   .tbl-wrap{overflow:visible!important}
   .stat{break-inside:avoid}
-  .seat{width:80px!important;height:70px!important}
+  .seat{width:88px!important;height:80px!important;font-size:11px!important}
+  .sname{font-size:13px!important}
+  .sphone{font-size:11px!important}
+  .splace{font-size:11px!important}
+  .snum{font-size:11px!important}
+  .seat.empty .snum{font-size:18px!important}
   .bus-wrap{overflow:visible!important}
-  .bus-row{flex-wrap:wrap!important}
+  .bus-row{flex-wrap:nowrap!important}
+  .bus-aisle{width:18px!important}
 }
 </style>
 </head>
@@ -2562,59 +2568,200 @@ function printBusLayout(cn,busIdx){
   const busName=getBusNames(cn)[busIdx]||'الباص '+(busIdx+1);
   const allBks=activeBookings().filter(b=>b.convoy===cn&&effSeats(b)>0);
   const bks=allBks.filter(b=>(b.busIdx===undefined?0:b.busIdx)===busIdx);
+  const returnClients=activeBookings().filter(b=>b.convoy2===cn&&effSeats(b)>0);
   const occ={};
-  bks.forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||''};});});
-  // Group by pickup
+  bks.forEach(b=>{(b.seatAssign||[]).forEach((sa,idx)=>{if(sa.seatNum)occ[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',seatNote:b.seatNote||'',isDouble:b.convoy2!=null};});});
+  const occ2={};
+  returnClients.forEach(b=>{(b.seatAssign2||[]).forEach((sa,idx)=>{if(sa.seatNum)occ2[sa.seatNum]={name:b.name,phone:b.phone||'',pickup:b.pickup||'',fromConvoy:b.convoy};});});
+  // Group by pickup for passenger list
   const byPickup={};
   bks.forEach(b=>{const p=b.pickup||'غير محدد';if(!byPickup[p])byPickup[p]=[];
-    (b.seatAssign||[]).forEach(sa=>{byPickup[p].push({seatNum:sa.seatNum||'—',name:b.name,phone:b.phone||''});});
+    (b.seatAssign||[]).forEach(sa=>{if(sa.seatNum)byPickup[p].push({seatNum:sa.seatNum,name:b.name,phone:b.phone||'',seatNote:b.seatNote||''});});
   });
   const COLORS=['#1a5276','#117a65','#7d3c98','#c0392b','#d68910','#1abc9c','#e67e22','#2980b9','#8e44ad','#27ae60'];
-  function seatCell(sn){
+  function pSeatCell(sn,isAisle){
+    if(isAisle)return `<td style="width:22px;text-align:center;color:#bbb;font-size:14px;vertical-align:middle">│</td>`;
+    if(occ2[sn]){
+      const o2=occ2[sn];
+      return `<td style="border:2px solid #7d3c98;width:88px;height:80px;text-align:center;vertical-align:middle;background:#7d3c98;color:#fff;font-size:10px;padding:4px;border-radius:6px">
+        <div style="font-size:11px;font-weight:900;opacity:.7">${sn}</div>
+        <div style="font-size:12px;font-weight:900;line-height:1.3;margin-top:2px">${o2.name.split(' ').slice(0,3).join(' ')}</div>
+        <div style="font-size:10px;opacity:.85;margin-top:1px">${o2.phone?'📱'+o2.phone:''}</div>
+        <div style="font-size:10px;opacity:.85;margin-top:1px">${o2.pickup}</div>
+        <div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:8px;font-weight:900;padding:1px 4px;margin-top:2px">↩ عودة</div>
+      </td>`;
+    }
     const o=occ[sn];
     const col=o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===sn))%COLORS.length]:'#f0f4f8';
-    const textCol=o?'#fff':'#aaa';
-    return `<td style="border:1.5px solid #ccc;width:80px;height:72px;text-align:center;vertical-align:middle;background:${col};color:${textCol};font-size:11px;padding:3px;font-weight:700;border-radius:4px">
-      <div style="font-size:10px;opacity:.75;font-weight:800">${sn}</div>
-      ${o?`<div style="font-size:11px;font-weight:800;overflow:hidden;line-height:1.3;margin-top:1px">${o.name.split(' ').slice(0,2).join(' ')}</div><div style="font-size:10px;opacity:.9;margin-top:1px">${o.phone?'📱'+o.phone.slice(-4):''}</div><div style="font-size:10px;opacity:.9;overflow:hidden;margin-top:1px">${o.pickup.slice(0,8)}</div>`:'<div style="font-size:10px;color:#bbb;margin-top:6px">فارغ</div>'}
+    const textCol=o?'#fff':'#999';
+    return `<td style="border:2px solid ${o?col+'aa':'#ddd'};width:88px;height:80px;text-align:center;vertical-align:middle;background:${col};color:${textCol};font-size:10px;padding:4px;font-weight:700;border-radius:6px">
+      <div style="font-size:11px;font-weight:900;${o?'opacity:.75':'color:#bbb'}">${sn}</div>
+      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.3;margin-top:2px">${o.name.split(' ').slice(0,3).join(' ')}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:2px">${o.phone?'📱 '+o.phone:''}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:1px">${o.pickup}</div>
+      ${o.isDouble?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 4px;margin-top:2px">⚠ فوجين</div>':''}
+      ${o.seatNote?'<div style="background:rgba(255,255,255,.25);border-radius:3px;font-size:9px;padding:1px 4px;margin-top:1px">📝 '+o.seatNote+'</div>':''}`
+      :'<div style="font-size:11px;color:#ccc;margin-top:8px">فارغ</div>'}
     </td>`;
   }
-  let rows='',sc=1;
-  for(let r=0;r<12;r++){
-    rows+=`<tr>`;
-    for(let c=0;c<4;c++){if(c===2)rows+=`<td style="width:20px;text-align:center;color:#aaa;font-size:12px">│</td>`;rows+=seatCell(sc++);}
-    rows+=`</tr>`;
+  // Build bus rows HTML
+  let busBodyRows='';
+  let sc=1;
+  // صفوف 1-4 (مقاعد 1-16)
+  for(let r=0;r<4;r++){
+    busBodyRows+=`<tr>`;
+    for(let c=0;c<4;c++){
+      if(c===2)busBodyRows+=pSeatCell(0,true);
+      busBodyRows+=pSeatCell(sc++);
+    }
+    busBodyRows+=`</tr>`;
   }
-  rows+=`<tr><td></td>${seatCell(49)}<td style="width:20px;text-align:center;color:#aaa">│</td><td></td></tr>`;
-  // Pickup list
-  const pickupList=Object.entries(byPickup).map(([place,seats])=>`
-    <div style="margin-bottom:.5rem;padding:.5rem;background:#f0f4f8;border-radius:6px">
-      <div style="font-weight:700;color:#117a65;margin-bottom:3px">${place} (${seats.length} مقعد)</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">${seats.map(s=>`<span style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:2px 6px;font-size:11px">${s.seatNum} - ${s.name.split(' ').slice(0,3).join(' ')}</span>`).join('')}</div>
+  // صف 5 (مقاعد 17-20) مع الباب
+  busBodyRows+=`<tr>`;
+  busBodyRows+=`<td colspan="6" style="padding:0">
+    <div style="display:flex;align-items:center;gap:5px">
+      <div style="width:70px;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fef9c3;border:2.5px dashed #d97706;border-radius:8px;font-size:13px;font-weight:900;color:#d97706;gap:3px;flex-shrink:0;padding:5px">
+        <span style="font-size:24px">🚪</span><span>باب</span>
+      </div>
+      <table style="border-collapse:separate;border-spacing:4px;flex:1"><tr>`;
+  for(let c=0;c<4;c++){
+    if(c===2)busBodyRows+=pSeatCell(0,true);
+    busBodyRows+=pSeatCell(sc++);
+  }
+  busBodyRows+=`</tr></table></div></td></tr>`;
+  // صفوف 6-11 (مقاعد 21-44)
+  for(let r=0;r<6;r++){
+    busBodyRows+=`<tr>`;
+    for(let c=0;c<4;c++){
+      if(c===2)busBodyRows+=pSeatCell(0,true);
+      busBodyRows+=pSeatCell(sc++);
+    }
+    busBodyRows+=`</tr>`;
+  }
+  // الكنبة الخلفية: مقاعد 45-49
+  busBodyRows+=`<tr><td colspan="6" style="padding:10px 0 4px">
+    <div style="border-top:3px dashed #cbd5e1;padding-top:10px">
+      <div style="text-align:center;font-size:14px;font-weight:900;color:#475569;margin-bottom:8px">🛋&nbsp; الكنبة الخلفية &nbsp;🛋</div>
+      <div style="display:flex;gap:5px;justify-content:center;align-items:stretch;flex-wrap:nowrap">`;
+  for(let s=45;s<=49;s++){
+    const o=occ[s]||occ2[s];
+    const isReturn=!!occ2[s];
+    const col=isReturn?'#7d3c98':(o?COLORS[bks.findIndex(b=>(b.seatAssign||[]).some(sa=>sa.seatNum===s))%COLORS.length]:'#f0f4f8');
+    const textCol=o?'#fff':'#999';
+    busBodyRows+=`<div style="width:88px;min-height:80px;text-align:center;background:${col};color:${textCol};border:2px solid ${o?col+'aa':'#ddd'};border-radius:6px;padding:5px;font-weight:700;font-size:10px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div style="font-size:11px;font-weight:900;${o?'opacity:.7':'color:#bbb'}">${s}</div>
+      ${o?`<div style="font-size:13px;font-weight:900;line-height:1.3;margin-top:2px">${o.name.split(' ').slice(0,3).join(' ')}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:2px">${o.phone?'📱 '+o.phone:''}</div>
+      <div style="font-size:11px;opacity:.9;margin-top:1px">${o.pickup||''}</div>
+      ${isReturn?'<div style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 4px;margin-top:2px">↩ عودة</div>':''}`
+      :'<div style="font-size:11px;color:#ccc;margin-top:8px">فارغ</div>'}
+    </div>`;
+  }
+  busBodyRows+=`</div></div></td></tr>`;
+  // Passenger list by pickup
+  const pickupList=Object.entries(byPickup).sort((a,b)=>a[0].localeCompare(b[0])).map(([place,seats])=>`
+    <div style="margin-bottom:.6rem;padding:.6rem .75rem;background:#f0f4f8;border-radius:8px;border-right:4px solid #117a65">
+      <div style="font-weight:800;color:#117a65;font-size:13px;margin-bottom:4px">📍 ${place} — ${seats.length} مقعد</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${seats.map(s=>`<span style="background:#fff;border:1px solid #d0e8ff;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:700">
+        <span style="color:#1a5276;font-weight:900">${s.seatNum}</span> — ${s.name.split(' ').slice(0,3).join(' ')}${s.phone?' · 📱'+s.phone:''}${s.seatNote?' · 📝'+s.seatNote:''}</span>`).join('')}</div>
     </div>`).join('');
+  // Return clients list
+  const returnList=returnClients.length?`
+    <div style="margin-top:.75rem;padding:.6rem .75rem;background:#f4ecf7;border-radius:8px;border-right:4px solid #7d3c98">
+      <div style="font-weight:800;color:#7d3c98;font-size:13px;margin-bottom:4px">↩ راجعين مع هذا الباص (فوجين)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${returnClients.map(b=>{
+        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(',');
+        return `<span style="background:#fff;border:1px solid #e8d5f5;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:700">
+          <span style="color:#7d3c98;font-weight:900">${seats2||'—'}</span> — ${b.name}${b.phone?' · 📱'+b.phone:''}</span>`;
+      }).join('')}</div>
+    </div>`:''  ;
+  // Full passenger table
+  const totalOcc=Object.keys(occ).length+Object.keys(occ2).length;
   const setts=(typeof settings!=='undefined'?settings:{})||{};
-  const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>قائمة الباص - ${conv.label}</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+<title>قائمة الباص - ${conv.label} - ${busName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:8px;font-size:11px}
-h2{font-size:16px;font-weight:800;color:#1a5276;margin-bottom:3px}
-table{border-collapse:collapse}
+body{font-family:'Cairo',Arial,sans-serif;direction:rtl;color:#1a2535;padding:10px;font-size:13px;background:#fff}
 *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-@media print{
-  @page{margin:6mm;size:A4 landscape}
-  body{padding:0;font-size:10px}
-}
+@media print{@page{margin:8mm;size:A4 landscape}body{padding:0;font-size:12px}}
+table{border-collapse:separate;border-spacing:4px}
 </style>
 </head><body>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #d6eaf8">
-  <div><h2>${setts.name||'مصيف مطروح 2026'}</h2><div style="color:#4a6278;font-size:11px">🚌 ${busName} · ${conv.label} · دخول ${conv.checkin} 9-11 ص · خروج ${conv.checkout} 5-7 ص</div></div>
-  <div style="text-align:left;font-size:10px;color:#888">${new Date().toLocaleDateString('ar-EG')}</div>
+<!-- هيدر -->
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:3px solid #d6eaf8">
+  <div>
+    <div style="font-size:22px;font-weight:900;color:#1a5276">${setts.name||'مصيف مطروح 2026'}</div>
+    <div style="font-size:14px;font-weight:700;color:#117a65;margin-top:3px">🚌 ${busName} &nbsp;·&nbsp; ${conv.label}</div>
+    <div style="font-size:13px;color:#4a6278;margin-top:2px">📅 دخول: ${conv.checkin} (9-11 ص) &nbsp;|&nbsp; خروج: ${conv.checkout} (5-7 ص)</div>
+  </div>
+  <div style="text-align:left;font-size:12px;color:#888;min-width:120px">
+    <div style="font-weight:700;color:#1a5276">المقاعد المحجوزة: ${totalOcc} / 49</div>
+    <div>طباعة: ${new Date().toLocaleDateString('ar-EG')} ${new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</div>
+  </div>
 </div>
-<table style="border-collapse:collapse;direction:ltr;margin:0 auto"><thead><tr><td style="text-align:center;background:#1a5276;color:#fff;padding:4px 10px;font-weight:700;font-size:11px" colspan="5">سائق</td></tr></thead><tbody>${rows}</tbody></table>
-<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+<!-- رسمة الباص -->
+<div style="margin:0 auto;overflow-x:auto">
+  <div style="font-size:14px;font-weight:800;color:#1a5276;text-align:center;margin-bottom:8px">🚌 خريطة مقاعد الباص</div>
+  <table style="margin:0 auto;direction:ltr">
+    <thead>
+      <tr>
+        <td colspan="6" style="text-align:center;background:#1a5276;color:#fff;padding:8px 16px;font-weight:900;font-size:15px;border-radius:6px 6px 0 0">🚗 سائق</td>
+      </tr>
+    </thead>
+    <tbody>${busBodyRows}</tbody>
+  </table>
+</div>
+<!-- فاصل -->
+<div style="border-top:2px solid #d6eaf8;margin:14px 0;padding-top:10px">
+  <div style="font-size:15px;font-weight:900;color:#1a5276;margin-bottom:8px">📋 قائمة الركاب حسب نقطة التجمع</div>
+  ${pickupList||'<div style="color:#999;font-size:12px">لا يوجد مقاعد محجوزة</div>'}
+  ${returnList}
+</div>
+<!-- جدول تفصيلي -->
+<div style="margin-top:10px">
+  <div style="font-size:15px;font-weight:900;color:#1a5276;margin-bottom:8px">📊 جدول الركاب التفصيلي</div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#1a5276;color:#fff">
+        <th style="padding:7px 10px;text-align:right;font-size:13px">#</th>
+        <th style="padding:7px 10px;text-align:right;font-size:13px">الاسم</th>
+        <th style="padding:7px 10px;text-align:right;font-size:13px">📱 الهاتف</th>
+        <th style="padding:7px 10px;text-align:right;font-size:13px">📍 التجمع</th>
+        <th style="padding:7px 10px;text-align:right;font-size:13px">🪑 المقاعد</th>
+        <th style="padding:7px 10px;text-align:right;font-size:13px">ملاحظات</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${bks.map((b,i)=>{
+        const seats=(b.seatAssign||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(' , ');
+        return `<tr style="background:${i%2===0?'#f8fafc':'#fff'};border-bottom:1px solid #e2e8f0">
+          <td style="padding:7px 10px;font-weight:800;color:#1a5276">${i+1}</td>
+          <td style="padding:7px 10px;font-weight:700;font-size:13px">${b.name}${b.convoy2?'<span style="background:#f9e79f;color:#7d3c98;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-right:4px">فوجين</span>':''}</td>
+          <td style="padding:7px 10px;direction:ltr;text-align:right">${b.phone||'—'}</td>
+          <td style="padding:7px 10px">${b.pickup||'—'}</td>
+          <td style="padding:7px 10px;font-weight:800;color:#117a65;font-size:13px">${seats||'لم يُحدد'}</td>
+          <td style="padding:7px 10px;font-size:11px;color:#666">${b.seatNote||'—'}</td>
+        </tr>`;
+      }).join('')}
+      ${returnClients.length?returnClients.map((b,i)=>{
+        const seats2=(b.seatAssign2||[]).filter(sa=>sa.seatNum).map(sa=>sa.seatNum).join(' , ');
+        return `<tr style="background:#f9f0ff;border-bottom:1px solid #e2e8f0">
+          <td style="padding:7px 10px;font-weight:800;color:#7d3c98">↩</td>
+          <td style="padding:7px 10px;font-weight:700;font-size:13px;color:#7d3c98">${b.name} <span style="background:#7d3c98;color:#fff;border-radius:3px;font-size:9px;font-weight:900;padding:1px 5px;margin-right:4px">عودة</span></td>
+          <td style="padding:7px 10px;direction:ltr;text-align:right">${b.phone||'—'}</td>
+          <td style="padding:7px 10px">${b.pickup||'—'}</td>
+          <td style="padding:7px 10px;font-weight:800;color:#7d3c98;font-size:13px">${seats2||'لم يُحدد'}</td>
+          <td style="padding:7px 10px;font-size:11px;color:#666">${b.seatNote||'—'}</td>
+        </tr>`;
+      }).join(''):''}
+    </tbody>
+  </table>
+</div>
+<script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script>
 </body></html>`;
-  const blob=new Blob([h],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),15000);
+  const blob=new Blob([h],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),20000);
 }
 function renderBusLayout(cn,busIdx){
   busIdx=busIdx||0;
@@ -2774,15 +2921,14 @@ function renderBusLayout(cn,busIdx){
     busHtml+=`</div>`;
   }
 
-  // صف 5 (كراسي 17-20) — الباب على يمين (جنب 17 و18)
-  busHtml+=`<div style="display:flex;align-items:stretch;gap:0;position:relative;margin-right:60px">`;
-  busHtml+=`<div style="position:absolute;right:-64px;top:4px;bottom:4px;width:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2px dashed var(--wn);border-radius:10px;font-size:11px;font-weight:700;color:var(--wn);gap:3px;flex-shrink:0"><span style="font-size:20px">🚪</span><span>باب</span></div>`;
-  busHtml+=`<div class="bus-row" style="flex:1">`;
+  // صف 5 (كراسي 17-20) — الباب على يمين
+  busHtml+=`<div style="display:flex;align-items:center;gap:5px;justify-content:center;margin-bottom:5px">`;
+  busHtml+=`<div style="width:60px;height:100%;min-height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--wnl);border:2.5px dashed var(--wn);border-radius:10px;font-size:13px;font-weight:800;color:var(--wn);gap:4px;flex-shrink:0;padding:6px"><span style="font-size:26px">🚪</span><span>باب</span></div>`;
   for(let c=0;c<4;c++){
     if(c===2)busHtml+=`<div class="bus-aisle">│</div>`;
     busHtml+=ms(sc++);
   }
-  busHtml+=`</div></div>`;
+  busHtml+=`</div>`;
 
   // صفوف 6-11 (كراسي 21-44) عادية
   for(let r=0;r<6;r++){
@@ -2795,9 +2941,9 @@ function renderBusLayout(cn,busIdx){
   }
 
   // صف الكنبة الأخير: 45 46 47 48 49 جنب بعض صف واحد
-  busHtml+=`<div style="margin-top:8px;border-top:2px dashed var(--bd2);padding-top:6px">`;
-  busHtml+=`<div style="text-align:center;font-size:11px;color:var(--tx3);margin-bottom:5px;font-weight:700">🛋 كنبة خلفية</div>`;
-  busHtml+=`<div style="display:flex;gap:6px;justify-content:center;align-items:center">`;
+  busHtml+=`<div style="margin-top:10px;border-top:3px dashed var(--bd2);padding-top:8px">`;
+  busHtml+=`<div style="text-align:center;font-size:14px;color:var(--tx2);margin-bottom:8px;font-weight:800;letter-spacing:1px">🛋&nbsp; الكنبة الخلفية &nbsp;🛋</div>`;
+  busHtml+=`<div style="display:flex;gap:5px;justify-content:center;align-items:stretch;flex-wrap:nowrap">`;
   busHtml+=ms(45)+ms(46)+ms(47)+ms(48)+ms(49);
   busHtml+=`</div></div>`;
   busHtml+=`<div class="bus-legend">${bks.map((b,i)=>`<span><span class="ldot" style="background:${SEAT_COLORS[i%SEAT_COLORS.length]}"></span>${b.name.split(' ').slice(0,2).join(' ')} · ${b.pickup||'-'}${b.convoy2?' ⚠فوجين':''}</span>`).join('')}</div>`;

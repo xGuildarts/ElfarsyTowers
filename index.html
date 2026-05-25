@@ -579,7 +579,7 @@ tr:hover td{background:#f5f8fc}
       <select id="cl-status" onchange="renderClients()" style="max-width:130px"><option value="">كل الحالات</option><option value="done">مكتمل</option><option value="pending">باقي</option></select>
       <select id="cl-party-f" onchange="renderClients()" style="max-width:130px"><option value="">الكل</option><option value="client">عملاء</option><option value="supplier">موردين</option></select>
     </div>
-    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>ذهاب</th><th>عودة</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>مكان الركوب</th><th>المسؤول</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead><tbody id="cl-tbl"></tbody></table></div></div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>كراسي الباص</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>مكان الركوب</th><th>المسؤول</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead><tbody id="cl-tbl"></tbody></table></div></div>
   </div>
   <div id="cl-det" style="display:none">
     <button class="btn" style="margin-bottom:.65rem" onclick="showClList()">← رجوع</button>
@@ -2344,16 +2344,13 @@ function renderClients(){
   const tb=document.getElementById('cl-tbl');
   if(!f.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--tx3);padding:2rem">لا توجد نتائج</td></tr>';return;}
   tb.innerHTML=f.map(b=>{
-    const goSeats=Math.max(0,aptSeats1(b)+(b.extraSeats||0)-(b.seatDiscount||0));
-    const retSeats=b.convoy2?effSeats(b):0;
     return `<tr>
     <td class="lnk" onclick="viewClient(${b.id})">${b.name}${b.partyType==='supplier'?'<span class="badge b-pu" style="margin-right:3px;font-size:9px">مورد</span>':''}${b.convoy2?'<span class="badge" style="background:var(--wnl);color:var(--wn);border:1px solid var(--wn);margin-right:3px;font-size:9px">⚠ فوجين</span>':''}</td>
     <td style="font-size:11px">${b.phone||'-'}</td>
     <td>${(b.apts||[]).map(a=>`<span class="badge b-bl" style="margin:1px">${a}</span>`).join('')}${(b.apts2||[]).length?'<span style="color:var(--wn);font-size:9px;margin:0 2px">+</span>'+(b.apts2||[]).map(a=>`<span class="badge b-wn" style="margin:1px;font-size:10px">${a}</span>`).join(''):''}</td>
     <td><span class="badge b-gy" style="font-size:10px">${b.checkin}</span></td>
-    <td><span class="badge b-gr" style="font-size:11px">${goSeats}</span></td>
-    <td>${retSeats>0?`<span class="badge b-wn" style="font-size:11px">${retSeats}</span>`:`<span style="color:var(--tx3);font-size:11px">—</span>`}</td>
-    <td><span class="badge b-pu">${b.intSeats||0}</span></td>
+    <td style="text-align:center"><span class="badge b-gr" style="font-size:11px">${effSeats(b)}</span></td>
+    <td style="text-align:center"><span class="badge b-pu">${b.intSeats||0}</span></td>
     <td style="text-align:center;font-weight:700;color:var(--pr)">${b.adults||0}</td>
     <td style="text-align:center;font-weight:700;color:var(--ac)">${b.children||0}</td>
     <td style="font-size:11px;color:var(--ac)">${b.pickup||'-'}</td>
@@ -3281,8 +3278,8 @@ function genReport(){
   const allBks=bookings,allAcc=accEntries;
   function bkTable(bks){
     if(!bks.length)return '<div style="text-align:center;color:var(--tx3);padding:2rem">لا توجد بيانات</div>';
-    return `<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>ذهاب</th><th>عودة</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
-    ${bks.map(b=>{const goS=Math.max(0,aptSeats1(b)+(b.extraSeats||0)-(b.seatDiscount||0));const retS=b.convoy2?effSeats(b):0;return`<tr><td style="font-weight:700">${b.name}</td><td>${b.phone||'-'}</td><td>${(b.apts||[]).join('، ')}${(b.apts2||[]).length?' / '+b.apts2.join('، ')+'(ف2)':''}</td><td style="font-size:11px">${b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${goS}</td><td style="text-align:center;font-weight:700;color:var(--wn)">${retS||'—'}</td><td style="text-align:center;font-weight:700;color:var(--pu)">${b.intSeats||0}</td><td style="text-align:center;font-weight:700;color:var(--pr)">${b.adults||0}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${b.children||0}</td><td style="font-weight:700">${b.total.toLocaleString()} ج</td><td style="color:var(--ac)">${b.paid.toLocaleString()} ج</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b.remaining.toLocaleString()} ج</td><td>${b.remaining<=0?'مكتمل':'باقي'}</td></tr>`}).join('')}
+    return `<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>كراسي الباص</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
+    ${bks.map(b=>`<tr><td style="font-weight:700">${b.name}</td><td>${b.phone||'-'}</td><td>${(b.apts||[]).join('، ')}${(b.apts2||[]).length?' / '+b.apts2.join('، ')+'(ف2)':''}</td><td style="font-size:11px">${b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${effSeats(b)}</td><td style="text-align:center;font-weight:700;color:var(--pu)">${b.intSeats||0}</td><td style="text-align:center;font-weight:700;color:var(--pr)">${b.adults||0}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${b.children||0}</td><td style="font-weight:700">${b.total.toLocaleString()} ج</td><td style="color:var(--ac)">${b.paid.toLocaleString()} ج</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b.remaining.toLocaleString()} ج</td><td>${b.remaining<=0?'مكتمل':'باقي'}</td></tr>`).join('')}
     </tbody></table>`;
   }
   function accTable(ents,mode){
@@ -3315,8 +3312,8 @@ function genReport(){
       title=`فوج: ${conv?conv.label:''}`;
       total=bks1.reduce((s,b)=>s+b.total,0); // المالي من العملاء الأساسيين فقط
       count=rows.length;
-      html=`<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>ذهاب</th><th>عودة</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
-      ${rows.map(b=>{const goS=Math.max(0,aptSeats1(b)+(b.extraSeats||0)-(b.seatDiscount||0));const retS=b.convoy2?effSeats(b):0;return`<tr style="${b._isReturn?'background:var(--pul)':''}"><td style="font-weight:700">${b.name}${b._isReturn?'<span class="badge b-pu" style="font-size:9px;margin-right:3px">↩ عودة</span>':''}</td><td>${b.phone||'-'}</td><td>${(b._displayApts||[]).join('، ')||'-'}</td><td style="font-size:11px">${b._displayCheckin||b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${goS}</td><td style="text-align:center;font-weight:700;color:var(--wn)">${retS||'—'}</td><td style="text-align:center;font-weight:700;color:var(--pu)">${b.intSeats||0}</td><td style="text-align:center;font-weight:700;color:var(--pr)">${b.adults||0}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${b.children||0}</td><td style="font-weight:700">${b._isReturn?'-':b.total.toLocaleString()+' ج'}</td><td style="color:var(--ac)">${b._isReturn?'-':b.paid.toLocaleString()+' ج'}</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b._isReturn?'-':b.remaining.toLocaleString()+' ج'}</td><td>${b._isReturn?'<span class="badge b-pu">عودة</span>':b.remaining<=0?'مكتمل':'باقي'}</td></tr>`}).join('')}
+      html=`<table><thead><tr><th>العميل</th><th>الهاتف</th><th>الشقق</th><th>الفوج</th><th>مكان الركوب</th><th>المسؤول</th><th>كراسي الباص</th><th>داخلي</th><th>أفراد</th><th>أطفال</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
+      ${rows.map(b=>`<tr style="${b._isReturn?'background:var(--pul)':''}"><td style="font-weight:700">${b.name}${b._isReturn?'<span class="badge b-pu" style="font-size:9px;margin-right:3px">↩ عودة</span>':''}</td><td>${b.phone||'-'}</td><td>${(b._displayApts||[]).join('، ')||'-'}</td><td style="font-size:11px">${b._displayCheckin||b.checkin}</td><td>${b.pickup||'-'}</td><td>${b.createdBy||'-'}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${effSeats(b)}</td><td style="text-align:center;font-weight:700;color:var(--pu)">${b.intSeats||0}</td><td style="text-align:center;font-weight:700;color:var(--pr)">${b.adults||0}</td><td style="text-align:center;font-weight:700;color:var(--ac)">${b.children||0}</td><td style="font-weight:700">${b._isReturn?'-':b.total.toLocaleString()+' ج'}</td><td style="color:var(--ac)">${b._isReturn?'-':b.paid.toLocaleString()+' ج'}</td><td style="color:${b.remaining>0?'var(--dn)':'var(--ac)'}">${b._isReturn?'-':b.remaining.toLocaleString()+' ج'}</td><td>${b._isReturn?'<span class="badge b-pu">عودة</span>':b.remaining<=0?'مكتمل':'باقي'}</td></tr>`).join('')}
       </tbody></table>`;
     }
   }

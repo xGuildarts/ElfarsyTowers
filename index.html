@@ -2925,7 +2925,7 @@ async function _doPoll(){
         if(_activeTab==='dash')renderDash();
         else if(_activeTab==='clients')renderClients();
         else if(_activeTab==='bus')renderBusTab();
-        if(typeof toast==='function')toast('🔄 تم تحديث البيانات','info');
+        // لا toast — بيوفر egress وما بيزعلش المستخدم
       }
     }
     // جيب آخر 30 قيد محاسبي
@@ -2953,7 +2953,7 @@ function startPollingFallback(){
   // أول poll بعد 3 ثواني من الدخول
   setTimeout(_doPoll,3000);
   // ثم كل 5 دقائق
-  _pollInterval=setInterval(_doPoll,300000);
+  _pollInterval=setInterval(_doPoll,900000); // كل 15 دقيقة بدل 5 لتوفير Egress
 }
 
 // تحديث يدوي فوري
@@ -3265,15 +3265,7 @@ function exportBackupCSV(){
   if(typeof toast==='function')toast('✅ تم تصدير ملف CSV','success');
 }
 // Auto backup reminder every 7 days
-function checkAutoBackup(){
-  const last=localStorage.getItem('mtr_last_backup');
-  const now=Date.now();
-  if(!last||now-parseInt(last)>7*24*60*60*1000){
-    setTimeout(()=>{
-      if(typeof toast==='function')toast('💾 تذكير: لم يتم عمل نسخة احتياطية منذ أكثر من 7 أيام','warn',6000);
-    },3000);
-  }
-}
+function checkAutoBackup(){} // تم إزالة تذكير الـ 7 أيام
 
 // ============================================================
 // STARTUP

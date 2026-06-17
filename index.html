@@ -3094,18 +3094,21 @@ async function exportBackupJSON(){
   // ====== جلب كل البيانات من Supabase بدون حد ======
   let allBookings=bookings,allAccEntries=accEntries,allActivityLog=activityLog,
       allUsers=users,allSuppliers=suppliers,allHotels=hotels,
-      allHotelBookings=hotelBookings,allTasks=(typeof tasks!=='undefined'?tasks:[]);
+      allHotelBookings=hotelBookings,allTasks=(typeof tasks!=='undefined'?tasks:[]),
+      allConvExpenses=(typeof convExpenses!=='undefined'?convExpenses:[]);
   try{
     toast('⏳ جاري تجميع النسخة الاحتياطية الكاملة...','info',15000);
-    const [bksFull,accFull,tskFull]=await Promise.all([
+    const [bksFull,accFull,tskFull,expFull]=await Promise.all([
       sbFetch('mtr_bookings','GET',null,'?order=id.asc&limit=9999'),
       sbFetch('mtr_acc','GET',null,'?order=id.asc&limit=9999'),
       sbFetch('mtr_tasks','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
+      sbFetch('mtr_conv_expenses','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
     ]);
     if(bksFull&&bksFull.length)allBookings=bksFull.map(mB);
     if(accFull&&accFull.length)allAccEntries=accFull.map(mA);
     // mtr_log محذوف من الـ export — بيوفر egress وما بيتستردش في الاستيراد
     if(tskFull&&tskFull.length)allTasks=tskFull;
+    if(expFull&&expFull.length)allConvExpenses=expFull;
   }catch(e){console.warn('Full fetch fallback to in-memory:',e);}
   // ====== snapshot كامل من localStorage ======
   const lsSnap={};
@@ -3123,6 +3126,7 @@ async function exportBackupJSON(){
       totalUsers:allUsers.length,
       totalTasks:allTasks.length,
       totalHotelBookings:allHotelBookings.length,
+      totalConvExpenses:allConvExpenses.length,
       exportedBy:(typeof currentUser!=='undefined'&&currentUser?currentUser.name:'—'),
     },
     // ===== Supabase tables =====
@@ -3134,6 +3138,7 @@ async function exportBackupJSON(){
     hotels:allHotels,
     hotelBookings:allHotelBookings,
     tasks:allTasks,
+    convExpenses:allConvExpenses,
     // ===== إعدادات النظام =====
     settings:settings,
     // ===== بيانات الأسعار والأدوار والفئات =====
@@ -3169,17 +3174,36 @@ async function importBackupJSON(){
         const data=JSON.parse(ev.target.result);
         if(!data.bookings&&!data.accEntries){alert('الملف غير صالح أو ليس نسخة احتياطية من هذا النظام');return;}
         const isMaster=data.version&&data.version.includes('MASTER');
-        if(!await confirm(
-          'سيتم استيراد:\n'+
-          '• '+(data.bookings||[]).length+' حجز\n'+
-          '• '+(data.accEntries||[]).length+' قيد محاسبي\n'+
-          '• '+(data.users||[]).length+' مستخدم\n'+
-          '• '+(data.hotels||[]).length+' فندق\n'+
-          '• '+(data.hotelBookings||[]).length+' حجز فندقي\n'+
-          '• '+(data.tasks||[]).length+' تاسك\n'+
-          (isMaster?'• أسعار + أدوار + فئات + إعدادات كاملة\n':'')+
-          '\nتم التصدير: '+(data.exportedAt||'غير معروف')+'\n\nهل تريد المتابعة؟'
-        ))return;
+        // modal اختيار طريقة الاستيراد
+        const _importMode = await new Promise(resolve=>{
+          const mo=document.createElement('div');
+          mo.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+          mo.innerHTML=`<div style="background:var(--sf);border-radius:16px;padding:28px 32px;min-width:320px;max-width:460px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,.3);font-family:'Cairo',sans-serif;direction:rtl">
+            <div style="font-size:18px;font-weight:800;color:var(--pr);margin-bottom:6px;text-align:center">📦 استيراد نسخة احتياطية</div>
+            <div style="font-size:12px;color:var(--tx2);text-align:center;margin-bottom:16px">تم التصدير: ${(data.exportedAt||'').replace('T',' ').slice(0,16)}</div>
+            <div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--tx2);margin-bottom:18px;line-height:2">
+              • ${(data.bookings||[]).length} حجز &nbsp;•&nbsp; ${(data.accEntries||[]).length} قيد محاسبي<br>
+              • ${(data.users||[]).length} مستخدم &nbsp;•&nbsp; ${(data.tasks||[]).length} تاسك<br>
+              • ${(data.hotels||[]).length} فندق &nbsp;•&nbsp; ${(data.hotelBookings||[]).length} حجز فندقي<br>
+              • ${(data.convExpenses||[]).length} مصروف فوج ${isMaster?'&nbsp;•&nbsp; إعدادات كاملة':''}
+            </div>
+            <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:10px">اختر طريقة الاستيراد:</div>
+            <button id="imp-fresh" style="width:100%;padding:12px;border-radius:10px;border:2px solid var(--pr);background:var(--prl);color:var(--pr);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;text-align:right">
+              🧹 استيراد نظيف<br>
+              <span style="font-size:11px;font-weight:400;color:var(--tx2)">امسح كل البيانات الحالية وابدأ من الـ backup — للمواقع الجديدة</span>
+            </button>
+            <button id="imp-merge" style="width:100%;padding:12px;border-radius:10px;border:2px solid var(--ac);background:var(--acl);color:var(--ac);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:16px;text-align:right">
+              ➕ دمج بدون تكرار<br>
+              <span style="font-size:11px;font-weight:400;color:var(--tx2)">أضف البيانات الجديدة فقط — السجلات الموجودة مش هتتضاف تاني</span>
+            </button>
+            <button id="imp-cancel" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--tx2);font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer">إلغاء</button>
+          </div>`;
+          document.body.appendChild(mo);
+          mo.querySelector('#imp-fresh').onclick=()=>{mo.remove();resolve('fresh');};
+          mo.querySelector('#imp-merge').onclick=()=>{mo.remove();resolve('merge');};
+          mo.querySelector('#imp-cancel').onclick=()=>{mo.remove();resolve(null);};
+        });
+        if(!_importMode)return;
         // === Progress Modal ===
         const _impMod=document.createElement('div');
         _impMod.id='imp-prog-mod';
@@ -3206,9 +3230,25 @@ async function importBackupJSON(){
         let done=0,errors=0;
         async function upsertAll(table,rows){
           if(!rows||!rows.length)return;
-          // استراتيجية جديدة: INSERT chunks كاملة بدون id — أسرع وأضمن
           const CHUNK=50;
-          const cleanRows=rows.map(({id,created_at,...rest})=>rest);
+          // merge mode: جيب الـ IDs الموجودة وشيل المكررة
+          let rowsToInsert=rows;
+          if(_importMode==='merge'){
+            try{
+              const existing=await fetch(SB_URL+'/rest/v1/'+table+'?select=id&limit=9999',{
+                headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+                signal:AbortSignal.timeout(10000)
+              });
+              if(existing.ok){
+                const exData=await existing.json();
+                const exIds=new Set((exData||[]).map(r=>r.id));
+                rowsToInsert=rows.filter(r=>!exIds.has(r.id));
+                if(rowsToInsert.length<rows.length)
+                  console.log(`[merge] ${table}: skip ${rows.length-rowsToInsert.length} existing, insert ${rowsToInsert.length} new`);
+              }
+            }catch(ex){console.warn('merge check failed',table,ex.message);}
+          }
+          const cleanRows=rowsToInsert.map(({id,created_at,...rest})=>rest);
           for(let i=0;i<cleanRows.length;i+=CHUNK){
             const chunk=cleanRows.slice(i,i+CHUNK);
             try{
@@ -3238,6 +3278,20 @@ async function importBackupJSON(){
             }catch(ex){errors++;console.warn('chunk error',table,ex.message);}
           }
           done+=rows.length;
+        }
+        // === fresh mode: امسح الجداول الأول ===
+        if(_importMode==='fresh'){
+          _updProg(3,'جاري مسح البيانات القديمة...','');
+          const _delTables=['mtr_bookings','mtr_acc','mtr_suppliers','htl_hotels','htl_bookings','mtr_tasks','mtr_conv_expenses'];
+          for(const t of _delTables){
+            try{
+              await fetch(SB_URL+'/rest/v1/'+t+'?id=gt.0',{
+                method:'DELETE',
+                headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+                signal:AbortSignal.timeout(10000)
+              });
+            }catch(ex){console.warn('delete table failed',t,ex.message);}
+          }
         }
         _updProg(5,'جاري تحضير بيانات الحجوزات...','');
         // Map bookings back to DB format
@@ -3318,15 +3372,27 @@ async function importBackupJSON(){
           console.log('users restored:',usersOk,'/',dbUsers.length);
           _updProg(82,'تم استيراد المستخدمين','المستخدمين: '+usersOk+' / '+dbUsers.length);
         }
+        // ===== conv_expenses =====
+        if((data.convExpenses||[]).length){
+          _updProg(86,'جاري استيراد مصاريف الأفواج...','');
+          await upsertAll('mtr_conv_expenses',data.convExpenses||[]);
+        }
         // ===== Tasks =====
         if((data.tasks||[]).length){
           const dbTasks=(data.tasks||[]).map(t=>({
             id:t.id,title:t.title||'',notes:t.notes||'',status:t.status||'open',
-            remind_at:t.remind_at||t.remindAt||null,remind_before_min:t.remind_before_min||t.remindBeforeMin||0,
-            client_name:t.client_name||t.clientName||'',done_at:t.done_at||t.doneAt||null,
-            snoozed_until:t.snoozed_until||t.snoozedUntil||null,created_at:t.created_at||null
+            priority:t.priority||'normal',
+            remind_at:t.remind_at||t.remindAt||null,
+            remind_before_min:t.remind_before_min||t.remindBeforeMin||30,
+            client_name:t.client_name||t.clientName||'',
+            booking_id:t.booking_id||t.bookingId||null,
+            created_by:t.created_by||t.createdBy||'',
+            assigned_to:t.assigned_to||t.assignedTo||'',
+            done_at:t.done_at||t.doneAt||null,
+            snoozed_until:t.snoozed_until||t.snoozedUntil||null,
+            created_at:t.created_at||null
           }));
-          _updProg(88,'جاري استيراد التاسكات...','');
+          _updProg(92,'جاري استيراد التاسكات...','');
           await upsertAll('mtr_tasks',dbTasks);
         }
         // ===== إعادة كتابة mtr_settings =====
@@ -3345,7 +3411,9 @@ async function importBackupJSON(){
             if(data.settings.license)settPatch.license_num=data.settings.license;
             if(data.settings.logo)settPatch.logo=data.settings.logo;
             if(data.settings.notes)settPatch.notes=data.settings.notes;
+            if(data.settings.notesHtml)settPatch.notes_html=data.settings.notesHtml;
             if(data.settings.hotelTerms)settPatch.hotel_terms=data.settings.hotelTerms;
+            if(data.settings.extraApts)settPatch.extra_apts=JSON.stringify(data.settings.extraApts);
           }
           if(Object.keys(settPatch).length){
             try{await sbFetch('mtr_settings','PATCH',settPatch,'?id=eq.1');}catch(ex){errors++;}
@@ -4588,6 +4656,8 @@ async function saveBooking(){
     }
     addLog(`إضافة ${pt==='supplier'?'حجز مورد':'حجز'}: ${name} - فوج ${cn} (${conv?.checkin||''} → ${conv?.checkout||''})`,'add',`إجمالي: ${total.toLocaleString()} ج · شقق: ${selApts.join('، ')||'-'} · مكان الركوب: ${document.getElementById('f-pickup')?.value||'-'} · هاتف: ${phone||'-'}`);
     alert('تم حفظ الحجز!');resetForm();
+    markTabsDirty('clients','dash','reports');
+    if(_activeTab==='clients')renderClients();
   }catch(e){alert('فشل: '+e.message)}
 }
 function resetForm(){
@@ -4641,7 +4711,7 @@ function renderClients(resetPage=true){
     const ms=!sf||(sf==='done'&&b.remaining<=0)||(sf==='pending'&&b.remaining>0);
     const mp=!pf||(b.partyType||'client')===pf;
     return mq&&ms&&mp;
-  });
+  }).sort((a,b)=>b.id-a.id);
   const tb=document.getElementById('cl-tbl');
   // pagination footer
   const totalPages=Math.ceil(f.length/_CL_PAGE_SIZE)||1;

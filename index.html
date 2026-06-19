@@ -483,6 +483,7 @@ tr:hover td{background:#f5f8fc}
   <div class="step"><strong>3. SQL Editor</strong>شغّل ملف supabase_setup.sql</div>
   <div class="step"><strong>4. للتحديث الجديد (فوجين)</strong>شغّل: <code style="font-size:10px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS convoy2 integer; ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS seat_assign2 jsonb DEFAULT '[]';</code></div>
   <div class="step"><strong>5. للتحديث الجديد (جهة التحصيل)</strong>شغّل: <code style="font-size:10px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS collect_via text;</code></div>
+  <div class="step"><strong>6. للتحديث الجديد (سعر كرسي المورد)</strong>شغّل: <code style="font-size:10px">ALTER TABLE mtr_bookings ADD COLUMN IF NOT EXISTS collect_via_seat_cost numeric DEFAULT 0;</code></div>
   <div class="cfg-err" id="cfg-err"></div>
   <div class="cfg-ok" id="cfg-ok"></div>
   <div class="fg"><label>Project URL</label><input type="text" id="sb-url" placeholder="https://xxxx.supabase.co"></div>
@@ -1876,8 +1877,9 @@ td{font-family:'Cairo',Arial,sans-serif}
   openHtmlPrint(h,'تقفيل الأفواج','#1a5276','تقفيل_الأفواج_'+new Date().toLocaleDateString('en-CA'));}
 
 // ====== إذن استلام / إذن صرف ======
-function printVoucher(bookingId, type){
+async function printVoucher(bookingId, type){
   const b=bookings.find(x=>x.id===bookingId);if(!b)return;
+  await ensureBookingDetail(b);
   const isReceipt=type==='receipt';
   const vColor=isReceipt?'#1a6b3a':'#8b1a1a';
   const vBg=isReceipt?'#f0faf3':'#fdf0f0';
@@ -2091,8 +2093,9 @@ async function doVoucherAction(bookingId, type, action){
 }
 
 // ====== طباعة إذن من كشف حساب العميل ======
-function printPaymentVoucher(bookingId, payIdx){
+async function printPaymentVoucher(bookingId, payIdx){
   const b=bookings.find(x=>x.id===bookingId);if(!b)return;
+  await ensureBookingDetail(b);
   const p=b.payments[payIdx];if(!p)return;
   const isDisburs=p.amount<0;
   const amt=Math.abs(p.amount);
@@ -2470,6 +2473,7 @@ async function doBulkVoucher(action){
 
   for(const id of ids){
     const b=bookings.find(x=>x.id===id);if(!b)continue;
+    await ensureBookingDetail(b);
     const amt=bvSelected[id];
     if(!amt||amt<=0)continue;
     try{
@@ -2939,6 +2943,16 @@ function getBusCount(cn){return getBusNames(cn).length;}
 // ============================================================
 const SB_URL_KEY='mtr_sb_url',SB_KEY_KEY='mtr_sb_key';
 function sbH(){return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'}}
+// ===== PASSWORD HASHING (SHA-256 via Web Crypto API) =====
+async function hashPassword(plain){
+  if(!plain)return'';
+  // لو الباسورد بيدو هاش بالفعل (64 حرف hex) — مترجعوش تاني
+  if(/^[0-9a-f]{64}$/i.test(plain))return plain.toLowerCase();
+  const enc=new TextEncoder();
+  const buf=await crypto.subtle.digest('SHA-256',enc.encode(plain));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function isHashed(pw){return/^[0-9a-f]{64}$/i.test(pw||'')}
 function setSyncing(v){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot'+(v?' s':'');if(t)t.textContent=v?'جاري المزامنة...':'متصل ✓'}
 function setSyncErr(){const d=document.getElementById('sdot'),t=document.getElementById('stxt');if(!d)return;d.className='sdot e';if(t)t.textContent='خطأ في الاتصال'}
 // ===== SUPABASE REALTIME =====
@@ -2953,33 +2967,43 @@ function initRealtime(){
 
 async function _doPoll(){
   if(!currentUser||!navigator.onLine)return;
+  // لو الـ tab مخفي مترحش egress عبثاً
+  if(document.hidden)return;
   const d=document.getElementById('sdot'),t=document.getElementById('stxt');
   try{
     if(d)d.className='sdot s';if(t)t.textContent='جاري التحديث...';
-    // جيب آخر 50 حجز فقط للمقارنة
-    const latest=await sbFetch('mtr_bookings','GET',null,'?order=id.desc&limit=50');
+    // جيب آخر 50 حجز — أعمدة المقارنة فقط
+    const latest=await sbFetch('mtr_bookings','GET',null,'?order=created_at.desc&limit=50&select=id,remaining,status,paid,total,convoy,name,created_at');
     if(latest&&Array.isArray(latest)){
       let changed=false;
       latest.forEach(r=>{
         const idx=bookings.findIndex(b=>b.id===r.id);
-        if(idx<0){bookings.unshift(mB(r));changed=true;}
-        else{
-          const mapped=mB(r);
-          if(JSON.stringify(bookings[idx].payments)!==JSON.stringify(mapped.payments)||bookings[idx].remaining!==mapped.remaining||bookings[idx].status!==mapped.status){
-            bookings[idx]=mapped;changed=true;
+        if(idx<0){
+          // حجز جديد — جيب بياناته الكاملة الخفيفة
+          sbFetch('mtr_bookings','GET',null,`?id=eq.${r.id}&select=id,name,phone,phone2,convoy,convoy2,checkin,checkout,apts,apts2,apts_total,apt_prices,apt_prices2,seats,extra_seats,seat_discount,seat_price,seat_disc_amt,int_seats,int_seat_price,int_total,transfer_fee,disc,total,paid,remaining,status,pickup,created_by,party_type,supplier_id,adults,children,bus_idx,collect_via,collect_via_seat_cost,created_at,last_edit_by,last_edit_at`)
+            .then(rows=>{if(rows&&rows[0]){bookings.unshift(mB(rows[0]));markAllTabsDirty();if(_activeTab==='dash')renderDash();else if(_activeTab==='clients')renderClients();}})
+            .catch(()=>{});
+          changed=true;
+        }else{
+          if(bookings[idx].remaining!==r.remaining||bookings[idx].status!==r.status||bookings[idx].paid!==r.paid){
+            bookings[idx].remaining=r.remaining;
+            bookings[idx].status=r.status;
+            bookings[idx].paid=r.paid;
+            bookings[idx].total=r.total;
+            changed=true;
           }
         }
       });
       if(changed){
+        bookings.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
         markAllTabsDirty();
         if(_activeTab==='dash')renderDash();
         else if(_activeTab==='clients')renderClients();
         else if(_activeTab==='bus')renderBusTab();
-        // لا toast — بيوفر egress وما بيزعلش المستخدم
       }
     }
-    // جيب آخر 30 قيد محاسبي
-    const latestAcc=await sbFetch('mtr_acc','GET',null,'?order=id.desc&limit=30');
+    // جيب آخر 30 قيد — المبلغ فقط للمقارنة
+    const latestAcc=await sbFetch('mtr_acc','GET',null,'?order=id.desc&limit=30&select=id,amount,op,type,entry_date,description,client_name,category,booking_ref,booking_pay_ref,supplier_id,created_at');
     if(latestAcc&&Array.isArray(latestAcc)){
       let accChanged=false;
       latestAcc.forEach(r=>{
@@ -2991,7 +3015,7 @@ async function _doPoll(){
     }
     // جيب آخر 20 تاسك
     try{
-      const latestTasks=await sbFetch('mtr_tasks','GET',null,'?order=id.desc&limit=20');
+      const latestTasks=await sbFetch('mtr_tasks','GET',null,'?order=id.desc&limit=20&select=id,title,status,priority,remind_at,client_name,booking_id,assigned_to,created_by,done_at,snoozed_until,created_at');
       if(latestTasks&&Array.isArray(latestTasks)&&typeof tasks!=='undefined'){
         let tChanged=false;
         latestTasks.forEach(r=>{
@@ -3033,8 +3057,12 @@ function startPollingFallback(){
   if(_pollInterval)return;
   // أول poll بعد 3 ثواني من الدخول
   setTimeout(_doPoll,3000);
-  // ثم كل 5 دقائق
-  _pollInterval=setInterval(_doPoll,1800000); // كل 30 دقيقة لتوفير Egress
+  // ثم كل 60 دقيقة
+  _pollInterval=setInterval(_doPoll,3600000); // كل 60 دقيقة لتوفير Egress
+  // توقف لما الـ tab مخفي، اشتغل لما يرجع
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden&&currentUser)_doPoll();
+  });
 }
 
 // تحديث يدوي فوري
@@ -3188,17 +3216,23 @@ async function exportBackupJSON(){
       allConvExpenses=(typeof convExpenses!=='undefined'?convExpenses:[]);
   try{
     toast('⏳ جاري تجميع النسخة الاحتياطية الكاملة...','info',15000);
-    const [bksFull,accFull,tskFull,expFull]=await Promise.all([
+    const [bksFull,accFull,tskFull,expFull,supFull,htlFull,hbkFull]=await Promise.all([
       sbFetch('mtr_bookings','GET',null,'?order=id.asc&limit=9999'),
       sbFetch('mtr_acc','GET',null,'?order=id.asc&limit=9999'),
       sbFetch('mtr_tasks','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
       sbFetch('mtr_conv_expenses','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
+      sbFetch('mtr_suppliers','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
+      sbFetch('htl_hotels','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
+      sbFetch('htl_bookings','GET',null,'?order=id.asc&limit=9999').catch(()=>[]),
     ]);
     if(bksFull&&bksFull.length)allBookings=bksFull.map(mB);
     if(accFull&&accFull.length)allAccEntries=accFull.map(mA);
     // mtr_log محذوف من الـ export — بيوفر egress وما بيتستردش في الاستيراد
     if(tskFull&&tskFull.length)allTasks=tskFull;
     if(expFull&&expFull.length)allConvExpenses=expFull;
+    if(supFull&&supFull.length)allSuppliers=supFull;
+    if(htlFull&&htlFull.length)allHotels=htlFull;
+    if(hbkFull&&hbkFull.length)allHotelBookings=hbkFull.map(r=>typeof mHB==='function'?mHB(r):r);
   }catch(e){console.warn('Full fetch fallback to in-memory:',e);}
   // ====== snapshot كامل من localStorage ======
   const lsSnap={};
@@ -3311,13 +3345,26 @@ async function importBackupJSON(){
           const bar=document.getElementById('imp-prog-bar');
           const lbl=document.getElementById('imp-prog-label');
           const det=document.getElementById('imp-prog-detail');
-          if(bar)bar.style.width=Math.min(100,pct)+'%';
-          if(lbl)lbl.textContent=label||'';
+          if(bar&&pct!=null)bar.style.width=Math.min(100,pct)+'%';
+          if(lbl&&label!=null)lbl.textContent=label;
           if(det)det.textContent=detail||'';
         }
         function _closeProg(){const m=document.getElementById('imp-prog-mod');if(m)m.remove();}
         // ===
         let done=0,errors=0;
+        const _failedTables={}; // {table: count} لإظهار تفاصيل واضحة لو جدول فضل فاضي
+        // جلب عدد السجلات الحالية في جدول — يُستخدم للتحقق بعد الإدخال
+        async function _countRows(table){
+          try{
+            const r=await fetch(SB_URL+'/rest/v1/'+table+'?select=id&limit=1',{
+              headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=exact'},
+              signal:AbortSignal.timeout(8000)
+            });
+            const cr=r.headers.get('content-range'); // مثال: "0-0/123"
+            return cr?parseInt(cr.split('/')[1]||'0'):null; // null = تعذر القياس
+          }catch(ex){return null;}
+        }
+        // upsertAll عادي (بدون الحاجة لـ idMap) — لكن الآن بيتحقق فعليًا إن الصفوف اتكتبت
         async function upsertAll(table,rows){
           if(!rows||!rows.length)return;
           const CHUNK=50;
@@ -3338,18 +3385,28 @@ async function importBackupJSON(){
               }
             }catch(ex){console.warn('merge check failed',table,ex.message);}
           }
+          if(!rowsToInsert.length)return;
+          const countBefore=await _countRows(table);
           const cleanRows=rowsToInsert.map(({id,...rest})=>rest); // نحتفظ بـ created_at الأصلي
+          let insertedOk=0;
           for(let i=0;i<cleanRows.length;i+=CHUNK){
             const chunk=cleanRows.slice(i,i+CHUNK);
             try{
               const res=await fetch(SB_URL+'/rest/v1/'+table,{
                 method:'POST',
                 headers:{'Content-Type':'application/json','apikey':SB_KEY,
-                  'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+                  'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
                 body:JSON.stringify(chunk),
                 signal:AbortSignal.timeout(20000)
               });
-              if(!res.ok){
+              if(res.ok){
+                const rd=await res.json().catch(()=>[]);
+                insertedOk+=Array.isArray(rd)?rd.length:chunk.length;
+                if(Array.isArray(rd)&&rd.length<chunk.length){
+                  console.warn('[RLS?] '+table+': sent '+chunk.length+' rows but only '+rd.length+' came back — some rows were likely blocked silently');
+                  errors+=(chunk.length-rd.length);
+                }
+              }else{
                 const e=await res.text();
                 console.warn('chunk insert failed',table,'chunk',i,e);
                 // fallback: insert واحد واحد
@@ -3358,21 +3415,104 @@ async function importBackupJSON(){
                     const r2=await fetch(SB_URL+'/rest/v1/'+table,{
                       method:'POST',
                       headers:{'Content-Type':'application/json','apikey':SB_KEY,
-                        'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+                        'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
                       body:JSON.stringify(row),signal:AbortSignal.timeout(8000)
                     });
-                    if(!r2.ok){const e2=await r2.text();console.warn('row insert fail',table,e2);errors++;}
+                    if(r2.ok){
+                      const rd2=await r2.json().catch(()=>[]);
+                      if(Array.isArray(rd2)&&rd2.length>0)insertedOk++;
+                      else{errors++;console.warn('[RLS?] row reported ok but returned no data',table);}
+                    }else{const e2=await r2.text();console.warn('row insert fail',table,e2);errors++;}
                   }catch(ex2){errors++;console.warn('row insert error',table,ex2.message);}
                 }
               }
             }catch(ex){errors++;console.warn('chunk error',table,ex.message);}
           }
-          done+=rows.length;
+          // ===== تحقق نهائي: قارن العدد الفعلي في القاعدة قبل/بعد =====
+          const countAfter=await _countRows(table);
+          if(countBefore!==null&&countAfter!==null){
+            const actualDelta=countAfter-countBefore;
+            if(actualDelta<insertedOk){
+              const missing=insertedOk-actualDelta;
+              console.error('[RLS SILENT FAILURE] '+table+': API reported '+insertedOk+' inserted, but row count only increased by '+actualDelta+' — '+missing+' rows were silently blocked (likely RLS policy)');
+              errors+=missing;
+              _failedTables[table]=(_failedTables[table]||0)+missing;
+            }
+          }
+          done+=insertedOk;
+        }
+        // ===== upsertAllMapped: زي upsertAll بس بيرجع {oldId: newId} =====
+        // لازم نستخدمه لأي جدول جداول تانية بتشاور عليه بـ Foreign Key
+        // (الحجوزات، الموردين، الفنادق، حجوزات الفنادق، القيود المحاسبية)
+        // ملاحظة: بنادخل صف صف (مش batch) لأن PostgREST مش بيضمن إن ترتيب الصفوف
+        // الراجعة من batch insert يطابق ترتيب الإدخال 100% — وده حرج جدًا لمطابقة IDs صحيحة
+        async function upsertAllMapped(table,rows){
+          const idMap={};
+          if(!rows||!rows.length)return idMap;
+          let rowsToInsert=rows;
+          if(_importMode==='merge'){
+            try{
+              const existing=await fetch(SB_URL+'/rest/v1/'+table+'?select=id&limit=9999',{
+                headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+                signal:AbortSignal.timeout(10000)
+              });
+              if(existing.ok){
+                const exData=await existing.json();
+                const exIds=new Set((exData||[]).map(r=>r.id));
+                // في وضع الدمج: لو الـ id موجود فعلاً، خليه يشاور على نفسه (مفيش تغيير)
+                rows.forEach(r=>{if(exIds.has(r.id))idMap[r.id]=r.id;});
+                rowsToInsert=rows.filter(r=>!exIds.has(r.id));
+              }
+            }catch(ex){console.warn('merge check failed',table,ex.message);}
+          }
+          if(!rowsToInsert.length)return idMap;
+          const countBefore=await _countRows(table);
+          let insertedOk=0;
+          for(let ri=0;ri<rowsToInsert.length;ri++){
+            const row=rowsToInsert[ri];
+            const {id:oldId,...rowRest}=row;
+            if(ri%25===0)_updProg(null,null,table+': '+ri+' / '+rowsToInsert.length);
+            try{
+              const res=await fetch(SB_URL+'/rest/v1/'+table,{
+                method:'POST',
+                headers:{'Content-Type':'application/json','apikey':SB_KEY,
+                  'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
+                body:JSON.stringify(rowRest),
+                signal:AbortSignal.timeout(10000)
+              });
+              if(res.ok){
+                const rd=await res.json().catch(()=>[]);
+                if(Array.isArray(rd)&&rd[0]&&rd[0].id!=null){
+                  if(oldId!=null)idMap[oldId]=rd[0].id;
+                  insertedOk++;
+                }else{
+                  console.error('[RLS SILENT FAILURE] '+table+': insert reported success (HTTP '+res.status+') but returned no row — likely blocked by RLS policy. Old id: '+oldId);
+                  errors++;
+                }
+              }else{
+                const e=await res.text();
+                console.warn('row insert fail',table,'old id',oldId,e);
+                errors++;
+              }
+            }catch(ex){errors++;console.warn('row insert error',table,'old id',oldId,ex.message);}
+          }
+          const countAfter=await _countRows(table);
+          if(countBefore!==null&&countAfter!==null){
+            const actualDelta=countAfter-countBefore;
+            if(actualDelta<insertedOk){
+              const missing=insertedOk-actualDelta;
+              console.error('[RLS SILENT FAILURE] '+table+': API reported '+insertedOk+' inserted, but row count only increased by '+actualDelta+' — '+missing+' rows were silently blocked (likely RLS policy). idMap may be unreliable for this table.');
+              errors+=missing;
+              _failedTables[table]=(_failedTables[table]||0)+missing;
+            }
+          }
+          done+=insertedOk;
+          return idMap;
         }
         // === fresh mode: امسح الجداول الأول ===
         if(_importMode==='fresh'){
           _updProg(3,'جاري مسح البيانات القديمة...','');
-          const _delTables=['mtr_bookings','mtr_acc','mtr_suppliers','htl_hotels','htl_bookings','mtr_tasks','mtr_conv_expenses'];
+          const _delTables=['mtr_acc','mtr_tasks','htl_bookings','mtr_bookings','htl_hotels','mtr_suppliers','mtr_conv_expenses'];
           for(const t of _delTables){
             try{
               await fetch(SB_URL+'/rest/v1/'+t+'?id=gt.0',{
@@ -3380,82 +3520,122 @@ async function importBackupJSON(){
                 headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
                 signal:AbortSignal.timeout(10000)
               });
+              // ===== تحقق فعلي إن الجدول فضل فاضي — DELETE برجع 2xx برضه لو RLS حظر الحذف =====
+              const remaining=await _countRows(t);
+              if(remaining!==null&&remaining>0){
+                console.error('[RLS SILENT FAILURE on DELETE] '+t+': still has '+remaining+' rows after delete — RLS likely blocking DELETE. Import will continue but old data may remain mixed with new data.');
+                errors++;
+                _failedTables['DELETE:'+t]=remaining;
+              }
             }catch(ex){console.warn('delete table failed',t,ex.message);}
           }
         }
         _updProg(5,'جاري استيراد الموردين...','');
-        // === نستورد الموردين الأول، قبل الحجوزات والحسابات، عشان نبني mapping بين الـ ID القديم والجديد ===
-        // (لازم يحصل قبل الحجوزات/الحسابات لأن العمودين supplier_id و collect_via بيعتمدوا على IDs الموردين)
-        const _supIdMap={}; // {oldId: newId}
-        if((data.suppliers||[]).length){
-          for(const sup of data.suppliers){
-            try{
-              const {id:oldId,created_at,...supRest}=sup;
-              const rs=await fetch(SB_URL+'/rest/v1/mtr_suppliers',{
-                method:'POST',
-                headers:{'Content-Type':'application/json','apikey':SB_KEY,
-                  'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
-                body:JSON.stringify({...supRest,created_at:sup.created_at||null}),
-                signal:AbortSignal.timeout(8000)
-              });
-              if(rs.ok){
-                const rd=await rs.json();
-                const newId=(rd&&rd[0])?rd[0].id:null;
-                if(newId&&oldId)_supIdMap[oldId]=newId;
-                done++;
-              }else{errors++;const e=await rs.text();console.warn('supplier insert fail',e);}
-            }catch(ex){errors++;console.warn('supplier error',ex.message);}
-          }
-          console.log('[import] supplier ID map:',_supIdMap);
-        }
+        // ===== 1) الموردين أولاً — لازم idMap قبل الحجوزات والقيود =====
+        const dbSuppliers=(data.suppliers||[]).map(s=>({...s}));
+        const supIdMap=await upsertAllMapped('mtr_suppliers',dbSuppliers);
+        console.log('[import] supplier ID map:',supIdMap);
         _updProg(15,'جاري تحضير بيانات الحجوزات...','');
-        // Map bookings back to DB format
+        // ===== 2) الحجوزات — مع تصحيح supplier_id و collect_via بالـ IDs الجديدة =====
         const dbBookings=(data.bookings||[]).map(b=>{
-          // نصحح supplier_id و collect_via بالـ ID الجديد للمورد (لو الـ mapping متوفر)
-          let fixedSupplierId=b.supplierId||null;
-          if(fixedSupplierId&&_supIdMap[fixedSupplierId])fixedSupplierId=_supIdMap[fixedSupplierId];
-          let fixedCollectVia=b.collectVia||'';
-          if(fixedCollectVia&&fixedCollectVia.startsWith('supplier_')){
-            const oldCvId=parseInt(fixedCollectVia.replace('supplier_',''));
-            if(_supIdMap[oldCvId])fixedCollectVia='supplier_'+_supIdMap[oldCvId];
+          // collect_via ممكن يكون 'supplier_<oldId>' — نصلحه على الـ ID الجديد فورًا
+          let fixedCollectVia=b.collectVia||null;
+          if(fixedCollectVia&&typeof fixedCollectVia==='string'&&fixedCollectVia.startsWith('supplier_')){
+            const oldSupId=parseInt(fixedCollectVia.replace('supplier_',''));
+            const newSupId=supIdMap[oldSupId];
+            if(newSupId)fixedCollectVia='supplier_'+newSupId;
           }
+          const fixedSupplierId=(b.supplierId!=null&&supIdMap[b.supplierId]!=null)?supIdMap[b.supplierId]:(b.supplierId||null);
           return{
-          id:b.id,name:b.name,phone:b.phone,phone2:b.phone2,pickup:b.pickup,
-          convoy:b.convoy,convoy2:b.convoy2,checkin:b.checkin,checkout:b.checkout,
-          apts:b.apts,apt_prices:b.aptPrices,apts_total:b.aptsTotal,
-          apts2:b.apts2,apt_prices2:b.aptPrices2,
-          seats:b.seats,extra_seats:b.extraSeats,seat_discount:b.seatDiscount,
-          seat_price:b.seatPrice,seat_disc_amt:b.seatDiscAmt,
-          int_seats:b.intSeats,int_seat_price:b.intSeatPrice,int_total:b.intTotal,
-          transfer_fee:b.transferFee,transfer_fee_note:b.transferFeeNote,
-          disc:b.disc,total:b.total,paid:b.paid,remaining:b.remaining,
-          payments:b.payments,notes:b.notes,seat_note:b.seatNote,
-          seat_assign:b.seatAssign,seat_assign2:b.seatAssign2,
-          mgr_snap:b.mgrSnap,created_by:b.createdBy,party_type:b.partyType,
-          supplier_id:fixedSupplierId,disc_reason:b.discReason,
-          adults:b.adults,children:b.children,status:b.status,
-          last_edit_by:b.lastEditBy,last_edit_at:b.lastEditAt,
-          bus_idx:b.busIdx,collect_via:fixedCollectVia,
-          created_at:b.createdAt||b.created_at||null
-        }});
+            id:b.id,name:b.name,phone:b.phone,phone2:b.phone2,pickup:b.pickup,
+            convoy:b.convoy,convoy2:b.convoy2,checkin:b.checkin,checkout:b.checkout,
+            apts:b.apts,apt_prices:b.aptPrices,apts_total:b.aptsTotal,
+            apts2:b.apts2,apt_prices2:b.aptPrices2,
+            seats:b.seats,extra_seats:b.extraSeats,seat_discount:b.seatDiscount,
+            seat_price:b.seatPrice,seat_disc_amt:b.seatDiscAmt,
+            int_seats:b.intSeats,int_seat_price:b.intSeatPrice,int_total:b.intTotal,
+            transfer_fee:b.transferFee,transfer_fee_note:b.transferFeeNote,
+            disc:b.disc,total:b.total,paid:b.paid,remaining:b.remaining,
+            payments:b.payments,notes:b.notes,seat_note:b.seatNote,
+            seat_assign:b.seatAssign,seat_assign2:b.seatAssign2,
+            mgr_snap:b.mgrSnap,created_by:b.createdBy,party_type:b.partyType,
+            supplier_id:fixedSupplierId,disc_reason:b.discReason,
+            adults:b.adults,children:b.children,status:b.status,
+            last_edit_by:b.lastEditBy,last_edit_at:b.lastEditAt,
+            bus_idx:b.busIdx,collect_via:fixedCollectVia,collect_via_seat_cost:b.collectViaSeatCost||0,
+            created_at:b.createdAt||b.created_at||null
+          };
+        });
+        _updProg(25,'جاري استيراد الحجوزات...','الحجوزات: '+(dbBookings.length)+' سجل');
+        const bookingIdMap=await upsertAllMapped('mtr_bookings',dbBookings);
+        console.log('[import] booking ID map size:',Object.keys(bookingIdMap).length);
+        // ===== 3) القيود المحاسبية — مع تصحيح booking_ref و supplier_id بالـ IDs الجديدة =====
+        // booking_ref ممكن يكون: رقم حجز عادي، أو 'htl_<id>' لحجوزات الفنادق، أو 'pair_...' لقيود مرتبطة ببعضها (مش معرّف حجز)
         const dbAcc=(data.accEntries||[]).map(a=>{
-          let fixedSupplierId=a.supplierId||null;
-          if(fixedSupplierId&&_supIdMap[fixedSupplierId])fixedSupplierId=_supIdMap[fixedSupplierId];
+          let fixedBookingRef=a.bookingRef||null;
+          if(fixedBookingRef&&typeof fixedBookingRef==='string'){
+            // 'htl_<oldId>' بيتصحح بعدين في خطوة 5b بعد ما نعرف IDs الجديدة لحجوزات الفنادق — نسيبه كما هو الآن
+            if(!fixedBookingRef.startsWith('htl_')&&!fixedBookingRef.startsWith('pair_')&&/^\d+$/.test(fixedBookingRef)){
+              const oldBId=parseInt(fixedBookingRef);
+              if(bookingIdMap[oldBId]!=null)fixedBookingRef=String(bookingIdMap[oldBId]);
+              else console.warn('[import] acc entry references missing booking id',oldBId);
+            }
+          }
+          const fixedSupId=(a.supplierId!=null&&supIdMap[a.supplierId]!=null)?supIdMap[a.supplierId]:(a.supplierId||null);
           return{
-          id:a.id,type:a.type,op:a.op,amount:a.amount,entry_date:a.date,
-          description:a.desc,client_name:a.clientName,category:a.category,
-          booking_ref:a.bookingRef,booking_pay_ref:a.bookingPayRef,supplier_id:fixedSupplierId,
-          created_at:a.createdAt||a.created_at||null
-        }});
-        // Upsert all Supabase tables
-        _updProg(30,'جاري استيراد الحجوزات...','الحجوزات: '+(dbBookings.length)+' سجل');
-        await upsertAll('mtr_bookings',dbBookings);
-        _updProg(45,'جاري استيراد القيود المحاسبية...','القيود: '+(dbAcc.length)+' سجل');
-        await upsertAll('mtr_acc',dbAcc);
+            id:a.id,type:a.type,op:a.op,amount:a.amount,entry_date:a.date,
+            description:a.desc,client_name:a.clientName,category:a.category,
+            booking_ref:fixedBookingRef,booking_pay_ref:a.bookingPayRef,supplier_id:fixedSupId,
+            created_at:a.createdAt||a.created_at||null
+          };
+        });
+        _updProg(40,'جاري استيراد القيود المحاسبية...','القيود: '+(dbAcc.length)+' سجل');
+        const accIdMap=await upsertAllMapped('mtr_acc',dbAcc);
         _updProg(62,'جاري استيراد الفنادق...','');
-        await upsertAll('htl_hotels',data.hotels||[]);
+        // ===== 4) الفنادق =====
+        const hotelIdMap=await upsertAllMapped('htl_hotels',data.hotels||[]);
         _updProg(70,'جاري استيراد حجوزات الفنادق...','');
-        await upsertAll('htl_bookings',data.hotelBookings||[]);
+        // ===== 5) حجوزات الفنادق — مع تصحيح hotel_id بالـ ID الجديد =====
+        const oldHotelBookings=data.hotelBookings||[];
+        const dbHotelBookings=oldHotelBookings.map(hb=>{
+          const fixedHotelId=(hb.hotelId!=null&&hotelIdMap[hb.hotelId]!=null)?hotelIdMap[hb.hotelId]:(hb.hotelId||null);
+          return{
+            id:hb.id,name:hb.name||'',phone:hb.phone||'',destination:hb.dest||'',
+            hotel_id:fixedHotelId,hotel_name:hb.hotelName||'',
+            checkin:hb.checkin||'',checkout:hb.checkout||'',nights:hb.nights||0,
+            room_type:hb.roomType||'single',rooms:hb.rooms||1,price_per_night:hb.pricePerNight||0,
+            adults:hb.adults||0,children:hb.children||0,disc:hb.disc||0,disc_reason:hb.discReason||'',
+            total:hb.total||0,paid:hb.paid||0,remaining:hb.remaining||0,payments:hb.payments||[],
+            status:hb.status||'pending',notes:hb.notes||'',sales_rep:hb.salesRep||'',
+            created_by:hb.createdBy||'',
+            bus_seats:hb.busSeats||0,bus_seat_price:hb.busSeatPrice||0,transport_total:hb.transportTotal||0,
+            pickup:hb.pickup||'',dropoff:hb.dropoff||'',transport_note:hb.transportNote||'',
+            created_at:hb.createdAt||hb.created_at||null
+          };
+        });
+        const hotelBookingIdMap=await upsertAllMapped('htl_bookings',dbHotelBookings);
+        // ===== 5b) تصحيح booking_ref='htl_<oldId>' في القيود المحاسبية بعد ما عرفنا IDs الجديدة لحجوزات الفنادق =====
+        if(Object.keys(hotelBookingIdMap).length){
+          const accNeedingHtlFix=(data.accEntries||[]).filter(a=>a.bookingRef&&typeof a.bookingRef==='string'&&a.bookingRef.startsWith('htl_'));
+          if(accNeedingHtlFix.length){
+            _updProg(78,'جاري إصلاح روابط حجوزات الفنادق المحاسبية...','');
+            for(const a of accNeedingHtlFix){
+              try{
+                const oldHbId=parseInt(a.bookingRef.replace('htl_',''));
+                const newHbId=hotelBookingIdMap[oldHbId];
+                const newAccId=accIdMap[a.id];
+                if(newHbId&&newAccId){
+                  await fetch(SB_URL+'/rest/v1/mtr_acc?id=eq.'+newAccId,{
+                    method:'PATCH',
+                    headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+                    body:JSON.stringify({booking_ref:'htl_'+newHbId}),
+                    signal:AbortSignal.timeout(6000)
+                  });
+                }
+              }catch(ex){console.warn('htl booking_ref fix error',a.id,ex.message);}
+            }
+          }
+        }
         // ✅ تحضير بيانات المستخدمين — نتأكد من custom_perms صح
         const dbUsers=(data.users||[]).map(u=>({
           id:u.id,
@@ -3484,11 +3664,15 @@ async function importBackupJSON(){
                 // مش موجود — أضفه
                 const ri=await fetch(SB_URL+'/rest/v1/mtr_users',{
                   method:'POST',
-                  headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+                  headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
                   body:JSON.stringify({username:u.username,password:u.password,name:u.name,role:u.role,custom_perms:u.custom_perms||[]}),
                   signal:AbortSignal.timeout(8000)
                 });
-                if(ri.ok)usersOk++;
+                if(ri.ok){
+                  const rd=await ri.json().catch(()=>[]);
+                  if(Array.isArray(rd)&&rd.length>0)usersOk++;
+                  else console.warn('[RLS?] user insert reported ok but returned no row',u.username);
+                }
                 else{const e=await ri.text();console.warn('user insert fail',u.username,e);}
               } else usersOk++;
             }catch(ex){console.warn('user upsert error',u.username,ex.message);}
@@ -3505,19 +3689,23 @@ async function importBackupJSON(){
         }
         // ===== Tasks =====
         if((data.tasks||[]).length){
-          const dbTasks=(data.tasks||[]).map(t=>({
-            id:t.id,title:t.title||'',notes:t.notes||'',status:t.status||'open',
-            priority:t.priority||'normal',
-            remind_at:t.remind_at||t.remindAt||null,
-            remind_before_min:t.remind_before_min||t.remindBeforeMin||30,
-            client_name:t.client_name||t.clientName||'',
-            booking_id:t.booking_id||t.bookingId||null,
-            created_by:t.created_by||t.createdBy||'',
-            assigned_to:t.assigned_to||t.assignedTo||'',
-            done_at:t.done_at||t.doneAt||null,
-            snoozed_until:t.snoozed_until||t.snoozedUntil||null,
-            created_at:t.created_at||null
-          }));
+          const dbTasks=(data.tasks||[]).map(t=>{
+            const oldBId=t.booking_id||t.bookingId||null;
+            const fixedBId=(oldBId!=null&&bookingIdMap[oldBId]!=null)?bookingIdMap[oldBId]:oldBId;
+            return{
+              id:t.id,title:t.title||'',notes:t.notes||'',status:t.status||'open',
+              priority:t.priority||'normal',
+              remind_at:t.remind_at||t.remindAt||null,
+              remind_before_min:t.remind_before_min||t.remindBeforeMin||30,
+              client_name:t.client_name||t.clientName||'',
+              booking_id:fixedBId,
+              created_by:t.created_by||t.createdBy||'',
+              assigned_to:t.assigned_to||t.assignedTo||'',
+              done_at:t.done_at||t.doneAt||null,
+              snoozed_until:t.snoozed_until||t.snoozedUntil||null,
+              created_at:t.created_at||null
+            };
+          });
           _updProg(92,'جاري استيراد التاسكات...','');
           await upsertAll('mtr_tasks',dbTasks);
         }
@@ -3553,15 +3741,20 @@ async function importBackupJSON(){
           // استعادة الفئات في الذاكرة
           if(data.pmTypes&&Array.isArray(data.pmTypes))try{localStorage.setItem('mtr_cats',JSON.stringify({pm:data.pmTypes,exp:data.expCats||[]}));}catch(ex){}
         }
+        const _failedTableNames=Object.keys(_failedTables);
         _updProg(100,'اكتمل الاستيراد ✅','إجمالي: '+done+' سجل'+(errors?' · أخطاء: '+errors:''));
         setTimeout(()=>{
           _closeProg();
-          if(errors>0){
+          if(_failedTableNames.length){
+            const detail=_failedTableNames.map(t=>t+' ('+_failedTables[t]+')').join('، ');
+            toast('🛑 فشل صامت مكتشف (RLS؟) في: '+detail+' — البيانات دخلت بنجاح ظاهريًا لكن الصفوف لم تُحفظ فعليًا في القاعدة. تحقق من سياسات RLS قبل الاستمرار. الصفحة لن تُحدّث تلقائيًا.','warn',15000);
+          } else if(errors>0){
             toast('⚠️ تم استيراد '+done+' سجل مع '+errors+' خطأ — افتح الكونسول (F12) لتفاصيل الأخطاء','warn',10000);
+            setTimeout(()=>location.reload(),3500);
           } else {
             toast('✅ تم الاستيراد الكامل بنجاح ('+done+' سجل)! سيتم تحديث الصفحة...','success',3000);
+            setTimeout(()=>location.reload(),3500);
           }
-          setTimeout(()=>location.reload(),3500);
         },800);
       }catch(ex){
         const m=document.getElementById('imp-prog-mod');if(m)m.remove();
@@ -3663,15 +3856,21 @@ async function resetConn(){if(!await confirm('إعادة الإعداد؟'))retu
 async function initApp(){
   document.getElementById('lod-msg').textContent='جاري تحميل البيانات...';
   const BK_LIMIT=1500,ACC_LIMIT=1500,HBK_LIMIT=1000;
+  // ===== Egress optimization: جيب الأعمدة الخفيفة فقط في initApp =====
+  // الأعمدة الثقيلة (payments, seat_assign, mgr_snap, notes...) تتحمل on-demand في viewClient
+  const BK_COLS='id,name,phone,phone2,convoy,convoy2,checkin,checkout,apts,apts2,apts_total,apt_prices,apt_prices2,seats,extra_seats,seat_discount,seat_price,seat_disc_amt,int_seats,int_seat_price,int_total,transfer_fee,disc,total,paid,remaining,status,pickup,created_by,party_type,supplier_id,adults,children,bus_idx,collect_via,collect_via_seat_cost,created_at,last_edit_by,last_edit_at';
+  const ACC_COLS='id,type,op,amount,entry_date,description,client_name,category,booking_ref,booking_pay_ref,supplier_id,created_at';
+  const HBK_COLS='id,name,phone,destination,hotel_id,hotel_name,checkin,checkout,nights,room_type,rooms,price_per_night,adults,children,disc,total,paid,remaining,status,sales_rep,created_by,bus_seats,bus_seat_price,transport_total,pickup,dropoff,created_at';
+  const USR_COLS='id,username,password,name,role,custom_perms,created_at';
   const [bks,accs,logs,usrs,setts,sups,htls,hbks]=await Promise.all([
-    sbFetch('mtr_bookings','GET',null,'?order=id.desc&limit='+BK_LIMIT),
-    sbFetch('mtr_acc','GET',null,'?order=id.desc&limit='+ACC_LIMIT),
+    sbFetch('mtr_bookings','GET',null,`?order=created_at.desc&limit=${BK_LIMIT}&select=${BK_COLS}`),
+    sbFetch('mtr_acc','GET',null,`?order=id.desc&limit=${ACC_LIMIT}&select=${ACC_COLS}`),
     sbFetch('mtr_log','GET',null,'?order=id.desc&limit=150'),
-    sbFetch('mtr_users','GET',null,'?order=id.asc'),
+    sbFetch('mtr_users','GET',null,`?order=id.asc&select=${USR_COLS}`),
     sbFetch('mtr_settings','GET',null,'?id=eq.1'),
     sbFetch('mtr_suppliers','GET',null,'?order=name.asc').catch(()=>[]),
     sbFetch('htl_hotels','GET',null,'?order=name.asc').catch(()=>[]),
-    sbFetch('htl_bookings','GET',null,'?order=id.desc&limit='+HBK_LIMIT).catch(()=>[]),
+    sbFetch('htl_bookings','GET',null,`?order=id.desc&limit=${HBK_LIMIT}&select=${HBK_COLS}`).catch(()=>[]),
   ]);
   bookings=(bks||[]).map(mB);
   accEntries=(accs||[]).map(mA);
@@ -3687,12 +3886,12 @@ async function initApp(){
   rebuildAPTS(); // بعد ما اتحملت الإعدادات من Supabase (فيها extra_apts)
   hideAll();
   // Restore session
-  try{const s=JSON.parse(sessionStorage.getItem('mtr_sess')||'null');if(s){const f=users.find(u=>u.username===s.username&&u.password===s.password);if(f){loginUser(f);return;}}}catch(e){}
+  try{const s=JSON.parse(sessionStorage.getItem('mtr_sess')||'null');if(s&&s.username){const f=users.find(u=>u.username===s.username&&u.password===(s.passwordHash||s.password));if(f){loginUser(f);return;}}}catch(e){}
   show('login-pg');updateLogoDsp();
 }
 
 // Mappers
-function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',phone2:r.phone2||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,apts2:r.apts2||[],aptPrices2:r.apt_prices2||{},seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatNote:r.seat_note||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('en-GB'):'',createdAt:r.created_at||'',busIdx:r.bus_idx||0,collectVia:r.collect_via||''}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null}}
+function mB(r){return{id:r.id,name:r.name||'',phone:r.phone||'',phone2:r.phone2||'',pickup:r.pickup||'',convoy:r.convoy,convoy2:r.convoy2||null,checkin:r.checkin||'',checkout:r.checkout||'',apts:r.apts||[],aptPrices:r.apt_prices||{},aptsTotal:r.apts_total||0,apts2:r.apts2||[],aptPrices2:r.apt_prices2||{},seats:r.seats||0,extraSeats:r.extra_seats||0,seatDiscount:r.seat_discount||0,seatPrice:r.seat_price||0,seatDiscAmt:r.seat_disc_amt||0,intSeats:r.int_seats||0,intSeatPrice:r.int_seat_price||0,intTotal:r.int_total||0,transferFee:r.transfer_fee||0,transferFeeNote:r.transfer_fee_note||'',disc:r.disc||0,total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],notes:r.notes||'',seatNote:r.seat_note||'',seatAssign:r.seat_assign||[],seatAssign2:r.seat_assign2||[],mgrSnap:r.mgr_snap||{},createdBy:r.created_by||'',partyType:r.party_type||'client',supplierId:r.supplier_id||null,discReason:r.disc_reason||'',adults:r.adults||0,children:r.children||0,status:r.status||'active',lastEditBy:r.last_edit_by||'',lastEditAt:r.last_edit_at||'',created:(()=>{const _d=r.created_at?new Date(r.created_at):new Date();return _d.getFullYear()+'/'+String(_d.getMonth()+1).padStart(2,'0')+'/'+String(_d.getDate()).padStart(2,'0');})(),createdAt:r.created_at||'',busIdx:r.bus_idx||0,collectVia:r.collect_via||'',collectViaSeatCost:r.collect_via_seat_cost||0}}function mA(r){return{id:r.id,type:r.type||'',op:r.op||'in',amount:r.amount||0,date:r.entry_date||'',desc:r.description||'',clientName:r.client_name||'',category:r.category||'',bookingRef:r.booking_ref||'',bookingPayRef:r.booking_pay_ref||'',counterParty:r.booking_pay_ref||'',supplierId:r.supplier_id||null,createdAt:r.created_at||''}}
 function mL(r){return{id:r.id,ts:r.created_at?new Date(r.created_at).toLocaleString('ar-EG'):'',user:r.user_name||'',username:r.username||'',action:r.action||'',type:r.log_type||'',detail:r.detail||''}}
 function mS(r){
   // Load price map from settings - always prefer DB over defaults
@@ -3729,7 +3928,22 @@ function mS(r){
 async function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value;
-  const f=users.find(x=>x.username===u&&x.password===p);
+  if(!u||!p){document.getElementById('login-err').style.display='block';return;}
+  const h=await hashPassword(p);
+  // ابحث بالـ hash الأول — لو مش لاقي جرب plain text (migration للحسابات القديمة)
+  let f=users.find(x=>x.username===u&&x.password===h);
+  if(!f){
+    // legacy: باسورد القديم plain text
+    const legacy=users.find(x=>x.username===u&&!isHashed(x.password)&&x.password===p);
+    if(legacy){
+      // رجّع الباسورد للـ hash تلقائياً في الخلفية
+      try{
+        await sbFetch('mtr_users','PATCH',{password:h},`?id=eq.${legacy.id}`);
+        legacy.password=h;
+      }catch(ex){console.warn('password migration failed',ex.message);}
+      f=legacy;
+    }
+  }
   if(!f){document.getElementById('login-err').style.display='block';return;}
   document.getElementById('login-err').style.display='none';
   addLog('تسجيل دخول','login',`${f.name} · دور: ${{admin:'GM',bookings:'Bookings',accounts:'Acountant',operations:'Oerations',viewer:'Viewer'}[f.role]||f.role}`);
@@ -3737,7 +3951,7 @@ async function doLogin(){
 }
 function loginUser(f){
   currentUser=f;
-  sessionStorage.setItem('mtr_sess',JSON.stringify({username:f.username,password:f.password}));
+  sessionStorage.setItem('mtr_sess',JSON.stringify({username:f.username,passwordHash:f.password}));
   // ===== Start Polling (Realtime disabled to save egress) =====
   setTimeout(initRealtime, 500);
   // Read lastTab BEFORE applyPerms (applyPerms no longer calls showTab)
@@ -4074,7 +4288,6 @@ function renderUsers(){
           <div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap">
             <span style="font-size:11px;color:var(--tx3)">🔒</span>
             <span id="pw-${u.id}" style="font-size:12px;font-family:monospace;letter-spacing:2px">••••••</span>
-            <button class="btn btn-sm" onclick="togglePw(${u.id},'${u.password}')" style="padding:1px 7px;font-size:10px">👁 عرض</button>
             <button class="btn btn-sm" onclick="openUserCredsModal(${u.id})" style="padding:1px 7px;font-size:10px">✏ تعديل بيانات الدخول</button>
           </div>
         </div>
@@ -4239,7 +4452,7 @@ async function saveUserCreds(id){
   }
   if(newPass){
     if(newPass.length<4){alert('كلمة المرور يجب أن تكون 4 أحرف على الأقل');return;}
-    patch.password=newPass;
+    patch.password=await hashPassword(newPass);
   }
   if(!Object.keys(patch).length){document.getElementById('ucred-overlay')?.remove();return;}
   try{
@@ -4249,7 +4462,7 @@ async function saveUserCreds(id){
     if(currentUser?.id===id){
       if(patch.username)currentUser.username=patch.username;
       if(patch.password)currentUser.password=patch.password;
-      sessionStorage.setItem('mtr_sess',JSON.stringify({username:currentUser.username,password:currentUser.password}));
+      sessionStorage.setItem('mtr_sess',JSON.stringify({username:currentUser.username,passwordHash:currentUser.password}));
     }
     const parts=[];if(patch.username)parts.push('اسم المستخدم → '+patch.username);if(patch.password)parts.push('كلمة المرور');
     addLog(`تعديل بيانات الدخول: ${u.name} (${parts.join(' · ')})`,'edit',`اسم المستخدم: ${u.username}`);
@@ -4265,7 +4478,8 @@ async function addUser(){
   if(p.length<4){alert('كلمة المرور يجب أن تكون 4 أحرف على الأقل');return;}
   if(users.find(x=>x.username===u)){alert('اسم المستخدم موجود بالفعل');return;}
   try{
-    const res=await sbFetch('mtr_users','POST',{username:u,password:p,name:n,role:r},'');
+    const ph=await hashPassword(p);
+    const res=await sbFetch('mtr_users','POST',{username:u,password:ph,name:n,role:r},'');
     if(res&&res[0])users.push(res[0]);
     addLog('إضافة مستخدم: '+n,'add','اسم المستخدم: '+u+' · الدور: '+getRoleLabel(r));
     ['nu-user','nu-pass','nu-name'].forEach(id=>document.getElementById(id).value='');
@@ -4305,6 +4519,15 @@ function aptSeats2(b){return(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return 
 // إجمالي الكراسي = (شقق ف1 + شقق ف2) + إضافي - خصم — نفس العدد للذهاب والعودة
 function effSeats(b){return Math.max(0,aptSeats1(b)+aptSeats2(b)+(b.extraSeats||0)-(b.seatDiscount||0))}
 function effSeatsTotal(b){return effSeats(b)}
+function busSeatsCount(b){
+  // نفس طريقة حساب عدد كراسي الباص المستخدمة في تقفيلة الفوج (apts فقط + إضافي - خصم)
+  const baseSeats=(b.apts||[]).reduce((s,a)=>{const inf=APTS[a];return s+(inf?(inf.type==='single'?2:4):0);},0);
+  const disc=b.seatDiscount||0,extra=b.extraSeats||0;
+  return Math.max(0,baseSeats-disc)+extra;
+}
+function busSeatCost(b){
+  return busSeatsCount(b)*(b.seatPrice||600);
+}
 function convEffSeats(cn){return activeBookings().filter(b=>b.convoy===cn).reduce((s,b)=>s+effSeats(b),0)}
 function cColor(bid,cn){const ids=activeBookings().filter(b=>b.convoy===cn).map(b=>b.id);return SEAT_COLORS[ids.indexOf(bid)%SEAT_COLORS.length]}
 function aptP(ci,type){return(PRICE_MAP[ci]||{single:9400,double:12800})[type]}
@@ -4764,7 +4987,7 @@ async function saveBooking(){
   const busIdxVal=parseInt(document.getElementById('f-bus-sel')?.value)||0;
   // sa2 = مقاعد العودة: نفس عدد الذهاب بالظبط
   const sa2=convoy2Val?[...Array(netSeatsTotal).keys()].map(()=>({seatNum:null,extra:false})):[];
-  const payload={name,phone,phone2,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1+base2,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_note:(document.getElementById('f-seat-note')?.value?.trim()||'')+(isTransportOnly?' [نقل فقط]':''),seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
+  const payload={name,phone,phone2,pickup,convoy:cn,convoy2:convoy2Val,checkin:conv.checkin,checkout:conv.checkout,apts:selApts,apt_prices:ap,apts_total:at+at2,apts2:selApts2,apt_prices2:ap2,seats:base1+base2,extra_seats:extra,seat_discount:sd,seat_price:sp,seat_disc_amt:sda,int_seats:intS,int_seat_price:intP,int_total:intT,disc,total,paid,remaining:total-paid,payments:pays,notes:document.getElementById('f-notes').value,seat_note:(document.getElementById('f-seat-note')?.value?.trim()||'')+(isTransportOnly?' [نقل فقط]':''),seat_assign:sa,seat_assign2:sa2,mgr_snap:settings,created_at:new Date().toISOString(),created_by:(document.getElementById('f-sales-rep')?.value||currentUser?.name||'—'),party_type:pt,supplier_id:supplierId,adults:parseInt(document.getElementById('f-adults')?.value)||0,children:parseInt(document.getElementById('f-children')?.value)||0,bus_idx:busIdxVal,_discReason:document.getElementById('f-disc-reason')?.value||''};
   // Store disc reason in notes if provided (temp workaround until SQL updated)
   const drVal=document.getElementById('f-disc-reason')?.value?.trim();
   if(drVal&&!payload.notes) payload.notes='خصم: '+drVal;
@@ -4773,7 +4996,7 @@ async function saveBooking(){
     delete payload._discReason;
     const res=await sbFetch('mtr_bookings','POST',payload,'');
     if(res&&res[0]){
-      const nb=mB(res[0]);bookings.unshift(nb);
+      const _r0=res[0];if(!_r0.created_at)_r0.created_at=new Date().toISOString();const nb=mB(_r0);bookings.unshift(nb);bookings.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
       if(supplierId&&total>0){
         const sup=suppliers.find(s=>s.id===supplierId);
         const se=await sbFetch('mtr_acc','POST',{type:sup?.name||'مورد',op:'expense',amount:total,entry_date:conv.checkin,description:`حجز فوج ${cn} - ${name}`,client_name:name,category:'',booking_ref:String(res[0].id),booking_pay_ref:'',supplier_id:supplierId},'');
@@ -4833,11 +5056,11 @@ function renderClients(resetPage=true){
   const f=bookings.filter(b=>{
     const conv=CONVOYS.find(c=>c.num===b.convoy);
     const convLabel=(conv?.label||'').toLowerCase();
-    const mq=!q||b.name.toLowerCase().includes(q)||(b.apts||[]).some(a=>a.toLowerCase().includes(q))||(b.phone||'').includes(q)||(b.phone2||'').includes(q)||(b.pickup||'').toLowerCase().includes(q)||(b.checkin||'').includes(q)||(b.checkout||'').includes(q)||(b.created||'').includes(q)||(b.createdBy||'').toLowerCase().includes(q)||String(b.convoy).includes(q)||convLabel.includes(q)||(b.notes||'').toLowerCase().includes(q);
+    const mq=!q||b.name.toLowerCase().includes(q)||(b.apts||[]).some(a=>a.toLowerCase().includes(q))||(b.phone||'').includes(q)||(b.pickup||'').toLowerCase().includes(q)||(b.checkin||'').includes(q)||(b.createdBy||'').toLowerCase().includes(q)||String(b.convoy).includes(q)||convLabel.includes(q)||(b.notes||'').toLowerCase().includes(q);
     const ms=!sf||(sf==='done'&&b.remaining<=0)||(sf==='pending'&&b.remaining>0);
     const mp=!pf||(b.partyType||'client')===pf;
     return mq&&ms&&mp;
-  }).sort((a,b)=>b.id-a.id);
+  }).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
   const tb=document.getElementById('cl-tbl');
   // pagination footer
   const totalPages=Math.ceil(f.length/_CL_PAGE_SIZE)||1;
@@ -4877,11 +5100,47 @@ function clPageGo(dir,total){
   renderClients(false);
   document.getElementById('cl-list')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function viewClient(id){
+// ===== تأكد من تحميل الأعمدة الثقيلة لحجز معين =====
+async function ensureBookingDetail(b){
+  if(!b||b._detailLoaded)return;
+  try{
+    const det=await sbFetch('mtr_bookings','GET',null,`?id=eq.${b.id}&select=id,payments,notes,seat_note,seat_assign,seat_assign2,mgr_snap,transfer_fee_note,disc_reason`);
+    if(det&&det[0]){
+      b.payments=det[0].payments||[];
+      b.notes=det[0].notes||'';
+      b.seatNote=det[0].seat_note||'';
+      b.seatAssign=det[0].seat_assign||[];
+      b.seatAssign2=det[0].seat_assign2||[];
+      b.mgrSnap=det[0].mgr_snap||{};
+      b.transferFeeNote=det[0].transfer_fee_note||'';
+      b.discReason=det[0].disc_reason||'';
+      b._detailLoaded=true;
+    }
+  }catch(ex){console.warn('ensureBookingDetail failed',b.id,ex.message);}
+}
+async function viewClient(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
   showTab('clients');
   document.getElementById('cl-list').style.display='none';
   document.getElementById('cl-det').style.display='block';
+  // ===== جيب الأعمدة الثقيلة on-demand لو مش موجودة =====
+  if(!b._detailLoaded){
+    document.getElementById('cl-content').innerHTML='<div style="text-align:center;padding:2rem;color:var(--tx3)">⏳ جاري تحميل التفاصيل...</div>';
+    try{
+      const det=await sbFetch('mtr_bookings','GET',null,`?id=eq.${id}&select=id,payments,notes,seat_note,seat_assign,seat_assign2,mgr_snap,transfer_fee_note,disc_reason`);
+      if(det&&det[0]){
+        b.payments=det[0].payments||[];
+        b.notes=det[0].notes||'';
+        b.seatNote=det[0].seat_note||'';
+        b.seatAssign=det[0].seat_assign||[];
+        b.seatAssign2=det[0].seat_assign2||[];
+        b.mgrSnap=det[0].mgr_snap||{};
+        b.transferFeeNote=det[0].transfer_fee_note||'';
+        b.discReason=det[0].disc_reason||'';
+        b._detailLoaded=true;
+      }
+    }catch(ex){console.warn('detail fetch failed',ex.message);}
+  }
   const pR=b.payments.length?b.payments.map((p,pi)=>{const isDisburs=p.amount<0;return`<tr><td>${p.date||'-'}</td><td style="font-weight:700;color:${isDisburs?'var(--dn)':'var(--ac)'}">${isDisburs?'↓ مسترد '+Math.abs(p.amount).toLocaleString():'↑ '+p.amount.toLocaleString()} ج</td><td>${p.payMethod||'-'}</td><td>${p.note||'-'}</td><td style="text-align:center"><button onclick="printPaymentVoucher(${b.id},${pi})" title="طباعة إذن" style="background:none;border:1px solid var(--bd2);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:11px;color:var(--tx2);font-family:'Cairo',sans-serif" onmouseover="this.style.borderColor='var(--pr)';this.style.color='var(--pr)'" onmouseout="this.style.borderColor='var(--bd2)';this.style.color='var(--tx2)'">🖨️</button></td></tr>`;}).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--tx3)">لا توجد دفعات</td></tr>';
   const aR=(b.apts||[]).map(a=>`<tr><td><span class="badge b-bl">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''}</td><td style="font-weight:700">${((b.aptPrices||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
   const aR2=(b.apts2||[]).map(a=>`<tr><td><span class="badge b-wn">${a}</span></td><td style="color:var(--tx2);font-size:11px">${APTS[a]?.desc||''} <span style="background:var(--wnl);color:var(--wn);border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">فوج 2</span></td><td style="font-weight:700">${((b.aptPrices2||{})[a]||0).toLocaleString()} ج</td></tr>`).join('');
@@ -5049,6 +5308,8 @@ function showCollectViaModal(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
   const cur=b.collectVia||((effSeats(b)>0)?'bus':'building');
   const supOpts=suppliers.map(s=>`<option value="supplier_${s.id}" ${cur==='supplier_'+s.id?'selected':''}>${s.name}</option>`).join('');
+  const seats=busSeatsCount(b);
+  const curRate=b.collectViaSeatCost||'';
   const html=`<div id="cvm-overlay" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center">
   <div style="background:var(--sf);border-radius:14px;padding:1.5rem;width:min(420px,92vw);box-shadow:0 8px 40px rgba(0,0,0,.3);direction:rtl;font-family:inherit">
     <div style="font-size:16px;font-weight:800;color:var(--pr);margin-bottom:1rem">🔄 جهة التحصيل — ${b.name}</div>
@@ -5060,6 +5321,18 @@ function showCollectViaModal(id){
         ${supOpts?`<optgroup label="🤝 الموردين">${supOpts}</optgroup>`:''}
         <option value="new_supplier">➕ إضافة مورد جديد...</option>
       </select>
+    </div>
+    <div id="cvm-sup-note" style="display:none;margin-bottom:1rem;background:var(--sf2);border-radius:8px;padding:.7rem .875rem;border:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.6rem">
+        <label style="font-size:12px;font-weight:700;color:var(--tx2);white-space:nowrap">سعر كرسي الباص عند المورد (تكلفة)</label>
+        <input id="cvm-seat-rate" type="number" min="0" value="${curRate}" placeholder="مثلاً 450" oninput="onCvmSelChange()" style="flex:1;padding:7px 9px;border-radius:7px;border:1.5px solid var(--bd2);font-size:13px;font-family:inherit;background:var(--sf);color:var(--tx)">
+      </div>
+      <div style="font-size:12px;color:var(--ac);font-weight:600;line-height:1.7">
+        عدد الكراسي: ${seats}<br>
+        المتبقي على العميل: ${(b.remaining||0).toLocaleString('ar-EG')} ج<br>
+        خصم الكراسي: <span id="cvm-seat-deduct">0</span> ج<br>
+        <strong>صافي المطلوب من المورد: <span id="cvm-net-amt">${(b.remaining||0).toLocaleString('ar-EG')}</span> ج</strong>
+      </div>
     </div>
     <div id="cvm-new-sup" style="display:none;margin-bottom:1rem;background:var(--sf2);border-radius:8px;padding:.875rem;border:1px solid var(--bd)">
       <div style="font-size:12px;font-weight:800;color:var(--ac);margin-bottom:.6rem">بيانات المورد الجديد</div>
@@ -5075,16 +5348,35 @@ function showCollectViaModal(id){
     </div>
   </div></div>`;
   document.body.insertAdjacentHTML('beforeend',html);
+  window._cvmCurId=id;
+  onCvmSelChange();
 }
 function onCvmSelChange(){
   const v=document.getElementById('cvm-sel')?.value;
   const nd=document.getElementById('cvm-new-sup');
   if(nd)nd.style.display=v==='new_supplier'?'block':'none';
+  const note=document.getElementById('cvm-sup-note');
+  const isSup=v==='new_supplier'||(v||'').startsWith('supplier_');
+  if(note)note.style.display=isSup?'block':'none';
+  const deductEl=document.getElementById('cvm-seat-deduct');
+  const netEl=document.getElementById('cvm-net-amt');
+  if(!deductEl||!netEl)return;
+  const b=bookings.find(x=>x.id===window._cvmCurId);
+  // fallback: get id from save button onclick context isn't available here, so use last opened id stored globally
+  const seats=b?busSeatsCount(b):0;
+  const rate=parseFloat(document.getElementById('cvm-seat-rate')?.value)||0;
+  const remaining=b?(b.remaining||0):0;
+  const deduct=seats*rate;
+  const net=Math.max(0,remaining-deduct);
+  deductEl.textContent=deduct.toLocaleString('ar-EG');
+  netEl.textContent=net.toLocaleString('ar-EG');
 }
 async function saveCollectVia(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
   const sel=document.getElementById('cvm-sel');if(!sel)return;
   let val=sel.value;
+  const isSupVal=val==='new_supplier'||val.startsWith('supplier_');
+  const seatRate=isSupVal?(parseFloat(document.getElementById('cvm-seat-rate')?.value)||0):0;
   if(val==='new_supplier'){
     const nm=(document.getElementById('cvm-sup-name')?.value||'').trim();
     if(!nm){alert('اكتب اسم المورد');return;}
@@ -5096,7 +5388,12 @@ async function saveCollectVia(id){
       suppliers.push(newSup);
       val='supplier_'+newSup.id;
       if(b.remaining>0){
-        await sbFetch('mtr_acc','POST',{type:nm,op:'expense',amount:b.remaining,entry_date:new Date().toISOString().split('T')[0],description:`تحصيل فوج ${b.convoy} - ${b.name}`,client_name:b.name,category:'',booking_ref:String(b.id),booking_pay_ref:'collect_via',supplier_id:newSup.id},'');
+        const seatCost=busSeatsCount(b)*seatRate;
+        const netAmt=Math.max(0,(b.remaining||0)-seatCost);
+        if(netAmt>0){
+          const desc=seatCost>0?`تحصيل فوج ${b.convoy} - ${b.name} (متبقي ${(b.remaining||0).toLocaleString('ar-EG')} - كراسي ${seatCost.toLocaleString('ar-EG')} = صافي ${netAmt.toLocaleString('ar-EG')})`:`تحصيل فوج ${b.convoy} - ${b.name}`;
+          await sbFetch('mtr_acc','POST',{type:nm,op:'expense',amount:netAmt,entry_date:new Date().toISOString().split('T')[0],description:desc,client_name:b.name,category:'',booking_ref:String(b.id),booking_pay_ref:'collect_via',supplier_id:newSup.id},'');
+        }
       }
     }catch(e){alert('فشل إضافة المورد: '+e.message);return;}
   } else if(val.startsWith('supplier_')){
@@ -5105,13 +5402,19 @@ async function saveCollectVia(id){
     if(sid!==prevSid&&b.remaining>0){
       const sup=suppliers.find(s=>s.id===sid);
       if(sup){
-        await sbFetch('mtr_acc','POST',{type:sup.name,op:'expense',amount:b.remaining,entry_date:new Date().toISOString().split('T')[0],description:`تحصيل فوج ${b.convoy} - ${b.name}`,client_name:b.name,category:'',booking_ref:String(b.id),booking_pay_ref:'collect_via',supplier_id:sid},'');
+        const seatCost=busSeatsCount(b)*seatRate;
+        const netAmt=Math.max(0,(b.remaining||0)-seatCost);
+        if(netAmt>0){
+          const desc=seatCost>0?`تحصيل فوج ${b.convoy} - ${b.name} (متبقي ${(b.remaining||0).toLocaleString('ar-EG')} - كراسي ${seatCost.toLocaleString('ar-EG')} = صافي ${netAmt.toLocaleString('ar-EG')})`:`تحصيل فوج ${b.convoy} - ${b.name}`;
+          await sbFetch('mtr_acc','POST',{type:sup.name,op:'expense',amount:netAmt,entry_date:new Date().toISOString().split('T')[0],description:desc,client_name:b.name,category:'',booking_ref:String(b.id),booking_pay_ref:'collect_via',supplier_id:sid},'');
+        }
       }
     }
   }
   try{
-    await sbFetch('mtr_bookings','PATCH',{collect_via:val},`?id=eq.${id}`);
+    await sbFetch('mtr_bookings','PATCH',{collect_via:val,collect_via_seat_cost:isSupVal?seatRate:0},`?id=eq.${id}`);
     b.collectVia=val;
+    b.collectViaSeatCost=isSupVal?seatRate:0;
     document.getElementById('cvm-overlay')?.remove();
     viewClient(id);
   }catch(e){alert('فشل الحفظ: '+e.message)}
@@ -6881,8 +7184,9 @@ function toggleLang(){
 // ============================================================
 // RECEIPT
 // ============================================================
-function editBooking(id){
+async function editBooking(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
+  await ensureBookingDetail(b);
   // Pre-calculate base seats for template
   const _bSeats1=(b.apts||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
   const _bSeats2=(b.apts2||[]).reduce((s,a)=>{const i=APTS[a];return s+(i?(i.type==='single'?2:4):0);},0);
@@ -7438,8 +7742,9 @@ function toggleEditApt(aptNum, bookingId){
 
 function closeEditModal(){document.getElementById('edit-modal').style.display='none';editSelApts={};editSelApts2={};}
 
-function printReceipt(id){
+async function printReceipt(id){
   const b=bookings.find(x=>x.id===id);if(!b)return;
+  await ensureBookingDetail(b);
   const m=b.mgrSnap||settings||{};
   // Smart format: if it contains HTML tags use as-is, otherwise convert newlines
   const fmtTxt=t=>{if(!t)return'';if(/<[a-z]/i.test(t))return t;return t.replace(/\r/g,'').replace(/\n/g,'<br>');};
@@ -7696,17 +8001,18 @@ function _getClosingTableData(sectionKey){
     const sid=sectionKey.replace('sup_','');
     const sup=suppliers.find(s=>String(s.id)===String(sid));
     const filtered=rows.filter(r=>r.remaining>0&&r.via==='supplier_'+sid);
-    return {rows:filtered,conv,title:'تحصيلات المورد: '+(sup?.name||sid),color:'#3c4fa8'};
+    return {rows:filtered,conv,title:'تحصيلات المورد: '+(sup?.name||sid),color:'#3c4fa8',isSupplier:true};
   }
   return {rows,conv,title:'التقفيلة الكاملة',color:'#1a5276'};
 }
 
 function exportClosingTableExcel(sectionKey){
   const setts=(typeof settings!=='undefined'?settings:{})||{};
-  const {rows,conv,title}=_getClosingTableData(sectionKey);
+  const {rows,conv,title,isSupplier}=_getClosingTableData(sectionKey);
   if(!rows.length){alert('لا يوجد بيانات');return;}
   const n=v=>(v||0).toLocaleString();
-  const T={busSeats:rows.reduce((s,r)=>s+r.busSeats,0),busTot:rows.reduce((s,r)=>s+r.busTot,0),intSeats:rows.reduce((s,r)=>s+r.intSeats,0),intTot:rows.reduce((s,r)=>s+r.intTot,0),aptNet:rows.reduce((s,r)=>s+r.aptNet,0),disc:rows.reduce((s,r)=>s+r.disc,0),total:rows.reduce((s,r)=>s+r.total,0),paid:rows.reduce((s,r)=>s+r.paid,0),remaining:rows.reduce((s,r)=>s+r.remaining,0)};
+  const sd=r=>r.busSeats*((r.b&&r.b.collectViaSeatCost)||0);
+  const T={busSeats:rows.reduce((s,r)=>s+r.busSeats,0),busTot:rows.reduce((s,r)=>s+r.busTot,0),intSeats:rows.reduce((s,r)=>s+r.intSeats,0),intTot:rows.reduce((s,r)=>s+r.intTot,0),aptNet:rows.reduce((s,r)=>s+r.aptNet,0),disc:rows.reduce((s,r)=>s+r.disc,0),total:rows.reduce((s,r)=>s+r.total,0),paid:rows.reduce((s,r)=>s+r.paid,0),remaining:rows.reduce((s,r)=>s+r.remaining,0),supDeduct:rows.reduce((s,r)=>s+sd(r),0),supNet:rows.reduce((s,r)=>s+Math.max(0,r.remaining-sd(r)),0)};
   const trs=rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f7f9fb'}">
     <td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:700">${r.i}</td>
     <td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:800;font-size:12pt">${r.name}</td>
@@ -7722,6 +8028,7 @@ function exportClosingTableExcel(sectionKey){
     <td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:800;color:#1a5276">${n(r.total)}</td>
     <td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:700;color:#117a65">${n(r.paid)}</td>
     <td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:800;color:#c0392b">${n(r.remaining)}</td>
+    ${isSupplier?`<td style="padding:7px 10px;border:1px solid #dce6f0;color:#c0392b">${sd(r)?'-'+n(sd(r)):'—'}</td><td style="padding:7px 10px;border:1px solid #dce6f0;font-weight:800;color:#117a65">${n(Math.max(0,r.remaining-sd(r)))}</td>`:''}
   </tr>`).join('');
   const BOM='﻿';
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">
@@ -7734,6 +8041,7 @@ function exportClosingTableExcel(sectionKey){
     <th>#</th><th>الاسم</th><th>الهاتف</th><th>الشقة</th><th>مكان الركوب</th>
     <th>كراسي باص</th><th>× 600</th><th>داخلي</th><th>× 200</th>
     <th>سعر الشقة</th><th>الخصم</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th>
+    ${isSupplier?`<th>خصم الكراسي</th><th>الصافي المطلوب من المورد</th>`:''}
   </tr></thead>
   <tbody>${trs}</tbody>
   <tfoot><tr>
@@ -7743,6 +8051,7 @@ function exportClosingTableExcel(sectionKey){
     <td>${n(T.aptNet)}</td><td style="color:#c0392b">${T.disc?n(T.disc):'—'}</td>
     <td style="color:#1a5276">${n(T.total)}</td><td style="color:#117a65">${n(T.paid)}</td>
     <td style="color:#c0392b;font-size:13pt">${n(T.remaining)}</td>
+    ${isSupplier?`<td style="color:#c0392b">${T.supDeduct?'-'+n(T.supDeduct):'—'}</td><td style="color:#117a65;font-size:13pt">${n(T.supNet)}</td>`:''}
   </tr></tfoot>
 </table>
 </body></html>`;
@@ -7754,10 +8063,11 @@ function exportClosingTableExcel(sectionKey){
 
 function exportClosingTablePDF(sectionKey){
   const setts=(typeof settings!=='undefined'?settings:{})||{};
-  const {rows,conv,title,color}=_getClosingTableData(sectionKey);
+  const {rows,conv,title,color,isSupplier}=_getClosingTableData(sectionKey);
   if(!rows.length){alert('لا يوجد بيانات');return;}
   const n=v=>(v||0).toLocaleString();
-  const T={busSeats:rows.reduce((s,r)=>s+r.busSeats,0),busTot:rows.reduce((s,r)=>s+r.busTot,0),intSeats:rows.reduce((s,r)=>s+r.intSeats,0),intTot:rows.reduce((s,r)=>s+r.intTot,0),aptNet:rows.reduce((s,r)=>s+r.aptNet,0),disc:rows.reduce((s,r)=>s+r.disc,0),total:rows.reduce((s,r)=>s+r.total,0),paid:rows.reduce((s,r)=>s+r.paid,0),remaining:rows.reduce((s,r)=>s+r.remaining,0)};
+  const sd=r=>r.busSeats*((r.b&&r.b.collectViaSeatCost)||0);
+  const T={busSeats:rows.reduce((s,r)=>s+r.busSeats,0),busTot:rows.reduce((s,r)=>s+r.busTot,0),intSeats:rows.reduce((s,r)=>s+r.intSeats,0),intTot:rows.reduce((s,r)=>s+r.intTot,0),aptNet:rows.reduce((s,r)=>s+r.aptNet,0),disc:rows.reduce((s,r)=>s+r.disc,0),total:rows.reduce((s,r)=>s+r.total,0),paid:rows.reduce((s,r)=>s+r.paid,0),remaining:rows.reduce((s,r)=>s+r.remaining,0),supDeduct:rows.reduce((s,r)=>s+sd(r),0),supNet:rows.reduce((s,r)=>s+Math.max(0,r.remaining-sd(r)),0)};
   const lightColor=color==='#1a5276'?'#e8f4fd':color==='#d68910'?'#fef9e7':'#fdf2f0';
   const trs=rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':lightColor}">
     <td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:700;color:${color}">${r.i}</td>
@@ -7774,6 +8084,7 @@ function exportClosingTablePDF(sectionKey){
     <td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:800;color:#1a5276">${n(r.total)}</td>
     <td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:700;color:#117a65">${n(r.paid)}</td>
     <td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:800;color:${color}">${n(r.remaining)}</td>
+    ${isSupplier?`<td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:700;color:#c0392b">${sd(r)?'-'+n(sd(r)):'—'}</td><td style="padding:8px 10px;border-bottom:1.5px solid #e0e7f0;font-weight:800;color:#117a65">${n(Math.max(0,r.remaining-sd(r)))}</td>`:''}
   </tr>`).join('');
   const h=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
 <title>${title} — ${conv?conv.label:''}</title>
@@ -7806,6 +8117,7 @@ tfoot td{padding:9px 12px;font-weight:800;font-size:12px;border-top:2.5px solid 
   <div class="stat" style="background:#f0f4f8;border-color:#dce6f0"><div style="font-size:18px;font-weight:900;color:#1a5276">${n(T.total)}</div><div style="font-size:11px;color:#4a6278;font-weight:700;margin-top:2px">الإجمالي</div></div>
   <div class="stat" style="background:#d5f5e3;border-color:#117a65"><div style="font-size:18px;font-weight:900;color:#117a65">${n(T.paid)}</div><div style="font-size:11px;color:#117a65;font-weight:700;margin-top:2px">المحصل</div></div>
   <div class="stat" style="background:#fadbd8;border-color:#c0392b"><div style="font-size:18px;font-weight:900;color:#c0392b">${n(T.remaining)}</div><div style="font-size:11px;color:#c0392b;font-weight:700;margin-top:2px">المتبقي</div></div>
+  ${isSupplier?`<div class="stat" style="background:#d5f5e3;border-color:#117a65"><div style="font-size:18px;font-weight:900;color:#117a65">${n(T.supNet)}</div><div style="font-size:11px;color:#117a65;font-weight:700;margin-top:2px">الصافي المطلوب من المورد</div></div>`:''}
   <div class="stat" style="background:#e8f4fd;border-color:#1a5276"><div style="font-size:18px;font-weight:900;color:#1a5276">${rows.length}</div><div style="font-size:11px;color:#4a6278;font-weight:700;margin-top:2px">عدد العملاء</div></div>
 </div>
 <table>
@@ -7815,6 +8127,7 @@ tfoot td{padding:9px 12px;font-weight:800;font-size:12px;border-top:2.5px solid 
     <th style="text-align:center">داخلي</th><th style="text-align:center">× 200</th>
     <th>سعر الشقة</th><th>الخصم</th>
     <th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th>
+    ${isSupplier?`<th>خصم الكراسي</th><th>الصافي المطلوب من المورد</th>`:''}
   </tr></thead>
   <tbody>${trs}</tbody>
   <tfoot><tr>
@@ -7828,6 +8141,7 @@ tfoot td{padding:9px 12px;font-weight:800;font-size:12px;border-top:2.5px solid 
     <td style="color:#1a5276;font-size:14px">${n(T.total)}</td>
     <td style="color:#117a65;font-size:14px">${n(T.paid)}</td>
     <td style="color:${color};font-size:15px;font-weight:900">${n(T.remaining)}</td>
+    ${isSupplier?`<td style="color:#c0392b">${T.supDeduct?'-'+n(T.supDeduct):'—'}</td><td style="color:#117a65;font-size:15px;font-weight:900">${n(T.supNet)}</td>`:''}
   </tr></tfoot>
 </table>
 <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
@@ -8134,17 +8448,20 @@ function renderClosing(){
   const hs=c=>`background:${c};color:#fff;padding:11px 13px;text-align:right;font-size:12px;font-weight:800;white-space:nowrap;border-bottom:2px solid rgba(0,0,0,.15)`;
   const ts=`border-bottom:1.5px solid #e8eef5;padding:9px 12px;text-align:right;font-size:13px;vertical-align:middle`;
   const fs=c=>`background:${c}22;padding:9px 12px;font-weight:900;text-align:right;font-size:13px;border-top:2.5px solid ${c}`;
-  function mkTable(data,title,color,light){
+  function mkTable(data,title,color,light,isSupplier){
     if(!data.length)return'';
+    const sd=r=>r.busSeats*((r.b&&r.b.collectViaSeatCost)||0);
     const TT={busSeats:data.reduce((s,r)=>s+r.busSeats,0),busTot:data.reduce((s,r)=>s+r.busTot,0),
       intSeats:data.reduce((s,r)=>s+r.intSeats,0),intTot:data.reduce((s,r)=>s+r.intTot,0),
       aptNet:data.reduce((s,r)=>s+r.aptNet,0),disc:data.reduce((s,r)=>s+r.disc,0),
       total:data.reduce((s,r)=>s+r.total,0),paid:data.reduce((s,r)=>s+r.paid,0),
-      remaining:data.reduce((s,r)=>s+r.remaining,0)};
+      remaining:data.reduce((s,r)=>s+r.remaining,0),
+      supDeduct:data.reduce((s,r)=>s+sd(r),0),
+      supNet:data.reduce((s,r)=>s+Math.max(0,r.remaining-sd(r)),0)};
     return `<div style="margin-top:1.25rem">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem">
         <div style="width:4px;height:22px;background:${color};border-radius:2px"></div>
-        <div style="font-size:15px;font-weight:800;color:${color}">${title} · ${data.length} عميل · ${n(TT.remaining)} ج متبقي</div>
+        <div style="font-size:15px;font-weight:800;color:${color}">${title} · ${data.length} عميل · ${n(TT.remaining)} ج متبقي${isSupplier?` · ${n(TT.supNet)} ج صافي مطلوب`:''}</div>
       </div>
       <div style="overflow-x:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08)">
       <table style="width:100%;border-collapse:collapse;min-width:800px">
@@ -8155,6 +8472,7 @@ function renderClosing(){
           <th style="${hs(color)}">داخلي</th><th style="${hs(color)}">× 200</th>
           <th style="${hs(color)}">سعر الشقة</th><th style="${hs(color)}">الخصم</th>
           <th style="${hs(color)}">الإجمالي</th><th style="${hs(color)}">المدفوع</th><th style="${hs(color)}">المتبقي</th>
+          ${isSupplier?`<th style="${hs(color)}">خصم الكراسي (تكلفة)</th><th style="${hs(color)}">الصافي المطلوب من المورد</th>`:''}
         </tr></thead>
         <tbody>${data.map((r,idx)=>`<tr style="background:${idx%2===0?'#fff':light};transition:background .1s">
           <td style="${ts};font-weight:700;color:${color}">${r.i}</td>
@@ -8171,6 +8489,7 @@ function renderClosing(){
           <td style="${ts};font-weight:800;font-size:14px;color:#1a5276">${n(r.total)}</td>
           <td style="${ts};font-weight:700;font-size:14px;color:#117a65">${n(r.paid)}</td>
           <td style="${ts};font-weight:900;font-size:14px;color:${color}">${n(r.remaining)}</td>
+          ${isSupplier?`<td style="${ts};font-weight:700;color:#c0392b">${sd(r)?'-'+n(sd(r)):'-'}</td><td style="${ts};font-weight:900;font-size:14px;color:#117a65">${n(Math.max(0,r.remaining-sd(r)))}</td>`:''}
         </tr>`).join('')}</tbody>
         <tfoot><tr style="background:${light}">
           <td style="padding:7px 9px;font-weight:800;font-size:13px;color:${color}" colspan="5">الإجمالي</td>
@@ -8183,6 +8502,7 @@ function renderClosing(){
           <td style="${fs(light)};color:#1a5276;font-size:14px">${n(TT.total)}</td>
           <td style="${fs(light)};color:#117a65;font-size:14px">${n(TT.paid)}</td>
           <td style="${fs(light)};color:${color};font-size:15px;font-weight:900">${n(TT.remaining)}</td>
+          ${isSupplier?`<td style="${fs(light)};color:#c0392b">${TT.supDeduct?'-'+n(TT.supDeduct):'-'}</td><td style="${fs(light)};color:#117a65;font-size:15px;font-weight:900">${n(TT.supNet)}</td>`:''}
         </tr></tfoot>
       </table></div></div>`;
   }
@@ -8192,7 +8512,7 @@ function renderClosing(){
   const collSupplierTbl=Object.entries(supGroups).map(([key,data])=>{
     const sid=parseInt(key.replace('supplier_',''));
     const sup=suppliers.find(s=>s.id===sid);
-    return mkTable(data,'تحصيلات عند المورد: '+(sup?.name||'مورد'),'#3c4fa8','#e8f0fe');
+    return mkTable(data,'تحصيلات عند المورد: '+(sup?.name||'مورد'),'#3c4fa8','#e8f0fe',true);
   }).join('');
   const allOk=!collBus.length&&!collBuilding.length?
     `<div style="background:var(--acl);border:1px solid var(--ac);border-radius:var(--r);padding:.875rem;font-weight:700;color:var(--ac);margin-top:1rem">✓ لا توجد تحصيلات متبقية</div>`:'';
@@ -8582,7 +8902,6 @@ window.renderUsers=function(){
           <div style="display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap">
             <span style="font-size:11px;color:var(--tx3)">كلمة المرور:</span>
             <span id="pw-${u.id}" style="font-size:12px;font-family:monospace">••••••</span>
-            <button class="btn btn-sm" onclick="togglePw(${u.id},'${u.password}')" style="padding:2px 6px;font-size:10px">عرض</button>
             <button class="btn btn-sm" onclick="openUserCredsModal(${u.id})" style="padding:2px 6px;font-size:10px">تعديل بيانات الدخول</button>
           </div>
         </div>
@@ -10175,7 +10494,8 @@ function mHB(r){
     adults:r.adults||0,children:r.children||0,disc:r.disc||0,discReason:r.disc_reason||'',
     total:r.total||0,paid:r.paid||0,remaining:r.remaining||0,payments:r.payments||[],
     status:r.status||'pending',notes:r.notes||'',salesRep:r.sales_rep||'',
-    createdBy:r.created_by||'',created:r.created_at?new Date(r.created_at).toLocaleDateString('en-GB'):'',
+    createdBy:r.created_by||'',created:(()=>{const _d=r.created_at?new Date(r.created_at):new Date();return _d.getFullYear()+'/'+String(_d.getMonth()+1).padStart(2,'0')+'/'+String(_d.getDate()).padStart(2,'0');})(),
+    createdAt:r.created_at||'',
     busSeats:r.bus_seats||0,busSeatPrice:r.bus_seat_price||0,transportTotal:r.transport_total||0,
     pickup:r.pickup||'',dropoff:r.dropoff||'',transportNote:r.transport_note||''
   };

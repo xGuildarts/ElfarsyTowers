@@ -6553,6 +6553,25 @@ async function delPendPay(bookingId,payIdx){
 async function approveAllPending(){
   if(!await confirm('اعتماد كل الدفعات المعلقة دفعة واحدة؟'))return;
   const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='⏳ جاري...';}
+  // ✅ بناء قائمة الدفعات المعلقة هنا مباشرة (بنفس منطق renderAccs) — 
+  // لا نعتمد على متغيّر pend خارجي لأنه محلي لدالة الرسم ولا يصل لهذا النطاق
+  const conf=new Set(accEntries
+    .filter(e=>e.bookingPayRef && (/^\d+_\d+$/.test(e.bookingPayRef)||/^htl_\d+_\d+$/.test(e.bookingPayRef)))
+    .map(e=>e.bookingPayRef)
+  );
+  const pend=[];
+  bookings.forEach(b=>b.payments.forEach((p,pi)=>{
+    if((p.amount||0)<=0)return;
+    const ref=String(b.id)+'_'+pi;
+    if(!conf.has(ref)) pend.push({...p,clientName:b.name,bookingId:b.id,payIdx:pi,ref,isHotel:false});
+  }));
+  if(typeof hotelBookings!=='undefined'){
+    hotelBookings.forEach(b=>(b.payments||[]).forEach((p,pi)=>{
+      const ref='htl_'+b.id+'_'+pi;
+      if(!conf.has(ref)) pend.push({amount:p.amount,date:p.date,payMethod:p.type,note:p.ref||'',clientName:b.name+' (فندق: '+(b.hotelName||'')+')',bookingId:b.id,payIdx:pi,ref,isHotel:true});
+    }));
+  }
+  if(!pend.length){toast('لا توجد دفعات معلقة للاعتماد','info');if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}return;}
   let ok=0,fail=0;
   const snapshot=[...pend];
   for(const p of snapshot){
@@ -6584,6 +6603,7 @@ async function approveAllPending(){
   addLog('اعتماد جماعي للدفعات: '+ok+' دفعة','add','إجمالي: '+snapshot.reduce((s,p)=>s+p.amount,0).toLocaleString()+' ج');
   renderAccs();
   toast('✓ تم اعتماد '+ok+' دفعة'+(fail?' · فشل '+fail:''),'success');
+  if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}
 }
 
 async function saveDoubleEntry(){

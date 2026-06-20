@@ -2997,7 +2997,7 @@ async function _doPoll(){
         if(idx<0){
           // حجز جديد — جيب بياناته الكاملة الخفيفة
           sbFetch('mtr_bookings','GET',null,`?id=eq.${r.id}&select=id,name,phone,phone2,convoy,convoy2,checkin,checkout,apts,apts2,apts_total,apt_prices,apt_prices2,seats,extra_seats,seat_discount,seat_price,seat_disc_amt,int_seats,int_seat_price,int_total,transfer_fee,disc,total,paid,remaining,status,pickup,created_by,party_type,supplier_id,adults,children,bus_idx,collect_via,collect_via_seat_cost,created_at,last_edit_by,last_edit_at`)
-            .then(rows=>{if(rows&&rows[0]){const _nb=mB(rows[0]);bookings.unshift(_nb);_busSeatsLoadedConvoys.delete(_nb.convoy);if(_nb.convoy2)_busSeatsLoadedConvoys.delete(_nb.convoy2);_allPaymentsLoaded=false;markAllTabsDirty();if(_activeTab==='dash')renderDash();else if(_activeTab==='clients')renderClients();else if(_activeTab==='accs')renderAccs();}})
+            .then(rows=>{if(rows&&rows[0]){const _nb=mB(rows[0]);bookings.unshift(_nb);_busSeatsLoadedConvoys.delete(_nb.convoy);if(_nb.convoy2)_busSeatsLoadedConvoys.delete(_nb.convoy2);markAllTabsDirty();if(_activeTab==='dash')renderDash();else if(_activeTab==='clients')renderClients();}})
             .catch(()=>{});
           changed=true;
         }else{
@@ -5039,8 +5039,9 @@ async function saveBooking(){
     }
     addLog(`إضافة ${pt==='supplier'?'حجز مورد':'حجز'}: ${name} - فوج ${cn} (${conv?.checkin||''} → ${conv?.checkout||''})`,'add',`إجمالي: ${total.toLocaleString()} ج · شقق: ${selApts.join('، ')||'-'} · مكان الركوب: ${document.getElementById('f-pickup')?.value||'-'} · هاتف: ${phone||'-'}`);
     alert('تم حفظ الحجز!');resetForm();
-    markTabsDirty('clients','dash','reports');
+    markTabsDirty('clients','dash','reports','accs');
     if(_activeTab==='clients')renderClients();
+    if(_activeTab==='accs')renderAccs();
   }catch(e){alert('فشل: '+e.message)}
 }
 function resetForm(){
@@ -6196,34 +6197,7 @@ function switchAccNav(){
   const val=document.getElementById('acc-nav-sub').value;
   if(val)renderAccDetail(val);
 }
-let _allPaymentsLoaded=false,_allPaymentsLoading=false;
-// ===== جلب عمود payments فقط لكل الحجوزات (خفيف على الـ egress) قبل حساب المعلّقات =====
-async function ensureAllPaymentsLoaded(){
-  if(_allPaymentsLoaded)return;
-  if(_allPaymentsLoading){while(_allPaymentsLoading)await new Promise(r=>setTimeout(r,150));return;}
-  _allPaymentsLoading=true;
-  try{
-    const[rows,hrows]=await Promise.all([
-      sbFetch('mtr_bookings','GET',null,'?select=id,payments&order=id.asc&limit=5000'),
-      sbFetch('htl_bookings','GET',null,'?select=id,payments&order=id.asc&limit=2000').catch(()=>[])
-    ]);
-    if(rows&&Array.isArray(rows)){
-      const map=new Map(rows.map(r=>[r.id,r.payments||[]]));
-      bookings.forEach(b=>{if(map.has(b.id))b.payments=map.get(b.id);});
-    }
-    if(hrows&&Array.isArray(hrows)&&typeof hotelBookings!=='undefined'){
-      const hmap=new Map(hrows.map(r=>[r.id,r.payments||[]]));
-      hotelBookings.forEach(b=>{if(hmap.has(b.id))b.payments=hmap.get(b.id);});
-    }
-    _allPaymentsLoaded=true;
-  }catch(ex){console.warn('ensureAllPaymentsLoaded failed',ex.message);}
-  _allPaymentsLoading=false;
-}
 function renderAccs(){
-  // لو الحجوزات لسه مفيهاش payments محمّلة، جيبها الأول وأعد الرسم لما تخلص
-  if(!_allPaymentsLoaded){
-    ensureAllPaymentsLoaded().then(()=>{if(_activeTab==='accs')renderAccs();});
-  }
   const allIn=accEntries.filter(e=>e.op==='in'&&!e.supplierId).reduce((s,e)=>s+e.amount,0);
   const allOut=accEntries.filter(e=>e.op==='expense'&&!e.supplierId).reduce((s,e)=>s+e.amount,0);
   document.getElementById('acc-gstats').innerHTML=`
@@ -6515,52 +6489,9 @@ async function delPendPay(bookingId,payIdx){
 }
 async function approveAllPending(){
   if(!await confirm('اعتماد كل الدفعات المعلقة دفعة واحدة؟'))return;
-  const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='⏳ جاري التحميل...';}
-  // ✅ تأكد إن كل الحجوزات معاها payments محمّلة فعليًا (مش لسه lazy-load) قبل ما نبني القايمة
-  await ensureAllPaymentsLoaded();
-  if(btn)btn.textContent='⏳ جاري...';
-  // ✅ بناء قائمة الدفعات المعلقة هنا مباشرة (بنفس منطق renderAccs) —
-  // لا نعتمد على متغيّر pend خارجي لأنه محلي لدالة الرسم ولا يصل لهذا النطاق
-  const conf=new Set(accEntries
-    .filter(e=>e.bookingPayRef && (/^\d+_\d+$/.test(e.bookingPayRef)||/^htl_\d+_\d+$/.test(e.bookingPayRef)))
-    .map(e=>e.bookingPayRef)
-  );
-  const pend=[];
-  bookings.forEach(b=>b.payments.forEach((p,pi)=>{
-    if((p.amount||0)<=0)return;
-    const ref=String(b.id)+'_'+pi;
-    if(!conf.has(ref)) pend.push({...p,clientName:b.name,bookingId:b.id,payIdx:pi,ref,isHotel:false});
-  }));
-  if(typeof hotelBookings!=='undefined'){
-    hotelBookings.forEach(b=>(b.payments||[]).forEach((p,pi)=>{
-      const ref='htl_'+b.id+'_'+pi;
-      if(!conf.has(ref)) pend.push({amount:p.amount,date:p.date,payMethod:p.type,note:p.ref||'',clientName:b.name+' (فندق: '+(b.hotelName||'')+')',bookingId:b.id,payIdx:pi,ref,isHotel:true});
-    }));
-  }
-  if(!pend.length){toast('لا توجد دفعات معلقة للاعتماد','info');if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}return;}
-  // ✅ حماية ضد التكرار: لو فيه قيد بنفس الاسم ونفس المبلغ موجود بالفعل في الحسابات
-  // (حتى لو بصيغة مرجع مختلفة عن bookingId_payIdx)، نسيبه معلّق ومانعتمدوش تلقائي
-  const normName=s=>String(s||'').replace(/\s+/g,' ').trim();
-  const dupKey=(name,amount)=>normName(name)+'|'+Math.round(amount);
-  const dupSet=new Set(accEntries.filter(e=>e.op==='in'&&!e.supplierId).map(e=>dupKey(e.clientName,e.amount)));
-  const skippedDup=[];
-  const toApprove=pend.filter(p=>{
-    if(dupSet.has(dupKey(p.clientName,p.amount))){skippedDup.push(p);return false;}
-    return true;
-  });
-  if(!toApprove.length){
-    if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}
-    alert('⚠️ كل الدفعات المعلقة ('+pend.length+') ليها قيد موجود بالفعل في الحسابات بنفس الاسم والمبلغ — متعتمدتش تلقائي عشان منكررش. راجعهم يدويًا واحدة واحدة.');
-    return;
-  }
-  if(skippedDup.length){
-    const ok2=await confirm('⚠️ في '+skippedDup.length+' دفعة شكلها مكررة (نفس الاسم والمبلغ موجود بالفعل في الحسابات) — مش هيتم اعتمادها تلقائي وهتفضل معلقة للمراجعة اليدوية.\nهيتم اعتماد '+toApprove.length+' دفعة فقط الآن. تكمل؟');
-    if(!ok2){if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}return;}
-    console.warn('[اعتماد الكل] دفعات اتسكبت كمحتمل تكرار:',skippedDup.map(p=>p.clientName+' | '+p.amount+' ج | '+p.date));
-  }
+  const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='⏳ جاري...';}
   let ok=0,fail=0;
-  const failedClients=[];
-  const snapshot=[...toApprove];
+  const snapshot=[...pend];
   for(const p of snapshot){
     try{
       const safeRef=String(p.ref).replace(/[^a-z0-9]/gi,'_');
@@ -6570,38 +6501,26 @@ async function approveAllPending(){
       const amt=el_amt?parseFloat(el_amt.value)||p.amount:p.amount;
       const pmType=el_pm?el_pm.value||p.payMethod:p.payMethod;
       const date=el_date?el_date.value||p.date:p.date;
-      let r=null;
       if(p.isHotel){
         const hb=typeof hotelBookings!=='undefined'?hotelBookings.find(x=>x.id===p.bookingId):null;
         const payRef='htl_'+p.bookingId+'_'+p.payIdx;
-        r=await sbFetch('mtr_acc','POST',{type:pmType,op:'in',amount:amt,entry_date:date||new Date().toISOString().split('T')[0],description:'حجز فندق: '+p.clientName,client_name:p.clientName,category:'',booking_ref:'htl_'+String(p.bookingId),booking_pay_ref:payRef,supplier_id:null},'');
+        const r=await sbFetch('mtr_acc','POST',{type:pmType,op:'in',amount:amt,entry_date:date||new Date().toISOString().split('T')[0],description:'حجز فندق: '+p.clientName,client_name:p.clientName,category:'',booking_ref:'htl_'+String(p.bookingId),booking_pay_ref:payRef,supplier_id:null},'');
+        if(r&&r[0])accEntries.push(mA(r[0]));
       }else{
         const b=bookings.find(x=>x.id===p.bookingId);
         const realAmt=b&&b.payments[p.payIdx]?b.payments[p.payIdx].amount:amt;
         const realPm=b&&b.payments[p.payIdx]?b.payments[p.payIdx].payMethod:pmType;
         const conv=b?getConv(b.convoy):null;
         const payRef=String(p.bookingId)+'_'+p.payIdx;
-        r=await sbFetch('mtr_acc','POST',{type:realPm,op:'in',amount:realAmt,entry_date:date||new Date().toISOString().split('T')[0],description:'حجز: '+p.clientName+(conv?' - فوج '+conv.checkin:''),client_name:p.clientName,category:'',booking_ref:String(p.bookingId),booking_pay_ref:payRef,supplier_id:null},'');
+        const r=await sbFetch('mtr_acc','POST',{type:realPm,op:'in',amount:realAmt,entry_date:date||new Date().toISOString().split('T')[0],description:'حجز: '+p.clientName+(conv?' - فوج '+conv.checkin:''),client_name:p.clientName,category:'',booking_ref:String(p.bookingId),booking_pay_ref:payRef,supplier_id:null},'');
+        if(r&&r[0])accEntries.push(mA(r[0]));
       }
-      // ✅ نحسبها ناجحة فقط لو رجع صف فعلي من Supabase
-      if(r&&r[0]){
-        accEntries.push(mA(r[0]));
-        ok++;
-      }else{
-        fail++;
-        failedClients.push(p.clientName);
-        console.error('[اعتماد الكل] فشل تسجيل القيد لـ',p.clientName,'— الطلب رجع بدون صف. تحقق من صلاحيات RLS على mtr_acc.');
-      }
-    }catch(e){fail++;failedClients.push(p.clientName);console.warn('approve failed:',p.clientName,e);}
+      ok++;
+    }catch(e){fail++;console.warn('approve failed:',p.clientName,e);}
   }
-  addLog('اعتماد جماعي للدفعات: '+ok+' دفعة','add','إجمالي: '+snapshot.reduce((s,p)=>s+p.amount,0).toLocaleString()+' ج'+(fail?' · فشل: '+fail:'')+(skippedDup.length?' · مكررة محتملة (لم تُعتمد): '+skippedDup.length:''));
+  addLog('اعتماد جماعي للدفعات: '+ok+' دفعة','add','إجمالي: '+snapshot.reduce((s,p)=>s+p.amount,0).toLocaleString()+' ج');
   renderAccs();
-  if(fail){
-    toast('⚠️ تم اعتماد '+ok+' دفعة لكن فشل '+fail+(skippedDup.length?' · متروك للمراجعة (تكرار محتمل): '+skippedDup.length:'')+' — افتح الكونسول (F12) للتفاصيل: '+failedClients.slice(0,5).join('، '),'warn',12000);
-  }else{
-    toast('✓ تم اعتماد '+ok+' دفعة بنجاح'+(skippedDup.length?' · '+skippedDup.length+' دفعة متروكة للمراجعة اليدوية (تكرار محتمل)':''),'success',skippedDup.length?12000:undefined);
-  }
-  if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}
+  toast('✓ تم اعتماد '+ok+' دفعة'+(fail?' · فشل '+fail:''),'success');
 }
 
 async function saveDoubleEntry(){

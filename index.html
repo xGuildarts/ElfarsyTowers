@@ -3000,7 +3000,7 @@ async function _doPoll(){
         if(idx<0){
           // حجز جديد — جيب بياناته الكاملة الخفيفة
           sbFetch('mtr_bookings','GET',null,`?id=eq.${r.id}&select=id,name,phone,phone2,convoy,convoy2,checkin,checkout,apts,apts2,apts_total,apt_prices,apt_prices2,seats,extra_seats,seat_discount,seat_price,seat_disc_amt,int_seats,int_seat_price,int_total,transfer_fee,disc,total,paid,remaining,status,pickup,created_by,party_type,supplier_id,adults,children,bus_idx,collect_via,collect_via_seat_cost,created_at,last_edit_by,last_edit_at`)
-            .then(rows=>{if(rows&&rows[0]){const _nb=mB(rows[0]);bookings.unshift(_nb);_busSeatsLoadedConvoys.delete(_nb.convoy);if(_nb.convoy2)_busSeatsLoadedConvoys.delete(_nb.convoy2);markAllTabsDirty();if(_activeTab==='dash')renderDash();else if(_activeTab==='clients')renderClients();}})
+            .then(rows=>{if(rows&&rows[0]){const _nb=mB(rows[0]);bookings.unshift(_nb);_busSeatsLoadedConvoys.delete(_nb.convoy);if(_nb.convoy2)_busSeatsLoadedConvoys.delete(_nb.convoy2);_allPaymentsLoaded=false;markAllTabsDirty();if(_activeTab==='dash')renderDash();else if(_activeTab==='clients')renderClients();else if(_activeTab==='accs')renderAccs();}})
             .catch(()=>{});
           changed=true;
         }else{
@@ -6264,7 +6264,34 @@ function switchAccNav(){
   const val=document.getElementById('acc-nav-sub').value;
   if(val)renderAccDetail(val);
 }
+let _allPaymentsLoaded=false,_allPaymentsLoading=false;
+// ===== جلب عمود payments فقط لكل الحجوزات (خفيف على الـ egress) قبل حساب المعلّقات =====
+async function ensureAllPaymentsLoaded(){
+  if(_allPaymentsLoaded)return;
+  if(_allPaymentsLoading){while(_allPaymentsLoading)await new Promise(r=>setTimeout(r,150));return;}
+  _allPaymentsLoading=true;
+  try{
+    const[rows,hrows]=await Promise.all([
+      sbFetch('mtr_bookings','GET',null,'?select=id,payments&order=id.asc&limit=5000'),
+      sbFetch('htl_bookings','GET',null,'?select=id,payments&order=id.asc&limit=2000').catch(()=>[])
+    ]);
+    if(rows&&Array.isArray(rows)){
+      const map=new Map(rows.map(r=>[r.id,r.payments||[]]));
+      bookings.forEach(b=>{if(map.has(b.id))b.payments=map.get(b.id);});
+    }
+    if(hrows&&Array.isArray(hrows)&&typeof hotelBookings!=='undefined'){
+      const hmap=new Map(hrows.map(r=>[r.id,r.payments||[]]));
+      hotelBookings.forEach(b=>{if(hmap.has(b.id))b.payments=hmap.get(b.id);});
+    }
+    _allPaymentsLoaded=true;
+  }catch(ex){console.warn('ensureAllPaymentsLoaded failed',ex.message);}
+  _allPaymentsLoading=false;
+}
 function renderAccs(){
+  // لو الحجوزات لسه مفيهاش payments محمّلة، جيبها الأول وأعد الرسم لما تخلص
+  if(!_allPaymentsLoaded){
+    ensureAllPaymentsLoaded().then(()=>{if(_activeTab==='accs')renderAccs();});
+  }
   const allIn=accEntries.filter(e=>e.op==='in'&&!e.supplierId).reduce((s,e)=>s+e.amount,0);
   const allOut=accEntries.filter(e=>e.op==='expense'&&!e.supplierId).reduce((s,e)=>s+e.amount,0);
   document.getElementById('acc-gstats').innerHTML=`
@@ -6568,7 +6595,10 @@ async function delPendPay(bookingId,payIdx){
 }
 async function approveAllPending(){
   if(!await confirm('اعتماد كل الدفعات المعلقة دفعة واحدة؟'))return;
-  const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='⏳ جاري...';}
+  const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='⏳ جاري التحميل...';}
+  // ✅ تأكد إن كل الحجوزات معاها payments محمّلة فعليًا قبل ما نبني القايمة (تفادي اعتبار حجز "مفيهوش دفعات" غلط بسبب lazy-loading)
+  await ensureAllPaymentsLoaded();
+  if(btn)btn.textContent='⏳ جاري...';
   // ✅ بناء قائمة الدفعات المعلقة هنا مباشرة (بنفس منطق renderAccs) — 
   // لا نعتمد على متغيّر pend خارجي لأنه محلي لدالة الرسم ولا يصل لهذا النطاق
   const conf=new Set(accEntries

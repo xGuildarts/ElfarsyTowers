@@ -6538,9 +6538,29 @@ async function approveAllPending(){
     }));
   }
   if(!pend.length){toast('لا توجد دفعات معلقة للاعتماد','info');if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}return;}
+  // ✅ حماية ضد التكرار: لو فيه قيد بنفس الاسم ونفس المبلغ موجود بالفعل في الحسابات
+  // (حتى لو بصيغة مرجع مختلفة عن bookingId_payIdx)، نسيبه معلّق ومانعتمدوش تلقائي
+  const normName=s=>String(s||'').replace(/\s+/g,' ').trim();
+  const dupKey=(name,amount)=>normName(name)+'|'+Math.round(amount);
+  const dupSet=new Set(accEntries.filter(e=>e.op==='in'&&!e.supplierId).map(e=>dupKey(e.clientName,e.amount)));
+  const skippedDup=[];
+  const toApprove=pend.filter(p=>{
+    if(dupSet.has(dupKey(p.clientName,p.amount))){skippedDup.push(p);return false;}
+    return true;
+  });
+  if(!toApprove.length){
+    if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}
+    alert('⚠️ كل الدفعات المعلقة ('+pend.length+') ليها قيد موجود بالفعل في الحسابات بنفس الاسم والمبلغ — متعتمدتش تلقائي عشان منكررش. راجعهم يدويًا واحدة واحدة.');
+    return;
+  }
+  if(skippedDup.length){
+    const ok2=await confirm('⚠️ في '+skippedDup.length+' دفعة شكلها مكررة (نفس الاسم والمبلغ موجود بالفعل في الحسابات) — مش هيتم اعتمادها تلقائي وهتفضل معلقة للمراجعة اليدوية.\nهيتم اعتماد '+toApprove.length+' دفعة فقط الآن. تكمل؟');
+    if(!ok2){if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}return;}
+    console.warn('[اعتماد الكل] دفعات اتسكبت كمحتمل تكرار:',skippedDup.map(p=>p.clientName+' | '+p.amount+' ج | '+p.date));
+  }
   let ok=0,fail=0;
   const failedClients=[];
-  const snapshot=[...pend];
+  const snapshot=[...toApprove];
   for(const p of snapshot){
     try{
       const safeRef=String(p.ref).replace(/[^a-z0-9]/gi,'_');
@@ -6574,12 +6594,12 @@ async function approveAllPending(){
       }
     }catch(e){fail++;failedClients.push(p.clientName);console.warn('approve failed:',p.clientName,e);}
   }
-  addLog('اعتماد جماعي للدفعات: '+ok+' دفعة','add','إجمالي: '+snapshot.reduce((s,p)=>s+p.amount,0).toLocaleString()+' ج'+(fail?' · فشل: '+fail:''));
+  addLog('اعتماد جماعي للدفعات: '+ok+' دفعة','add','إجمالي: '+snapshot.reduce((s,p)=>s+p.amount,0).toLocaleString()+' ج'+(fail?' · فشل: '+fail:'')+(skippedDup.length?' · مكررة محتملة (لم تُعتمد): '+skippedDup.length:''));
   renderAccs();
   if(fail){
-    toast('⚠️ تم اعتماد '+ok+' دفعة لكن فشل '+fail+' — افتح الكونسول (F12) للتفاصيل: '+failedClients.slice(0,5).join('، '),'warn',12000);
+    toast('⚠️ تم اعتماد '+ok+' دفعة لكن فشل '+fail+(skippedDup.length?' · متروك للمراجعة (تكرار محتمل): '+skippedDup.length:'')+' — افتح الكونسول (F12) للتفاصيل: '+failedClients.slice(0,5).join('، '),'warn',12000);
   }else{
-    toast('✓ تم اعتماد '+ok+' دفعة بنجاح','success');
+    toast('✓ تم اعتماد '+ok+' دفعة بنجاح'+(skippedDup.length?' · '+skippedDup.length+' دفعة متروكة للمراجعة اليدوية (تكرار محتمل)':''),'success',skippedDup.length?12000:undefined);
   }
   if(btn){btn.disabled=false;btn.textContent='✅ اعتماد الكل';}
 }

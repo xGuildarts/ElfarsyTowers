@@ -758,7 +758,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="ocr-area" id="ocr-drop" onclick="document.getElementById('ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
           <div style="font-size:36px;margin-bottom:8px">📷</div>
           <div style="color:var(--text2);font-weight:600">اسحب صورة الجواز أو اضغط للاختيار</div>
-          <div style="color:var(--text3);font-size:12px;margin-top:4px">سيتم استخراج البيانات تلقائياً (OCR مجاني - Tesseract.js)</div>
+          <div style="color:var(--text3);font-size:12px;margin-top:4px">سيتم استخراج كل البيانات تلقائياً بالذكاء الاصطناعي (الاسم، الرقم، التواريخ، الجنسية...)</div>
           <input type="file" id="ocr-inp" accept="image/*" style="display:none" onchange="runOCR(event)">
         </div>
         <div id="ocr-prg" style="display:none">
@@ -1468,24 +1468,58 @@ async function saveClient(){
   try{if(ed.client)await sb(`haj_clients?id=eq.${ed.client}`,'PATCH',d);else await sb('haj_clients','POST',d);toast('تم الحفظ');closeM('cl-modal');loadClients();}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
-// ============ OCR ============
+// ============ OCR (Claude Vision) ============
 function handleDrop(e){e.preventDefault();document.getElementById('ocr-drop').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)doOCR(f);}
 function runOCR(e){const f=e.target.files[0];if(f)doOCR(f);}
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
 async function doOCR(file){
   const url=URL.createObjectURL(file);document.getElementById('pp-img').src=url;document.getElementById('pp-preview').style.display='block';
   const prg=document.getElementById('ocr-prg'),bar=document.getElementById('ocr-bar'),stat=document.getElementById('ocr-stat');
-  prg.style.display='block';stat.textContent='جاري تحميل محرك OCR...';bar.style.width='5%';
-  // Lazy-load Tesseract only when needed
-  if(typeof Tesseract==='undefined'){
-    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
-  }
-  stat.textContent='جاري التحليل...';
+  prg.style.display='block';stat.textContent='جاري تجهيز الصورة...';bar.style.width='10%';
   try{
-    const r=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=Math.round(m.progress*100)+'%';}});
-    bar.style.width='100%';stat.textContent='&#x2705; تم - راجع البيانات';
-    const pp=r.data.text.match(/[A-Z]{1,2}\d{6,8}/);if(pp)document.getElementById('cl-ppno').value=pp[0];
-    toast('تم الاستخراج - راجع البيانات يدوياً','info');
-  }catch(e){stat.textContent='&#x274C; فشل';toast('أدخل البيانات يدوياً','error');}
+    const base64=await fileToBase64(file);
+    const mediaType=file.type&&file.type.startsWith('image/')?file.type:'image/jpeg';
+    stat.textContent='جاري قراءة بيانات الجواز بالذكاء الاصطناعي...';bar.style.width='35%';
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:1000,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+          {type:'text',text:'أنت خبير في قراءة جوازات السفر. استخرج البيانات التالية من صورة الجواز المرفقة، معتمداً بالأساس على منطقة القراءة الآلية (MRZ) - السطرين في أسفل صفحة الجواز - لأنها الأدق، وأكمل أي بيانات ناقصة من النص المطبوع في الصفحة. أرجع الناتج بصيغة JSON فقط، بدون أي نص أو شرح أو علامات Markdown قبله أو بعده، وبهذا الشكل بالضبط (اجعل القيمة null لو غير موجودة أو غير واضحة):\n{"full_name_ar":"الاسم بالعربي إن وجد وإلا null","full_name_en":"الاسم بالإنجليزي كما هو مكتوب في الجواز","gender":"ذكر أو أنثى","birth_date":"YYYY-MM-DD","nationality":"الجنسية بالعربي مثل مصرية","passport_no":"رقم الجواز","passport_issue_date":"YYYY-MM-DD","passport_expiry_date":"YYYY-MM-DD","passport_issue_place":"جهة إصدار الجواز"}'}
+        ]}]
+      })
+    });
+    bar.style.width='75%';
+    if(!resp.ok)throw new Error('API error '+resp.status);
+    const data=await resp.json();
+    const txt=data.content.map(b=>b.text||'').join('').trim().replace(/^```json\s*|```$/g,'').trim();
+    const d=JSON.parse(txt);
+    bar.style.width='100%';stat.textContent='&#x2705; تم الاستخراج - راجع البيانات قبل الحفظ';
+    if(d.full_name_ar)document.getElementById('cl-ar').value=d.full_name_ar;
+    if(d.full_name_en)document.getElementById('cl-en').value=d.full_name_en;
+    if(d.gender==='ذكر'||d.gender==='أنثى')document.getElementById('cl-gen').value=d.gender;
+    if(d.birth_date)document.getElementById('cl-bday').value=d.birth_date;
+    if(d.nationality)document.getElementById('cl-nat').value=d.nationality;
+    if(d.passport_no)document.getElementById('cl-ppno').value=d.passport_no;
+    if(d.passport_issue_date)document.getElementById('cl-ppiss').value=d.passport_issue_date;
+    if(d.passport_expiry_date)document.getElementById('cl-ppexp').value=d.passport_expiry_date;
+    if(d.passport_issue_place)document.getElementById('cl-pppl').value=d.passport_issue_place;
+    toast('تم استخراج بيانات الجواز بالذكاء الاصطناعي - راجعها قبل الحفظ','success');
+  }catch(e){
+    console.error(e);
+    stat.textContent='&#x274C; تعذر الاستخراج التلقائي';
+    toast('تعذر استخراج البيانات تلقائياً - أدخلها يدوياً','error');
+  }
 }
 
 // ============ BOOKINGS ============

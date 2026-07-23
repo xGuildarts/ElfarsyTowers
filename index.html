@@ -5,7 +5,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Adreska Tours - إدارة السياحة الدينية</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dark:#9a7a2e;--green:#1a6b4a;--green-light:#2a8a60;--green-dark:#104030;--bg:#0d1a12;--bg2:#152219;--bg3:#1e2f22;--card:#1a2a1e;--border:#2a3d2e;--text:#e8e4d8;--text2:#a8b8a0;--text3:#6a8070;--red:#c0392b;--red-light:#e74c3c;--blue:#2980b9;--radius:10px;--shadow:0 4px 20px rgba(0,0,0,0.4)}
@@ -138,6 +137,41 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 /* ====== NO-CONFIG BANNER ====== */
 #no-config-banner{display:none;background:linear-gradient(135deg,#c9a84c,#9a7a2e);color:var(--bg);padding:12px 20px;text-align:center;font-weight:700;font-size:13px;cursor:pointer}
 #no-config-banner.show{display:block}
+
+/* ====== DRAG AND DROP ROOMS ====== */
+.room-card{border:2px solid var(--border);border-radius:10px;overflow:hidden;transition:all .2s;position:relative}
+.room-card.drag-over{border-color:var(--gold)!important;background:rgba(201,168,76,.08);box-shadow:0 0 0 3px rgba(201,168,76,.2)}
+.room-card.full{border-color:var(--red-light)!important}
+.room-card.partial{border-color:var(--gold)!important}
+.room-guest-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);cursor:grab}
+.room-guest-item:last-child{border-bottom:none}
+.room-guest-item:active{cursor:grabbing}
+.unassigned-client{background:var(--bg3);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;border:2px dashed var(--border);cursor:grab;transition:all .2s}
+.unassigned-client:hover{border-color:var(--gold);background:rgba(201,168,76,.05)}
+.unassigned-client.dragging{opacity:.5;border-style:solid;border-color:var(--gold)}
+.drop-hint{font-size:11px;color:var(--text3);text-align:center;padding:8px;border:1px dashed var(--border);border-radius:6px;margin-top:6px}
+.room-grid-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:16px}
+.family-badge{display:inline-flex;align-items:center;gap:3px;background:rgba(41,128,185,.15);color:#5dade2;border:1px solid rgba(41,128,185,.3);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700}
+
+/* ====== ALERTS PANEL ====== */
+.alerts-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.alerts-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.alert-rule-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.alert-rule-row:last-child{border-bottom:none}
+.alert-toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.alert-toggle input{opacity:0;width:0;height:0}
+.alert-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.3s}
+.alert-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:white;border-radius:50%;transition:.3s}
+.alert-toggle input:checked+.alert-slider{background:var(--green-light)}
+.alert-toggle input:checked+.alert-slider:before{transform:translateX(16px)}
+
+/* ====== REPORT CARDS ====== */
+.report-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.report-card-btn{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:8px}
+.report-card-btn:hover{border-color:var(--gold);background:rgba(201,168,76,.05);transform:translateY(-2px)}
+.report-card-btn .rep-icon{font-size:28px}
+.report-card-btn .rep-label{font-size:13px;font-weight:700;color:var(--text)}
+.report-card-btn .rep-sub{font-size:11px;color:var(--text3)}
 </style>
 </head>
 <body>
@@ -339,11 +373,63 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 <!-- REPORTS -->
 <div id="tab-reports" class="tab-content" style="display:none">
   <div class="section-title"><span>🖨️</span> التقارير</div>
+
+  <!-- Alerts Panel -->
+  <div class="alerts-panel" id="alerts-config-panel">
+    <div class="alerts-panel-header">
+      <div class="card-title">🔔 لوحة التنبيهات التلقائية</div>
+      <button class="btn btn-primary btn-sm" onclick="saveAlertSettings()">💾 حفظ الإعدادات</button>
+    </div>
+    <div id="alerts-rules-list">
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-passport-exp" checked><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">⚠️ جوازات منتهية الصلاحية</div><div style="font-size:11px;color:var(--text3)">تنبيه فوري عند وجود جوازات منتهية</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-passport-soon" checked><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">⏰ جوازات تنتهي قريباً</div><div style="font-size:11px;color:var(--text3)">تنبيه قبل</div></div>
+        <select id="alrt-passport-days" style="width:100px;padding:4px 8px;font-size:12px"><option value="30">30 يوم</option><option value="60">60 يوم</option><option value="90" selected>90 يوم</option><option value="180">6 أشهر</option></select>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-unpaid" checked><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">💰 حجوزات بدون دفع</div><div style="font-size:11px;color:var(--text3)">تنبيه بالحجوزات التي لم يُسدَّد عليها شيء</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-no-visa"><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">🪪 تأشيرات لم تُقدَّم</div><div style="font-size:11px;color:var(--text3)">تنبيه بعملاء لم تُقدَّم تأشيرتهم</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-no-room"><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">🛏️ عملاء بدون تسكين</div><div style="font-size:11px;color:var(--text3)">تنبيه بالبالغين الذين لم يُسكَّنوا بعد</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-family-split"><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">👨‍👩‍👧 أسرة في غرف مختلفة</div><div style="font-size:11px;color:var(--text3)">تنبيه عند وجود أفراد من نفس الأسرة في غرف مختلفة</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-gender-mix"><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">🚫 اختلاط غير مسموح في الغرف</div><div style="font-size:11px;color:var(--text3)">تنبيه عند وجود رجل وامرأة (غير محارم) في نفس الغرفة</div></div>
+      </div>
+      <div class="alert-rule-row">
+        <label class="alert-toggle"><input type="checkbox" id="alrt-trip-soon"><span class="alert-slider"></span></label>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">✈️ رحلة قادمة قريباً</div><div style="font-size:11px;color:var(--text3)">تنبيه قبل</div></div>
+        <select id="alrt-trip-days" style="width:100px;padding:4px 8px;font-size:12px"><option value="7" selected>7 أيام</option><option value="14">14 يوم</option><option value="30">30 يوم</option></select>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">التنبيهات الحالية:</div>
+      <div id="live-alerts-output"><div style="color:var(--text3);font-size:12px">اضغط "فحص التنبيهات" لعرض النتائج</div></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="runLiveAlerts()">🔍 فحص التنبيهات الآن</button>
+    </div>
+  </div>
+
+  <!-- Reports Section -->
   <div class="card">
-    <div class="card-header"><div class="card-title">تقارير الرحلة</div>
+    <div class="card-header">
+      <div class="card-title">📊 تقارير الرحلة</div>
       <select id="rep-trip-f" onchange="showRepBtns()" style="width:230px"><option value="">-- اختر الرحلة --</option></select>
     </div>
-    <div id="rep-content"><div class="empty-state"><div class="empty-icon">🖨️</div><h3>اختر رحلة</h3></div></div>
+    <div id="rep-content"><div class="empty-state"><div class="empty-icon">🖨️</div><h3>اختر رحلة لعرض التقارير</h3></div></div>
   </div>
 </div>
 
@@ -890,8 +976,8 @@ async function fillTrSels(){
 // ============ DASHBOARD ============
 async function loadDash(){
   try{
-    const[trips,bks,cls,pays]=await Promise.all([sb('haj_trips?status=eq.مفتوحة&limit=100'),sb('haj_bookings?limit=1000'),sb('haj_clients?is_cancelled=eq.false&limit=1000'),sb('haj_payments?limit=2000')]);
-    aTrips=await sb('haj_trips?order=depart_date.desc&limit=200');
+    const[trips,bks,cls,pays,allTrips]=await Promise.all([sb('haj_trips?status=eq.مفتوحة&limit=100'),sb('haj_bookings?limit=1000'),sb('haj_clients?is_cancelled=eq.false&limit=1000'),sb('haj_payments?limit=2000'),sb('haj_trips?order=depart_date.desc&limit=200')]);
+    aTrips=allTrips; aPays=pays; aClients=cls; aBks=bks;
     document.getElementById('s-trips').textContent=trips.length;
     document.getElementById('s-bks').textContent=bks.filter(b=>b.status!=='ملغي').length;
     document.getElementById('s-cls').textContent=cls.length;
@@ -1196,7 +1282,12 @@ function runOCR(e){const f=e.target.files[0];if(f)doOCR(f);}
 async function doOCR(file){
   const url=URL.createObjectURL(file);document.getElementById('pp-img').src=url;document.getElementById('pp-preview').style.display='block';
   const prg=document.getElementById('ocr-prg'),bar=document.getElementById('ocr-bar'),stat=document.getElementById('ocr-stat');
-  prg.style.display='block';stat.textContent='جاري التحليل...';bar.style.width='5%';
+  prg.style.display='block';stat.textContent='جاري تحميل محرك OCR...';bar.style.width='5%';
+  // Lazy-load Tesseract only when needed
+  if(typeof Tesseract==='undefined'){
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  stat.textContent='جاري التحليل...';
   try{
     const r=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=Math.round(m.progress*100)+'%';}});
     bar.style.width='100%';stat.textContent='&#x2705; تم - راجع البيانات';
@@ -1346,13 +1437,14 @@ async function savePay(){
   if(!bid||!amt){toast('يرجى إدخال الحجز والمبلغ','error');return;}
   const d={booking_id:bid,amount:amt,currency:document.getElementById('pay-cur').value,payment_method:document.getElementById('pay-mth').value,payment_date:document.getElementById('pay-dt').value,receipt_no:document.getElementById('pay-rc').value.trim()||null,notes:document.getElementById('pay-nts').value.trim()||null};
   try{
-    await sb('haj_payments','POST',d);
+    const saved=await sb('haj_payments','POST',d);
+    if(saved&&saved[0])aPays=[saved[0],...aPays];
     const bk=aBks.find(x=>x.id==bid);
-    if(bk){const totP=aPays.filter(p=>p.booking_id==bid&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0)+(d.currency==='EGP'?amt:0);const ns=totP>=(+bk.final_price)?'مكتمل':totP>0?'مدفوع جزئي':'محجوز';await sb(`haj_bookings?id=eq.${bid}`,'PATCH',{status:ns});}
+    if(bk){const totP=aPays.filter(p=>p.booking_id==bid&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);const ns=totP>=(+bk.final_price)?'مكتمل':totP>0?'مدفوع جزئي':'محجوز';bk.status=ns;await sb(`haj_bookings?id=eq.${bid}`,'PATCH',{status:ns});}
     toast('تم تسجيل الدفعة');closeM('pay-modal');loadPayments();
   }catch(e){toast('خطأ: '+e.message,'error');}
 }
-function confirmDelPay(id){confirmAction('حذف هذه الدفعة؟','سيتم حذف الدفعة نهائياً وتحديث حالة الحجز','💰',async()=>{try{await sb(`haj_payments?id=eq.${id}`,'DELETE');toast('تم الحذف');aPays=[];loadPayments();}catch(e){toast('خطأ','error');} });}
+function confirmDelPay(id){confirmAction('حذف هذه الدفعة؟','سيتم حذف الدفعة نهائياً وتحديث حالة الحجز','💰',async()=>{try{await sb(`haj_payments?id=eq.${id}`,'DELETE');aPays=aPays.filter(p=>p.id!=id);toast('تم الحذف');loadPayments();}catch(e){toast('خطأ','error');} });}
 async function delPay(id){try{await sb(`haj_payments?id=eq.${id}`,'DELETE');toast('تم الحذف');aPays=[];loadPayments();}catch(e){toast('خطأ','error');}}
 
 let _editPayId=null;
@@ -1371,7 +1463,7 @@ async function saveEditPay(){
   if(!_editPayId)return;
   const d={amount:+document.getElementById('ep-amt').value,currency:document.getElementById('ep-cur').value,payment_method:document.getElementById('ep-mth').value,payment_date:document.getElementById('ep-dt').value,receipt_no:document.getElementById('ep-rc').value.trim()||null,notes:document.getElementById('ep-nts').value.trim()||null};
   if(!d.amount){toast('يرجى إدخال المبلغ','error');return;}
-  try{await sb(`haj_payments?id=eq.${_editPayId}`,'PATCH',d);toast('تم التعديل ✅');closeM('edit-pay-modal');aPays=[];loadPayments();}catch(e){toast('خطأ: '+e.message,'error');}
+  try{await sb(`haj_payments?id=eq.${_editPayId}`,'PATCH',d);const idx=aPays.findIndex(p=>p.id==_editPayId);if(idx>-1)aPays[idx]={...aPays[idx],...d};toast('تم التعديل ✅');closeM('edit-pay-modal');loadPayments();}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
 // loadRooms - defined in v4 rooms section below
@@ -1381,7 +1473,9 @@ async function loadSettlement(){
   const tid=document.getElementById('set-trip-f').value,cnt=document.getElementById('set-content');
   if(!tid){cnt.innerHTML='<div class="empty-state"><div class="empty-icon">&#x1F4C8;</div><h3>&#x627;&#x62E;&#x62A;&#x631; &#x631;&#x62D;&#x644;&#x629;</h3></div>';return;}
   try{
-    const[bks,pays,exps]=await Promise.all([sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`),sb('haj_payments?limit=2000'),sb(`haj_expenses?trip_id=eq.${tid}&limit=200`)]);
+    const[bks,exps]=await Promise.all([sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`),sb(`haj_expenses?trip_id=eq.${tid}&limit=200`)]);
+    const _bidsForSettle=bks.map(b=>b.id);
+    const pays=_bidsForSettle.length?await sb(`haj_payments?booking_id=in.(${_bidsForSettle.join(',')})&limit=1000`):[];
     const bids=bks.map(b=>b.id),tp=pays.filter(p=>bids.includes(p.booking_id));
     const rev=bks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
     const coll=tp.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
@@ -1460,7 +1554,7 @@ async function _printRepBase(type,tid){
     ${rows.map(r=>`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.c?.passport_no||'-'}</td><td>${r.b.vaccine_status}</td></tr>`).join('')}
     </tbody></table>`;
   }else if(type==='financial'){
-    const pays=await sb('haj_payments?limit=2000');const bids=bks.map(b=>b.id);const tpays=pays.filter(p=>bids.includes(p.booking_id));
+    const bids=bks.map(b=>b.id);const pays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];const tpays=pays;
     body=`<h1>الحساب المالي - ${trip?.name||''}</h1>
     <table><thead><tr><th>#</th><th>العميل</th><th>النوع</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
     ${rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid;return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:green">${fn(paid)} ج</td><td style="${rem>0?'color:red':''}">${fn(rem)} ج</td><td>${r.b.status}</td></tr>`;}).join('')}
@@ -1732,8 +1826,8 @@ async function exportExcel(type, tid){
     });
   } else if(type==='financial'){
     sheetName='المالي';
-    const pays=await sb('haj_payments?limit=2000');
-    const bids=bks.map(b=>b.id),tpays=pays.filter(p=>bids.includes(p.booking_id));
+    const bids=bks.map(b=>b.id);
+    const tpays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
     headers=['#','العميل','النوع','الكود','التسكين','السعر الأساسي','الخصومات','الإضافات','السعر النهائي','العملة','المدفوع (ج)','المتبقي (ج)','الحالة'];
     rows=bks.map((b,i)=>{
       const c=aClients.find(x=>x.id==b.client_id),pg=aProgs.find(x=>x.id==b.program_id);
@@ -2029,10 +2123,10 @@ async function openClientProfile(cid){
     const c=aClients.find(x=>x.id==cid)||await sb(`haj_clients?id=eq.${cid}&limit=1`).then(r=>r[0]);
     if(!c){body.innerHTML='<div class="info-box danger">❌ العميل غير موجود</div>';return;}
     const bks=await sb(`haj_bookings?client_id=eq.${cid}&order=created_at.desc&limit=50`);
-    const pays=await sb(`haj_payments?limit=2000`);
     if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
     if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
-    const bkPays=pays.filter(p=>bks.map(b=>b.id).includes(p.booking_id));
+    const _bkIds=bks.map(b=>b.id);
+    const bkPays=_bkIds.length?await sb(`haj_payments?booking_id=in.(${_bkIds.join(',')})&limit=500`):[];
     const totalDebit=bks.filter(b=>b.currency==='EGP'&&b.status!=='ملغي').reduce((s,b)=>s+(+b.final_price),0);
     const totalCredit=bkPays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
     const balance=totalDebit-totalCredit;
@@ -2404,17 +2498,70 @@ async function printLastBkCard() {
 // ============================================================
 // ROOMS - MANUAL ASSIGNMENT SYSTEM
 // ============================================================
-let _roomsData = { tripId: null, rooms: [], bookings: [], city: 'مكة' };
+let _roomsData = { tripId: null, rooms: [], bookings: [], city: 'مكة', virtualRooms: {} };
+
+const ROOM_TYPE_CAP = { 'فردي':1,'ثنائي':2,'ثلاثي':3,'رباعي':4,'خماسي':5 };
+const ROOM_TYPE_COLOR = { 'فردي':'badge-purple','ثنائي':'badge-blue','ثلاثي':'badge-gold','رباعي':'badge-green','خماسي':'badge-red' };
+
+// Small colored badge showing a client's assigned room type + capacity
+function roomTypeBadge(type){
+  if(!type) return `<span class="badge badge-gray">تسكين غير محدد</span>`;
+  return `<span class="badge ${ROOM_TYPE_COLOR[type]||'badge-blue'}">🛏️ ${type} (${ROOM_TYPE_CAP[type]||'?'})</span>`;
+}
+
+// Returns all clients transitively linked to this client (family/محرم chain), excluding the client itself.
+// Supports groups larger than 2 people (e.g. زوج+زوجة+ابن all linked through each other).
+function getLinkedGroup(clientId){
+  const visited = new Set([clientId]);
+  let changed = true;
+  while(changed){
+    changed = false;
+    aClients.forEach(c=>{
+      if(visited.has(c.id) && c.linked_to && !visited.has(c.linked_to)){ visited.add(c.linked_to); changed = true; }
+      if(c.linked_to && visited.has(c.linked_to) && !visited.has(c.id)){ visited.add(c.id); changed = true; }
+    });
+  }
+  visited.delete(clientId);
+  return Array.from(visited).map(id=>aClients.find(x=>x.id==id)).filter(Boolean);
+}
+
+// HTML block listing a client's family/linked group and where each of them is roomed (for the given city)
+function familyGroupHtml(clientId, city, bks, currentRoomNo){
+  const group = getLinkedGroup(clientId);
+  if(!group.length) return '';
+  const field = city==='مكة' ? 'room_number_mecca' : 'room_number_madina';
+  const rows = group.map(gc=>{
+    const gb = bks.find(x=>x.client_id==gc.id);
+    const groomNo = gb ? gb[field] : null;
+    let status;
+    if(!gb) status = `<span style="color:var(--text3)">غير موجود بهذه الرحلة</span>`;
+    else if(!groomNo) status = `<span style="color:var(--gold)">⚠️ غير مسكّن</span>`;
+    else if(currentRoomNo && groomNo===currentRoomNo) status = `<span style="color:#4caf84">✅ نفس الغرفة</span>`;
+    else status = `<span style="color:var(--gold)">⚠️ غرفة ${groomNo}</span>`;
+    return `<div style="display:flex;justify-content:space-between;gap:6px"><span>${gc.full_name_ar}${gc.link_relation?` (${gc.link_relation})`:''}</span>${status}</div>`;
+  }).join('');
+  return `<div style="margin-top:4px;font-size:11px;background:rgba(41,128,185,.08);border-radius:6px;padding:4px 6px">
+    <div style="font-weight:700;color:#5dade2;margin-bottom:2px">👨‍👩‍👧‍👦 مرتبطون بنفس الحجز/الأسرة</div>${rows}
+  </div>`;
+}
+
+function saveVirtualRooms(){
+  if(!_roomsData.tripId) return;
+  try{ localStorage.setItem(`hj_virtual_rooms_${_roomsData.tripId}`, JSON.stringify(_roomsData.virtualRooms||{})); }catch(e){}
+}
 
 async function loadRooms() {
   const tid = document.getElementById('rm-trip-f').value;
   const cnt = document.getElementById('rm-content');
+  try{ localStorage.setItem('hj_rm_trip', tid||''); }catch(e){}
   if(!tid) { cnt.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><h3>اختر رحلة</h3></div>'; return; }
   try {
     // Load rooms from haj_rooms table (we use haj_bookings room fields as source of truth)
     const bks = await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`);
     if(!aClients.length) aClients = await sb('haj_clients?is_cancelled=eq.false&limit=1000');
-    _roomsData = { tripId: tid, bookings: bks, city: document.getElementById('rm-city-f').value };
+    let virtualRooms = {};
+    try{ virtualRooms = JSON.parse(localStorage.getItem(`hj_virtual_rooms_${tid}`)||'{}'); }catch(e){}
+    _roomsData = { tripId: tid, bookings: bks, city: document.getElementById('rm-city-f').value, virtualRooms };
     renderRoomView();
     checkRoomAlerts(bks);
   } catch(e) { cnt.innerHTML = '<div class="info-box danger">❌ خطأ في التحميل</div>'; }
@@ -2422,26 +2569,26 @@ async function loadRooms() {
 
 function checkRoomAlerts(bks) {
   const alerts = document.getElementById('rm-alerts');
-  let html = '';
-  // Find linked clients not in same room type
-  const linked = bks.filter(b => {
-    const c = aClients.find(x=>x.id==b.client_id);
-    return c && c.linked_to;
-  });
+  const city = document.getElementById('rm-city-f')?.value || _roomsData.city || 'مكة';
+  const field = city==='مكة' ? 'room_number_mecca' : 'room_number_madina';
   const warnings = [];
-  linked.forEach(b => {
+  const processed = new Set();
+  bks.forEach(b => {
     const c = aClients.find(x=>x.id==b.client_id);
-    const linkedBk = bks.find(x=>x.client_id==c.linked_to);
-    if(!linkedBk) return;
-    const linkedC = aClients.find(x=>x.id==c.linked_to);
-    // Check if room numbers differ (in mecca)
-    if(b.room_number_mecca && linkedBk.room_number_mecca && b.room_number_mecca !== linkedBk.room_number_mecca) {
-      warnings.push(`⚠️ ${c.full_name_ar} (${c.link_relation}: ${linkedC?.full_name_ar}) في غرف مختلفة بمكة: ${b.room_number_mecca} ≠ ${linkedBk.room_number_mecca}`);
-    }
-    if(!b.room_number_mecca && b.traveler_type==='بالغ') {
-      warnings.push(`🔔 ${c.full_name_ar} لم يُسكَّن بعد في مكة`);
+    if(!c || !c.linked_to || processed.has(c.id)) return;
+    const group = getLinkedGroup(c.id);
+    const members = [c, ...group];
+    members.forEach(m=>processed.add(m.id));
+    const memberBks = members.map(m=>bks.find(x=>x.client_id==m.id)).filter(Boolean);
+    const roomsUsed = [...new Set(memberBks.map(mb=>mb[field]).filter(Boolean))];
+    const notAssigned = memberBks.filter(mb=>mb.traveler_type==='بالغ' && !mb[field]);
+    if(roomsUsed.length > 1) {
+      warnings.push(`⚠️ مجموعة (${members.map(m=>m.full_name_ar).join('، ')}) في غرف مختلفة بـ${city}: ${roomsUsed.join(' / ')}`);
+    } else if(roomsUsed.length === 1 && notAssigned.length) {
+      warnings.push(`🔔 ${notAssigned.map(mb=>aClients.find(x=>x.id==mb.client_id)?.full_name_ar).join('، ')} لم يُسكَّن بعد رغم أن باقي المجموعة مسكّنة بـ${city}`);
     }
   });
+  let html = '';
   if(warnings.length) {
     html = `<div class="info-box warning" style="flex-direction:column;gap:4px"><div style="font-weight:700">تنبيهات التسكين:</div>${warnings.slice(0,5).map(w=>`<div>${w}</div>`).join('')}${warnings.length>5?`<div>...و ${warnings.length-5} تنبيه آخر</div>`:''}</div>`;
   }
@@ -2451,6 +2598,7 @@ function checkRoomAlerts(bks) {
 function renderRoomView() {
   const city = document.getElementById('rm-city-f').value;
   _roomsData.city = city;
+  try{ localStorage.setItem('hj_rm_city', city); }catch(e){}
   const bks = _roomsData.bookings;
   const cnt = document.getElementById('rm-content');
 
@@ -2465,19 +2613,24 @@ function renderRoomView() {
       rooms[rn].guests.push(b);
     } else unassigned.push(b);
   });
+  // Merge in empty rooms created via "غرفة جديدة" that have no occupants yet, so they're visible with their full capacity
+  if(_roomsData.virtualRooms) {
+    Object.values(_roomsData.virtualRooms).forEach(vr => {
+      if(vr.city===city && !rooms[vr.no]) rooms[vr.no] = { no: vr.no, type: vr.type, guests: [] };
+    });
+  }
 
-  const roomTypes = { 'فردي':1,'ثنائي':2,'ثلاثي':3,'رباعي':4,'خماسي':5 };
   let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px">`;
 
   Object.values(rooms).sort((a,b)=>a.no.localeCompare(b.no, undefined, {numeric:true})).forEach(room => {
-    const cap = roomTypes[room.type] || 4;
+    const cap = ROOM_TYPE_CAP[room.type] || 4;
     const isFull = room.guests.length >= cap;
     const borderCol = isFull ? 'var(--red-light)' : room.guests.length>0 ? 'var(--gold)' : 'var(--border)';
     html += `<div style="border:2px solid ${borderCol};border-radius:10px;overflow:hidden">
       <div style="background:var(--bg3);padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <span style="font-weight:700;font-size:15px">🛏️ ${room.no}</span>
-          <span class="badge badge-blue" style="margin-right:6px">${room.type}</span>
+          <span class="badge ${ROOM_TYPE_COLOR[room.type]||'badge-blue'}" style="margin-right:6px">${room.type}</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:12px;color:${isFull?'var(--red-light)':'#4caf84'}">${room.guests.length}/${cap}</span>
@@ -2488,19 +2641,19 @@ function renderRoomView() {
       <div style="padding:10px">
         ${room.guests.map(b => {
           const c = aClients.find(x=>x.id==b.client_id);
-          const linked = c&&c.linked_to ? aClients.find(x=>x.id==c.linked_to) : null;
-          const linkedBk = linked ? bks.find(x=>x.client_id==linked.id) : null;
-          const linkedRoom = linkedBk ? (city==='مكة'?linkedBk.room_number_mecca:linkedBk.room_number_madina) : null;
-          const sameRoom = linkedRoom === room.no;
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-            <div>
-              <div style="font-weight:600;font-size:13px">${c?.full_name_ar||'-'}</div>
-              ${linked?`<div style="font-size:11px;color:${sameRoom?'#4caf84':'var(--gold)'}">${sameRoom?'✅':'⚠️'} ${c.link_relation}: ${linked.full_name_ar}${sameRoom?'':' (غرفة أخرى)'}</div>`:''}
+          const familyHtml = familyGroupHtml(b.client_id, city, bks, room.no);
+          return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:600;font-size:13px">${c?.full_name_ar||'-'}</div>
+                <div style="margin-top:2px">${roomTypeBadge(b.room_type)}</div>
+              </div>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="removeFromRoom(${b.id},'${city}')" title="إزالة من الغرفة">✕</button>
             </div>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="removeFromRoom(${b.id},'${city}')" title="إزالة من الغرفة">✕</button>
+            ${familyHtml}
           </div>`;
         }).join('')}
-        ${room.guests.length===0?`<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px">غرفة فارغة</div>`:''}
+        ${room.guests.length===0?`<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px">غرفة فارغة (${cap} أماكن) - اضغط ➕ لإضافة عملاء</div>`:''}
       </div>
     </div>`;
   });
@@ -2510,15 +2663,15 @@ function renderRoomView() {
   if(unassigned.length) {
     html += `<div class="card" style="border-color:var(--gold-dark)">
       <div class="card-header"><div class="card-title" style="color:var(--gold)">⚠️ لم يُسكَّنوا بعد (${unassigned.length})</div></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
         ${unassigned.map(b => {
           const c = aClients.find(x=>x.id==b.client_id);
-          const linked = c&&c.linked_to ? aClients.find(x=>x.id==c.linked_to) : null;
-          return `<div style="background:var(--bg3);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
-            <div>
+          const familyHtml = familyGroupHtml(b.client_id, city, bks, null);
+          return `<div style="background:var(--bg3);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+            <div style="flex:1">
               <div style="font-weight:600;font-size:13px">${c?.full_name_ar||'-'}</div>
-              <div style="font-size:11px;color:var(--text3)">${b.room_type||'غير محدد'}</div>
-              ${linked?`<div style="font-size:11px;color:var(--gold)">🔗 ${linked.full_name_ar}</div>`:''}
+              <div style="margin-top:2px">${roomTypeBadge(b.room_type)}</div>
+              ${familyHtml}
             </div>
             <button class="btn btn-primary btn-sm btn-icon" onclick="openAssignModalForClient(${b.id},'${city}')" title="تسكين">🛏️</button>
           </div>`;
@@ -2554,15 +2707,17 @@ async function saveRoom() {
   const city = document.getElementById('ar-city').value;
   const type = document.getElementById('ar-type').value;
   if(!no) { toast('يرجى إدخال رقم الغرفة','error'); return; }
-  // Check if room number already exists
-  const exists = _roomsData.bookings.some(b => (city==='مكة'?b.room_number_mecca:b.room_number_madina) === no && b.traveler_type==='بالغ');
+  // Check if room number already exists (as an occupied room or an empty virtual room)
+  const exists = _roomsData.bookings.some(b => (city==='مكة'?b.room_number_mecca:b.room_number_madina) === no && b.traveler_type==='بالغ')
+    || (_roomsData.virtualRooms && _roomsData.virtualRooms[`${city}-${no}`]);
   if(exists) { toast('رقم الغرفة موجود بالفعل','error'); return; }
-  // Add a placeholder so room appears
-  toast(`تمت إضافة غرفة ${no} - يمكنك الآن إضافة عملاء لها`,'info');
-  closeM('addroom-modal');
-  // Store room in memory as virtual room
+  // Store room in memory (and localStorage) as virtual room so it appears with its full capacity even before anyone is assigned
   _roomsData.virtualRooms = _roomsData.virtualRooms||{};
   _roomsData.virtualRooms[`${city}-${no}`] = { no, city, type };
+  saveVirtualRooms();
+  toast(`تمت إضافة غرفة ${no} (${type}) - يمكنك الآن إضافة عملاء لها`,'info');
+  closeM('addroom-modal');
+  document.getElementById('rm-city-f').value = city;
   renderRoomView();
 }
 
@@ -2573,6 +2728,7 @@ async function deleteRoom(roomNo, city) {
     // Remove room number from all bookings in this room
     const bksInRoom = _roomsData.bookings.filter(b=>(city==='مكة'?b.room_number_mecca:b.room_number_madina)===roomNo);
     for(const b of bksInRoom) await sb(`haj_bookings?id=eq.${b.id}`,'PATCH',{[field]:null});
+    if(_roomsData.virtualRooms) { delete _roomsData.virtualRooms[`${city}-${roomNo}`]; saveVirtualRooms(); }
     toast('تم حذف الغرفة');
     await loadRooms();
   } catch(e) { toast('خطأ','error'); }
@@ -2589,18 +2745,18 @@ async function removeFromRoom(bkId, city) {
   } catch(e) { toast('خطأ','error'); }
 }
 
-let _assignRoomNo = null, _assignCity = null, _assignBkId = null;
+let _assignRoomNo = null, _assignCity = null, _assignBkId = null, _assignRoomType = null;
 
 function openAssignModal(roomNo, city, roomType) {
-  _assignRoomNo = roomNo; _assignCity = city; _assignBkId = null;
+  _assignRoomNo = roomNo; _assignCity = city; _assignBkId = null; _assignRoomType = roomType;
   document.getElementById('assign-room-name').textContent = `- غرفة ${roomNo} (${roomType})`;
   document.getElementById('assign-search').value = '';
-  buildAssignList(roomNo, city);
+  buildAssignList(roomNo, city, roomType);
   openM('assign-modal');
 }
 
 function openAssignModalForClient(bkId, city) {
-  _assignBkId = bkId; _assignCity = city; _assignRoomNo = null;
+  _assignBkId = bkId; _assignCity = city; _assignRoomNo = null; _assignRoomType = null;
   document.getElementById('assign-room-name').textContent = '- اختر الغرفة';
   document.getElementById('assign-search').value = '';
   buildRoomChoiceList(bkId, city);
@@ -2614,59 +2770,122 @@ function filterAssignList() {
   });
 }
 
-function buildAssignList(roomNo, city) {
-  // Show unassigned clients for this trip
-  const unassigned = _roomsData.bookings.filter(b => {
+// Builds the list of clients that can be added to a specific room. Only clients whose OWN
+// room type (from their booking) matches this room's type are shown as selectable — a client
+// booked "ثلاثي" cannot be added to a "رباعي" room and vice versa.
+function buildAssignList(roomNo, city, roomType) {
+  const allUnassigned = _roomsData.bookings.filter(b => {
     if(b.traveler_type !== 'بالغ') return false;
     const rn = city==='مكة' ? b.room_number_mecca : b.room_number_madina;
     return !rn;
   });
   const list = document.getElementById('assign-list');
-  if(!unassigned.length) { list.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px">كل العملاء لديهم تسكين</div>'; return; }
-  list.innerHTML = unassigned.map(b => {
+  if(!allUnassigned.length) { list.innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px">كل العملاء لديهم تسكين</div>'; return; }
+
+  const matched = allUnassigned.filter(b => (b.room_type||'ثنائي') === roomType);
+  const mismatched = allUnassigned.filter(b => (b.room_type||'ثنائي') !== roomType);
+
+  let html = '';
+  if(!matched.length) {
+    html += `<div class="info-box warning" style="margin-bottom:8px">لا يوجد عملاء غير مسكّنين من نوع "${roomType}" ليتم إضافتهم لهذه الغرفة</div>`;
+  }
+  html += matched.map(b => {
     const c = aClients.find(x=>x.id==b.client_id);
-    const linked = c&&c.linked_to ? aClients.find(x=>x.id==c.linked_to) : null;
-    const linkedBk = linked ? _roomsData.bookings.find(x=>x.client_id==linked.id) : null;
-    const linkedRoom = linkedBk ? (city==='مكة'?linkedBk.room_number_mecca:linkedBk.room_number_madina) : null;
-    return `<div class="assign-item" data-name="${c?.full_name_ar||''}" style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="assignToRoom(${b.id},'${roomNo}','${city}')">
-      <div>
+    const familyHtml = familyGroupHtml(b.client_id, city, _roomsData.bookings, roomNo);
+    return `<div class="assign-item" data-name="${c?.full_name_ar||''}" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="assignToRoom(${b.id},'${roomNo}','${city}')">
+      <div style="flex:1">
         <div style="font-weight:600">${c?.full_name_ar||'-'}</div>
-        <div style="font-size:11px;color:var(--text3)">${c?.full_name_en||''} | ${b.room_type||''}</div>
-        ${linked?`<div style="font-size:11px;color:${linkedRoom?'#4caf84':'var(--gold)'}">🔗 ${c.link_relation}: ${linked.full_name_ar} ${linkedRoom?'(غرفة '+linkedRoom+')':'(غير مسكّن)'}</div>`:''}
+        <div style="font-size:11px;color:var(--text3);margin:2px 0">${c?.full_name_en||''}</div>
+        ${roomTypeBadge(b.room_type)}
+        ${familyHtml}
       </div>
       <button class="btn btn-primary btn-sm">تسكين</button>
     </div>`;
   }).join('');
+  if(mismatched.length) {
+    html += `<div style="padding:8px 10px;font-size:11px;color:var(--text3);border-top:2px dashed var(--border);margin-top:6px">🚫 عملاء بنوع تسكين مختلف (لا يمكن إضافتهم لغرفة "${roomType}"):</div>`;
+    html += mismatched.map(b=>{
+      const c = aClients.find(x=>x.id==b.client_id);
+      return `<div class="assign-item" data-name="${c?.full_name_ar||''}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;opacity:.5">
+        <div><div style="font-weight:600">${c?.full_name_ar||'-'}</div>${roomTypeBadge(b.room_type)}</div>
+        <span style="font-size:11px;color:var(--text3)">غير متوافق</span>
+      </div>`;
+    }).join('');
+  }
+  list.innerHTML = html;
 }
 
+// Builds the list of rooms a given client can be placed into: only rooms of the SAME type as the
+// client's own booking, and with a free seat. Rooms of a different type are shown but disabled.
 function buildRoomChoiceList(bkId, city) {
-  // Show rooms with space available
+  const bk = _roomsData.bookings.find(x=>x.id==bkId);
+  const clientRoomType = bk?.room_type || 'ثنائي';
   const rooms = {};
   _roomsData.bookings.forEach(b => {
     if(b.traveler_type !== 'بالغ') return;
     const rn = city==='مكة' ? b.room_number_mecca : b.room_number_madina;
     if(rn) { if(!rooms[rn]) rooms[rn]={no:rn,type:b.room_type,count:0}; rooms[rn].count++; }
   });
-  const caps = { 'فردي':1,'ثنائي':2,'ثلاثي':3,'رباعي':4,'خماسي':5 };
-  const available = Object.values(rooms).filter(r=>r.count < (caps[r.type]||4));
+  // include empty rooms created via "غرفة جديدة" that have no occupants yet
+  if(_roomsData.virtualRooms) {
+    Object.values(_roomsData.virtualRooms).forEach(vr=>{
+      if(vr.city===city && !rooms[vr.no]) rooms[vr.no] = { no: vr.no, type: vr.type, count: 0 };
+    });
+  }
+  const available = Object.values(rooms).filter(r => r.type===clientRoomType && r.count < (ROOM_TYPE_CAP[r.type]||4));
+  const otherRooms = Object.values(rooms).filter(r => r.type!==clientRoomType && r.count < (ROOM_TYPE_CAP[r.type]||4));
   const list = document.getElementById('assign-list');
-  list.innerHTML = `<div style="padding:8px;font-size:12px;color:var(--text3)">اختر الغرفة:</div>` +
-    available.map(r=>`<div class="assign-item" data-name="${r.no}" style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="assignToRoom(${bkId},'${r.no}','${city}')">
-      <div><div style="font-weight:600">غرفة ${r.no}</div><div style="font-size:12px;color:var(--text3)">${r.type} | ${r.count}/${caps[r.type]||4} مقعد</div></div>
+  let html = `<div style="padding:8px;font-size:12px;color:var(--text3)">نوع تسكين العميل: ${roomTypeBadge(clientRoomType)}</div>`;
+  if(!available.length){
+    html += `<div style="padding:0 10px 8px;color:var(--gold);font-size:12px">لا توجد غرفة "${clientRoomType}" بها مكان متاح حالياً — يمكنك إنشاء غرفة جديدة</div>`;
+  }
+  html += available.map(r=>`<div class="assign-item" data-name="${r.no}" style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);cursor:pointer" onclick="assignToRoom(${bkId},'${r.no}','${city}')">
+      <div><div style="font-weight:600">غرفة ${r.no}</div><div style="font-size:12px;color:var(--text3)">${r.type} | ${r.count}/${ROOM_TYPE_CAP[r.type]||4} مقعد</div></div>
       <button class="btn btn-primary btn-sm">تسكين</button>
-    </div>`).join('') + `<div class="assign-item" data-name="جديدة" style="padding:10px;border-top:2px dashed var(--border);display:flex;justify-content:space-between;align-items:center" onclick="assignToNewRoom(${bkId},'${city}')">
-      <span style="color:var(--gold)">➕ غرفة جديدة</span>
+    </div>`).join('');
+  html += `<div class="assign-item" data-name="جديدة" style="padding:10px;border-top:2px dashed var(--border);display:flex;justify-content:space-between;align-items:center" onclick="assignToNewRoom(${bkId},'${city}')">
+      <span style="color:var(--gold)">➕ غرفة جديدة (${clientRoomType})</span>
       <button class="btn btn-gold btn-sm">إضافة</button>
     </div>`;
+  if(otherRooms.length){
+    html += `<div style="padding:8px 10px;font-size:11px;color:var(--text3);border-top:2px dashed var(--border);margin-top:6px">🚫 غرف بأنواع مختلفة (غير متاحة لهذا العميل):</div>`;
+    html += otherRooms.map(r=>`<div class="assign-item" data-name="${r.no}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;opacity:.5">
+      <div><div style="font-weight:600">غرفة ${r.no}</div><div style="font-size:11px">${r.type} | ${r.count}/${ROOM_TYPE_CAP[r.type]||4}</div></div>
+      <span style="font-size:11px;color:var(--text3)">غير متوافق</span>
+    </div>`).join('');
+  }
+  list.innerHTML = html;
 }
 
+// Central validation point: rejects the assignment if the client's own room type doesn't match
+// the target room's type, or if the room is already full — regardless of which UI path triggered it.
 async function assignToRoom(bkId, roomNo, city) {
   const field = city==='مكة' ? 'room_number_mecca' : 'room_number_madina';
+  const bk = _roomsData.bookings.find(x=>x.id==bkId);
+  if(!bk) { toast('لم يتم العثور على الحجز','error'); return; }
+  const clientType = bk.room_type || 'ثنائي';
+
+  const occupants = _roomsData.bookings.filter(b => b.id!=bkId && b.traveler_type==='بالغ' && (city==='مكة'?b.room_number_mecca:b.room_number_madina)===roomNo);
+  let roomType = occupants[0]?.room_type;
+  if(!roomType && _roomsData.virtualRooms && _roomsData.virtualRooms[`${city}-${roomNo}`]) roomType = _roomsData.virtualRooms[`${city}-${roomNo}`].type;
+
+  if(roomType && roomType !== clientType) {
+    toast(`❌ لا يمكن تسكين العميل هنا: تسكينه "${clientType}" لا يطابق نوع الغرفة "${roomType}"`,'error');
+    return;
+  }
+  const cap = ROOM_TYPE_CAP[roomType||clientType] || 4;
+  if(occupants.length >= cap) {
+    toast(`❌ الغرفة ممتلئة (${occupants.length}/${cap})`,'error');
+    return;
+  }
+
   try {
     await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',{[field]:roomNo});
-    // update local
-    const b = _roomsData.bookings.find(x=>x.id==bkId);
-    if(b) b[field] = roomNo;
+    bk[field] = roomNo;
+    if(!occupants.length) {
+      _roomsData.virtualRooms = _roomsData.virtualRooms||{};
+      if(!_roomsData.virtualRooms[`${city}-${roomNo}`]) { _roomsData.virtualRooms[`${city}-${roomNo}`] = {no:roomNo, city, type:clientType}; saveVirtualRooms(); }
+    }
     closeM('assign-modal');
     renderRoomView();
     checkRoomAlerts(_roomsData.bookings);
@@ -2677,6 +2896,11 @@ async function assignToRoom(bkId, roomNo, city) {
 async function assignToNewRoom(bkId, city) {
   const no = prompt('رقم الغرفة الجديدة:');
   if(!no) return;
+  const bk = _roomsData.bookings.find(x=>x.id==bkId);
+  const type = bk?.room_type || 'ثنائي';
+  _roomsData.virtualRooms = _roomsData.virtualRooms||{};
+  _roomsData.virtualRooms[`${city}-${no.trim()}`] = { no: no.trim(), city, type };
+  saveVirtualRooms();
   await assignToRoom(bkId, no.trim(), city);
 }
 
@@ -2754,9 +2978,10 @@ async function loadClientStatement() {
   try {
     const c=aClients.find(x=>x.id==cid);
     const bks=await sb(`haj_bookings?client_id=eq.${cid}&order=created_at.asc&limit=100`);
-    const pays=await sb(`haj_payments?limit=2000`);
     if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
     if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
+    const _csBkIds=bks.map(b=>b.id);
+    const pays=_csBkIds.length?await sb(`haj_payments?booking_id=in.(${_csBkIds.join(',')})&limit=500`):[];
 
     let totalDebit=0,totalCredit=0;
     let rows='';
@@ -2831,13 +3056,10 @@ async function loadTripStatement() {
   if(!tid){res.innerHTML='<div class="empty-state"><div class="empty-icon">🗓️</div><h3>اختر رحلة</h3></div>';return;}
   try {
     const trip=aTrips.find(x=>x.id==tid);
-    const bks=await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&order=created_at.asc&limit=500`);
-    const pays=await sb('haj_payments?limit=2000');
-    const exps=await sb(`haj_expenses?trip_id=eq.${tid}&limit=200`);
+    const[bks,exps]=await Promise.all([sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&order=created_at.asc&limit=500`),sb(`haj_expenses?trip_id=eq.${tid}&limit=200`)]);
     if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
-
     const bids=bks.map(b=>b.id);
-    const tpays=pays.filter(p=>bids.includes(p.booking_id));
+    const tpays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
     const totalRev=bks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
     const totalColl=tpays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
     const totalExp=exps.filter(e=>e.currency==='EGP').reduce((s,e)=>s+(+e.amount),0);
@@ -2934,12 +3156,10 @@ async function loadBalance() {
   const tid=document.getElementById('acc-bal-trip').value;
   const res=document.getElementById('acc-bal-result');
   try {
-    const bks=tid ? await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`) : await sb('haj_bookings?status=neq.ملغي&limit=1000');
-    const pays=await sb('haj_payments?limit=2000');
+    const[bks]=await Promise.all([tid ? sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`) : sb('haj_bookings?status=neq.ملغي&limit=1000')]);
     if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
-
     const bids=bks.map(b=>b.id);
-    const tpays=pays.filter(p=>bids.includes(p.booking_id)&&p.currency==='EGP');
+    const tpays=bids.length?(await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`)).filter(p=>p.currency==='EGP'):[];
 
     const totalRevEGP=bks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
     const totalColl=tpays.reduce((s,p)=>s+(+p.amount),0);
@@ -2994,7 +3214,7 @@ async function loadBalance() {
 async function printClientStatement(cid) {
   const c=aClients.find(x=>x.id==cid);
   const bks=await sb(`haj_bookings?client_id=eq.${cid}&order=created_at.asc&limit=100`);
-  const pays=await sb('haj_payments?limit=2000');
+  const _pcsIds=bks.map(b=>b.id);const pays=_pcsIds.length?await sb(`haj_payments?booking_id=in.(${_pcsIds.join(',')})&limit=500`):[];
   let totalD=0,totalC=0,rows='';
   bks.forEach(b=>{
     const t=aTrips.find(x=>x.id==b.trip_id);
@@ -3056,7 +3276,7 @@ async function exportJournalExcel() {
 async function exportClientExcel(cid) {
   const c=aClients.find(x=>x.id==cid);
   const bks=await sb(`haj_bookings?client_id=eq.${cid}&limit=100`);
-  const pays=await sb('haj_payments?limit=2000');
+  const _eceIds=bks.map(b=>b.id);const pays=_eceIds.length?await sb(`haj_payments?booking_id=in.(${_eceIds.join(',')})&limit=500`):[];
   const rows=[['التاريخ','البيان','مدين (عليه)','دائن (له)','العملة']];
   bks.forEach(b=>{
     const t=aTrips.find(x=>x.id==b.trip_id);

@@ -848,12 +848,14 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="price-row add" id="px-mkv-r" style="display:none"><span>+ 🕌 إطلالة مكة</span><span id="px-mkv">0 ج</span></div>
         <div class="price-row add" id="px-hrv-r" style="display:none"><span>+ 🕋 إطلالة الحرم</span><span id="px-hrv">0 ج</span></div>
         <div class="price-row total"><span>💰 السعر النهائي</span><span id="px-fin">0 ج</span></div>
+        <div class="price-row" id="px-profit-r" style="display:none"><span>📈 مكسبك (بعد تكلفة المورد)</span><span id="px-profit">0 ج</span></div>
       </div>
       <div class="form-grid" style="margin-top:14px">
         <div class="form-group"><label>العملة</label><select id="bk-cur"><option value="EGP">جنيه مصري</option><option value="SAR">ريال سعودي</option><option value="USD">دولار</option></select></div>
         <div class="form-group"><label>حالة التأشيرة</label><select id="bk-vstat"><option value="لم تُقدَّم">لم تُقدَّم</option><option value="قُدِّمت">قُدِّمت</option><option value="موافق عليها">موافق عليها</option><option value="مرفوضة">مرفوضة</option></select></div>
         <div class="form-group"><label>التطعيمات</label><select id="bk-vac"><option value="غير مكتملة">غير مكتملة</option><option value="مكتملة">مكتملة</option></select></div>
         <div class="form-group"><label>حالة الحجز</label><select id="bk-st"><option value="محجوز">محجوز</option><option value="مدفوع جزئي">مدفوع جزئي</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select></div>
+        <div class="form-group"><label>💵 تكلفة المورد (اللي بتسلمه له)</label><input id="bk-supcost" type="number" min="0" step="0.01" placeholder="0" oninput="calcPx()"><small style="color:var(--text3)">الفرق بينها وبين السعر النهائي = مكسبك على هذا الجواز</small></div>
         <div class="form-group full"><label>ملاحظات</label><textarea id="bk-nts" rows="2"></textarea></div>
       </div>
     </div>
@@ -1092,6 +1094,45 @@ function tt(bd){if(!bd)return'بالغ';const d=(new Date()-new Date(bd))/(1000*
 function fd(d){return d?new Date(d).toLocaleDateString('ar-EG'):'-';}
 function fn(n){return n?Number(n).toLocaleString('ar-EG'):'0';}
 function bdg(s){const m={'مفتوحة':'badge-green','مغلقة':'badge-gray','منتهية':'badge-red','محجوز':'badge-blue','مدفوع جزئي':'badge-gold','مكتمل':'badge-green','ملغي':'badge-red','موافق عليها':'badge-green','مرفوضة':'badge-red','لم تُقدَّم':'badge-gray','قُدِّمت':'badge-blue','غير مكتملة':'badge-red','مكتملة':'badge-green'};return`<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;}
+
+// ============ CLIENT DUPLICATE DETECTION ============
+// نفس العميل يُعتبر مكرر لو: نفس رقم الجواز (أهم معيار)، أو نفس الاسم بالكامل + نفس تاريخ الميلاد، أو نفس الاسم + نفس رقم الهاتف
+function _normDup(s){return(s||'').toString().trim().toLowerCase().replace(/\s+/g,' ');}
+function findDuplicateClient(data, excludeId, list){
+  const arr=list||aClients;
+  const ppno=_normDup(data.passport_no), name=_normDup(data.full_name_ar), bday=data.birth_date||'', ph=_normDup(data.phone);
+  return arr.find(c=>{
+    if(excludeId && c.id==excludeId) return false;
+    const cppno=_normDup(c.passport_no), cname=_normDup(c.full_name_ar), cph=_normDup(c.phone);
+    if(ppno && cppno && ppno===cppno) return true;
+    if(name && cname && name===cname && bday && c.birth_date && bday===c.birth_date) return true;
+    if(name && cname && name===cname && ph && cph && ph===cph) return true;
+    return false;
+  });
+}
+// بيحدّث aClients من السيرفر عشان الفحص يكون على أحدث بيانات، وبعدين بيرجع أي تكرار موجود
+async function checkDuplicateClient(data, excludeId){
+  try{ aClients = await sb('haj_clients?is_cancelled=eq.false&limit=1000'); }catch(e){}
+  return findDuplicateClient(data, excludeId);
+}
+function dupMsg(dup){return `⚠️ العميل موجود بالفعل: ${dup.full_name_ar}${dup.passport_no?' - جواز رقم '+dup.passport_no:''}${dup.phone?' - هاتف '+dup.phone:''}`;}
+
+// ============ SAFE BOOKING SAVE (supplier_cost column may not exist yet in DB) ============
+// لو عمود supplier_cost لسه مش متضاف في جدول haj_bookings في Supabase، بيحاول يحفظ من غيره
+// بدل ما يمنع حفظ الحجز خالص، ويطلع تنبيه للمستخدم إنه لازم يضيف العمود.
+async function saveBookingSafe(bkId, d){
+  try{
+    return bkId ? await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',d) : await sb('haj_bookings','POST',d);
+  }catch(e){
+    if(/supplier_cost/i.test(e.message||'') && ('supplier_cost' in d)){
+      const d2={...d}; delete d2.supplier_cost;
+      const r = bkId ? await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',d2) : await sb('haj_bookings','POST',d2);
+      toast('تم الحفظ، لكن تكلفة المورد لم تُحفظ - يجب إضافة عمود supplier_cost لجدول haj_bookings في قاعدة البيانات','error');
+      return r;
+    }
+    throw e;
+  }
+}
 function trbdg(t){return t==='حج'?'<span class="badge badge-gold">&#x1F54B; &#x62D;&#x62C;</span>':'<span class="badge badge-green">&#x1F319; &#x639;&#x645;&#x631;&#x629;</span>';}
 // toast replaced by dlg system below
 
@@ -1521,6 +1562,8 @@ function quickBk(id){showTab('bookings');setTimeout(()=>openBkModal(null,id),300
 async function saveClient(){
   const d={full_name_ar:document.getElementById('cl-ar').value.trim(),full_name_en:document.getElementById('cl-en').value.trim()||null,gender:document.getElementById('cl-gen').value,birth_date:document.getElementById('cl-bday').value||null,nationality:document.getElementById('cl-nat').value.trim(),marital_status:document.getElementById('cl-mar').value,job:document.getElementById('cl-job').value.trim()||null,phone:document.getElementById('cl-ph').value.trim()||null,address:document.getElementById('cl-addr').value.trim()||null,passport_no:document.getElementById('cl-ppno').value.trim()||null,passport_issue_date:document.getElementById('cl-ppiss').value||null,passport_expiry_date:document.getElementById('cl-ppexp').value||null,passport_issue_place:document.getElementById('cl-pppl').value.trim()||null,did_hajj:document.getElementById('cl-hajj').checked,hajj_year:document.getElementById('cl-hjyr').value.trim()||null,linked_to:document.getElementById('cl-lnk').value||null,link_relation:document.getElementById('cl-rel').value||null,notes:document.getElementById('cl-notes').value.trim()||null};
   if(!d.full_name_ar){toast('يرجى إدخال اسم العميل','error');return;}
+  const dup=await checkDuplicateClient(d, ed.client);
+  if(dup){toast(dupMsg(dup),'error');return;}
   try{if(ed.client)await sb(`haj_clients?id=eq.${ed.client}`,'PATCH',d);else await sb('haj_clients','POST',d);toast('تم الحفظ');closeM('cl-modal');loadClients();}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
@@ -1780,7 +1823,7 @@ function renderBks(list){
     <td>${t?t.name:'-'}${pg?`<br><span class="badge badge-blue">&#x643;&#x648;&#x62F; ${pg.code}</span>`:''}</td>
     <td><span class="badge ${b.traveler_type==='بالغ'?'badge-green':b.traveler_type==='طفل'?'badge-blue':'badge-purple'}">${b.traveler_type}</span></td>
     <td>${b.room_type||'-'}</td>
-    <td><b style="color:var(--gold)">${fn(b.final_price)} ${b.currency}</b>${disc?`<br><small style="color:var(--red-light)">${disc}</small>`:''}${add?`<br><small style="color:#4caf84">${add}</small>`:''}</td>
+    <td><b style="color:var(--gold)">${fn(b.final_price)} ${b.currency}</b>${disc?`<br><small style="color:var(--red-light)">${disc}</small>`:''}${add?`<br><small style="color:#4caf84">${add}</small>`:''}${(+b.supplier_cost>0)?`<br><small style="color:${(b.final_price-b.supplier_cost)>=0?'#4caf84':'var(--red-light)'}">📈 مكسب: ${fn(b.final_price-b.supplier_cost)} ج</small>`:''}</td>
     <td><span style="color:#4caf84">${fn(paid)} ج</span>${rem>0?`<br><small style="color:var(--red-light)">&#x645;&#x62A;&#x628;&#x642;&#x64A;: ${fn(rem)}</small>`:''}</td>
     <td>${bdg(b.status)}</td><td>${bdg(b.visa_status)}</td>
     <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editBk(${b.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})" title="دفعة">&#x1F4B0;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="printBkCard(${b.id})" title="طباعة">&#x1F5A8;&#xFE0F;</button> <button class="btn btn-outline btn-sm btn-icon" onclick="openClientProfile(${b.client_id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelBk(${b.id},'${c?c.full_name_ar:''}')" title="حذف">&#x1F5D1;&#xFE0F;</button></td>
@@ -1793,8 +1836,8 @@ async function _openBkModalBase(id=null,preCl=null){
   if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
   fillClSels();fillTrSels();
   ['bk-tkt','bk-brc','bk-vis','bk-mls','bk-trn','bk-mkv','bk-hrv'].forEach(f=>document.getElementById(f).checked=false);
-  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
-  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';calcPx();}
+  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
+  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';calcPx();}
   openM('bk-modal');
 }
 function editBk(id){openBkModal(id);}
@@ -1831,6 +1874,10 @@ function calcPx(){
   const sw=(id,cond,amt)=>{document.getElementById(id+'-r').style.display=cond?'flex':'none';if(cond)document.getElementById(id).textContent=fn(amt)+' ج';};
   sw('px-tkt',gt('bk-tkt'),curTrip.ticket_price);sw('px-brc',gt('bk-brc'),curTrip.barcode_price);sw('px-vis',gt('bk-vis'),curTrip.visa_price);sw('px-mls',gt('bk-mls'),curTrip.meals_price);sw('px-trn',gt('bk-trn'),curTrip.train_price);sw('px-mkv',gt('bk-mkv'),curTrip.makkah_view_price);sw('px-hrv',gt('bk-hrv'),curTrip.haram_view_price);
   prc={base,deduct,add,fin};
+  const supEl=document.getElementById('bk-supcost'),supCost=supEl?(+supEl.value||0):0;
+  const profitR=document.getElementById('px-profit-r');
+  if(supCost>0){profitR.style.display='flex';const prof=fin-supCost;document.getElementById('px-profit').textContent=fn(prof)+' ج';document.getElementById('px-profit').style.color=prof>=0?'#4caf84':'var(--red-light)';}
+  else profitR.style.display='none';
 }
 async function saveBk(){
   const d={client_id:document.getElementById('bk-cl').value,trip_id:document.getElementById('bk-tr').value,program_id:document.getElementById('bk-pg').value||null,traveler_type:document.getElementById('bk-tp').value,room_type:document.getElementById('bk-rm').value,room_number_mecca:document.getElementById('bk-rm-mc').value.trim()||null,room_number_madina:document.getElementById('bk-rm-md').value.trim()||null,has_own_ticket:document.getElementById('bk-tkt').checked,has_own_barcode:document.getElementById('bk-brc').checked,has_own_visa:document.getElementById('bk-vis').checked,has_meals:document.getElementById('bk-mls').checked,has_train:document.getElementById('bk-trn').checked,has_makkah_view:document.getElementById('bk-mkv').checked,has_haram_view:document.getElementById('bk-hrv').checked,base_price:prc.base||0,deductions_total:prc.deduct||0,additions_total:prc.add||0,final_price:prc.fin||0,currency:document.getElementById('bk-cur').value,visa_status:document.getElementById('bk-vstat').value,vaccine_status:document.getElementById('bk-vac').value,status:document.getElementById('bk-st').value,notes:document.getElementById('bk-nts').value.trim()||null};
@@ -1925,13 +1972,26 @@ async function loadSettlement(){
     const exp=exps.filter(e=>e.currency==='EGP').reduce((s,e)=>s+(+e.amount),0);
     const prof=coll-exp;
     const ad=bks.filter(b=>b.traveler_type==='بالغ').length,ch=bks.filter(b=>b.traveler_type==='طفل').length,inf=bks.filter(b=>b.traveler_type==='رضيع').length;
+    // مكسب الجوازات: سعر البيع لكل حجز - تكلفة المورد لنفس الحجز (بغض النظر عن التحصيل)
+    const bksWithCost=bks.filter(b=>b.currency==='EGP'&&(+b.supplier_cost>0));
+    const totSupCost=bksWithCost.reduce((s,b)=>s+(+b.supplier_cost),0);
+    const totSaleForCosted=bksWithCost.reduce((s,b)=>s+(+b.final_price),0);
+    const passportProfit=totSaleForCosted-totSupCost;
     cnt.innerHTML=`<div class="stats-grid">
       <div class="stat-card"><div class="stat-icon">&#x1F4CB;</div><div class="stat-num">${bks.length}</div><div class="stat-label">${ad} بالغ / ${ch} طفل / ${inf} رضيع</div></div>
       <div class="stat-card green"><div class="stat-icon">&#x1F4B0;</div><div class="stat-num">${fn(rev)}</div><div class="stat-label">الإيرادات المتوقعة (ج)</div></div>
       <div class="stat-card blue"><div class="stat-icon">&#x2705;</div><div class="stat-num">${fn(coll)}</div><div class="stat-label">المحصّل (ج)</div></div>
       <div class="stat-card red"><div class="stat-icon">&#x1F4B8;</div><div class="stat-num">${fn(exp)}</div><div class="stat-label">المصروفات (ج)</div></div>
-      <div class="stat-card ${prof>=0?'green':'red'}"><div class="stat-icon">${prof>=0?'&#x1F4C8;':'&#x1F4C9;'}</div><div class="stat-num">${fn(prof)}</div><div class="stat-label">صافي الربح (ج)</div></div>
+      <div class="stat-card ${prof>=0?'green':'red'}"><div class="stat-icon">${prof>=0?'&#x1F4C8;':'&#x1F4C9;'}</div><div class="stat-num">${fn(prof)}</div><div class="stat-label">صافي الربح (محصّل - مصروفات) (ج)</div></div>
     </div>
+    ${bksWithCost.length?`<div class="stats-grid" style="margin-top:10px">
+      <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-num">${fn(totSupCost)}</div><div class="stat-label">إجمالي تكلفة الموردين (ج)</div></div>
+      <div class="stat-card ${passportProfit>=0?'green':'red'}"><div class="stat-icon">🛂</div><div class="stat-num">${fn(passportProfit)}</div><div class="stat-label">مكسب الجوازات (سعر البيع - تكلفة المورد) (ج)</div></div>
+    </div>
+    <div class="card"><div class="card-header"><div class="card-title">🛂 مكسب كل جواز على حدة</div></div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>العميل</th><th>سعر البيع</th><th>تكلفة المورد</th><th>المكسب</th></tr></thead><tbody>
+    ${bksWithCost.map((b,i)=>{const c=aClients.find?aClients.find(x=>x.id==b.client_id):null;const pr=(+b.final_price)-(+b.supplier_cost);return `<tr><td>${i+1}</td><td>${c?.full_name_ar||('عميل #'+b.client_id)}</td><td>${fn(b.final_price)} ج</td><td>${fn(b.supplier_cost)} ج</td><td style="color:${pr>=0?'#4caf84':'var(--red-light)'};font-weight:700">${fn(pr)} ج</td></tr>`;}).join('')}
+    </tbody></table></div></div>`:''}
     <div class="card"><div class="card-header"><div class="card-title">&#x1F4B8; المصروفات</div><button class="btn btn-primary btn-sm" onclick="addExp(${tid})">&#x2795; مصروف</button></div>
     <div class="table-wrap"><table><thead><tr><th>البند</th><th>المورد</th><th>المبلغ</th><th>العملة</th><th>ملاحظات</th><th>حذف</th></tr></thead><tbody>
     ${exps.length?exps.map(e=>`<tr><td>${e.category}</td><td>${e.supplier||'-'}</td><td>${fn(e.amount)}</td><td>${e.currency}</td><td>${e.notes||'-'}</td><td><button class="btn btn-danger btn-sm btn-icon" onclick="delExp(${e.id})">&#x1F5D1;&#xFE0F;</button></td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3)">لا توجد مصروفات</td></tr>'}
@@ -1952,6 +2012,7 @@ function showRepBtns(){
   if(!tid){cnt.innerHTML='<div class="empty-state"><div class="empty-icon">&#x1F5A8;&#xFE0F;</div><h3>&#x627;&#x62E;&#x62A;&#x631; &#x631;&#x62D;&#x644;&#x629;</h3></div>';return;}
   cnt.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 0">
     <div style="width:100%;font-size:12px;font-weight:700;color:var(--text3);margin-bottom:4px">🖨️ تقارير للطباعة</div>
+    <button class="btn btn-gold" onclick="openCompRepModal(${tid})" style="font-weight:800">📋 تقرير شامل (اختاري الأعمدة)</button>
     <button class="btn btn-gold" onclick="printRep('travelers',${tid})">&#x1F5A8;&#xFE0F; قائمة المسافرين</button>
     <button class="btn btn-primary" onclick="printRep('passports',${tid})">&#x1F4D8; قائمة الجوازات</button>
     <button class="btn btn-outline" onclick="printRep('visa',${tid})">&#x1FABA; متابعة التأشيرات</button>
@@ -2000,8 +2061,8 @@ async function _printRepBase(type,tid){
   }else if(type==='financial'){
     const bids=bks.map(b=>b.id);const pays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];const tpays=pays;
     body=`<h1>الحساب المالي - ${trip?.name||''}</h1>
-    <table><thead><tr><th>#</th><th>العميل</th><th>النوع</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>
-    ${rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid;return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:green">${fn(paid)} ج</td><td style="${rem>0?'color:red':''}">${fn(rem)} ج</td><td>${r.b.status}</td></tr>`;}).join('')}
+    <table><thead><tr><th>#</th><th>العميل</th><th>النوع</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>تكلفة المورد</th><th>المكسب</th><th>الحالة</th></tr></thead><tbody>
+    ${rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid,sc=+r.b.supplier_cost||0,pr=sc>0?(+r.b.final_price)-sc:null;return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:green">${fn(paid)} ج</td><td style="${rem>0?'color:red':''}">${fn(rem)} ج</td><td>${sc>0?fn(sc)+' ج':'-'}</td><td style="${pr!==null?(pr>=0?'color:green':'color:red'):''}">${pr!==null?fn(pr)+' ج':'-'}</td><td>${r.b.status}</td></tr>`;}).join('')}
     </tbody></table>`;
   }
   const w=window.open('','_blank');w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير</title>${css}</head><body>${body}<p style="text-align:center;color:#999;margin-top:20px;font-size:11px">Adreska Tours | ${fd(new Date().toISOString())}</p></body></html>`);w.document.close();w.print();
@@ -2195,6 +2256,28 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 </body>
 </html>
+<!-- COMPREHENSIVE REPORT MODAL (column picker) -->
+<div id="comprep-modal" class="modal-overlay">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header"><div class="modal-title">📋 التقرير الشامل - اختر الأعمدة</div><button class="close-btn" onclick="closeM('comprep-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="info-box info"><span>ℹ️</span><div>حددي الأعمدة اللي عاوزاها تظهر في التقرير المطبوع/الـ PDF. العمود اللي مش متعلّم عليه مش هيظهر.</div></div>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <button class="btn btn-outline btn-sm" onclick="comprepToggleAll(true)">تحديد الكل</button>
+        <button class="btn btn-outline btn-sm" onclick="comprepToggleAll(false)">إلغاء الكل</button>
+      </div>
+      <div class="check-row" id="comprep-cols" style="flex-wrap:wrap"></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <label class="check-item" style="font-weight:700"><input type="checkbox" id="comprep-family" checked> 👨‍👩‍👧‍👦 تجميع الأسر مع بعض (كل أسرة بلوك لوحده تحت اسم رب الأسرة)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeM('comprep-modal')">إلغاء</button>
+      <button class="btn btn-gold" onclick="generateCompRep()">🖨️ إنشاء التقرير</button>
+    </div>
+  </div>
+</div>
+
 <!-- NOTIFICATIONS MODAL -->
 <div id="notif-modal" class="modal-overlay">
   <div class="modal" style="max-width:600px">
@@ -2272,12 +2355,13 @@ async function exportExcel(type, tid){
     sheetName='المالي';
     const bids=bks.map(b=>b.id);
     const tpays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
-    headers=['#','العميل','النوع','الكود','التسكين','السعر الأساسي','الخصومات','الإضافات','السعر النهائي','العملة','المدفوع (ج)','المتبقي (ج)','الحالة'];
+    headers=['#','العميل','النوع','الكود','التسكين','السعر الأساسي','الخصومات','الإضافات','السعر النهائي','العملة','المدفوع (ج)','المتبقي (ج)','تكلفة المورد (ج)','المكسب (ج)','الحالة'];
     rows=bks.map((b,i)=>{
       const c=aClients.find(x=>x.id==b.client_id),pg=aProgs.find(x=>x.id==b.program_id);
       const paid=tpays.filter(p=>p.booking_id==b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
       const rem=(+b.final_price)-paid;
-      return[i+1,c?.full_name_ar||'',b.traveler_type,pg?`كود ${pg.code}`:'',b.room_type||'',+b.base_price||0,+b.deductions_total||0,+b.additions_total||0,+b.final_price,b.currency,paid,rem,b.status];
+      const sc=+b.supplier_cost||0;
+      return[i+1,c?.full_name_ar||'',b.traveler_type,pg?`كود ${pg.code}`:'',b.room_type||'',+b.base_price||0,+b.deductions_total||0,+b.additions_total||0,+b.final_price,b.currency,paid,rem,sc||'',sc>0?(+b.final_price-sc):'',b.status];
     });
   }
 
@@ -2809,6 +2893,8 @@ async function saveInlineClient() {
     link_relation: document.getElementById('nk-rel').value||null,
     notes: document.getElementById('nk-notes').value.trim()||null,
   };
+  const dup = await checkDuplicateClient(data);
+  if(dup){ toast(dupMsg(dup),'error'); return; }
   try {
     const res = await sb('haj_clients','POST',data);
     const newId = res[0]?.id;
@@ -2857,16 +2943,17 @@ async function saveBkAndPay() {
     visa_status: document.getElementById('bk-vstat').value,
     vaccine_status: document.getElementById('bk-vac').value,
     status: document.getElementById('bk-st').value,
-    notes: document.getElementById('bk-nts').value.trim()||null
+    notes: document.getElementById('bk-nts').value.trim()||null,
+    supplier_cost: +document.getElementById('bk-supcost').value||0
   };
   try {
     let bkId = ed.bk;
     if(bkId) {
-      await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',d);
+      await saveBookingSafe(bkId, d);
       toast('تم تحديث الحجز ✅');
       closeM('bk-modal'); loadBookings();
     } else {
-      const res = await sb('haj_bookings','POST',d);
+      const res = await saveBookingSafe(null, d);
       bkId = res[0]?.id;
       _lastSavedBkId = bkId;
       toast('تم حفظ الحجز ✅ - سدّد الدفعة الآن');
@@ -3191,6 +3278,17 @@ async function saveFam() {
     if(!m.full_name_ar || !m.full_name_ar.trim()) { toast(`فرد ناقصه الاسم بالعربي - راجعي البطاقة رقم ${famMembers.indexOf(m)+1}`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     if(!m.is_head && !m.link_relation) { toast(`"${m.full_name_ar}" محتاج تحديد صفة القرابة لرب الأسرة`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     if(!m.reviewed) { toast(`لازم تراجعي بيانات "${m.full_name_ar||'الفرد رقم '+(famMembers.indexOf(m)+1)}" وتعلّمي "✅ راجعت البيانات" قبل الحفظ`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  }
+  // ------- فحص التكرار: مع العملاء المحفوظين بالفعل، وبين أفراد الأسرة نفسها -------
+  try{ aClients = await sb('haj_clients?is_cancelled=eq.false&limit=1000'); }catch(e){}
+  for(const m of famMembers){
+    if(m.saved) continue;
+    const mData={full_name_ar:m.full_name_ar,passport_no:m.passport_no,birth_date:m.birth_date,phone:m.phone};
+    const dupExisting=findDuplicateClient(mData,null,aClients);
+    if(dupExisting){ toast(`"${m.full_name_ar}" ${dupMsg(dupExisting).replace('⚠️ العميل موجود بالفعل: ','مكرر مع عميل مسجل بالفعل: ')}`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    const others=famMembers.filter(x=>x!==m && !x.saved);
+    const dupInFam=findDuplicateClient(mData,null,others);
+    if(dupInFam){ toast(`"${m.full_name_ar}" مكرر مع "${dupInFam.full_name_ar}" في نفس الأسرة اللي بتضيفيها`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
   }
   const saveBtn = document.getElementById('fam-save-btn');
   saveBtn.disabled = true;
@@ -4041,5 +4139,116 @@ function initAccountsTab() {
   if(!aClients.length&&SURL) loadClients().then(()=>fillAccClients());
   else fillAccClients();
   accTab('clients');
+}
+</script>
+<script>
+// ============ COMPREHENSIVE REPORT (اختيار الأعمدة + تجميع الأسر) ============
+const COMPREP_COLS=[
+  {key:'name_ar', label:'الاسم بالعربي', def:true},
+  {key:'name_en', label:'الاسم بالإنجليزي', def:false},
+  {key:'gender', label:'الجنس', def:false},
+  {key:'type', label:'النوع (بالغ/طفل/رضيع)', def:true},
+  {key:'family', label:'الأسرة', def:true},
+  {key:'birth', label:'تاريخ الميلاد', def:false},
+  {key:'passport', label:'رقم الجواز', def:true},
+  {key:'passport_exp', label:'انتهاء الجواز', def:false},
+  {key:'nationality', label:'الجنسية', def:false},
+  {key:'phone', label:'الهاتف', def:false},
+  {key:'program', label:'البرنامج/الكود', def:false},
+  {key:'room_type', label:'نوع التسكين', def:true},
+  {key:'room_mecca', label:'رقم غرفة مكة', def:true},
+  {key:'room_madina', label:'رقم غرفة المدينة', def:true},
+  {key:'visa_status', label:'حالة التأشيرة', def:true},
+  {key:'own_visa', label:'معاه تأشيرة خاصة؟ (لتفادي إصدارها تاني)', def:true},
+  {key:'own_ticket', label:'معاه تذكرة خاصة؟', def:false},
+  {key:'own_barcode', label:'معاه باركود خاص؟', def:false},
+  {key:'vaccine', label:'التطعيمات', def:false},
+  {key:'price', label:'السعر النهائي', def:false},
+  {key:'paid', label:'المدفوع', def:false},
+  {key:'remaining', label:'المتبقي', def:false},
+  {key:'status', label:'حالة الحجز', def:false},
+  {key:'notes', label:'ملاحظات', def:false},
+];
+let _compRepTid=null;
+function openCompRepModal(tid){
+  _compRepTid=tid;
+  const wrap=document.getElementById('comprep-cols');
+  wrap.innerHTML=COMPREP_COLS.map(c=>`<label class="check-item" style="min-width:220px"><input type="checkbox" id="comprep-c-${c.key}" ${c.def?'checked':''}> ${c.label}</label>`).join('');
+  openM('comprep-modal');
+}
+function comprepToggleAll(val){COMPREP_COLS.forEach(c=>{const el=document.getElementById('comprep-c-'+c.key);if(el)el.checked=val;});}
+// بيرجع الجد الأعلى (رب الأسرة) عن طريق تتبع linked_to لحد ما يوصل لعميل مالوش ربط
+function familyRootId(clientId){
+  let cur=aClients.find(x=>x.id==clientId), guard=0;
+  while(cur && cur.linked_to && guard<20){const next=aClients.find(x=>x.id==cur.linked_to);if(!next)break;cur=next;guard++;}
+  return cur?cur.id:clientId;
+}
+async function generateCompRep(){
+  const tid=_compRepTid; if(!tid)return;
+  const selected=COMPREP_COLS.filter(c=>document.getElementById('comprep-c-'+c.key)?.checked);
+  if(!selected.length){toast('اختاري عمود واحد على الأقل','error');return;}
+  const groupFam=document.getElementById('comprep-family').checked;
+  closeM('comprep-modal');
+  const bks=await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&order=id.asc&limit=500`);
+  if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+  if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
+  if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
+  const trip=aTrips.find(x=>x.id==tid);
+  const needPay=selected.some(c=>c.key==='paid'||c.key==='remaining');
+  const bids=bks.map(b=>b.id);
+  const pays=needPay&&bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
+  let rows=bks.map(b=>{
+    const c=aClients.find(x=>x.id==b.client_id), pg=aProgs.find(x=>x.id==b.program_id);
+    const rootId=familyRootId(b.client_id), root=aClients.find(x=>x.id==rootId);
+    return {b,c,pg,rootId,rootName:root?root.full_name_ar:(c?.full_name_ar||'')};
+  });
+  if(groupFam){
+    // رتّبي حسب اسم رب الأسرة عشان كل أسرة تتجمع مع بعض
+    rows.sort((a,b2)=>(a.rootName||'').localeCompare((b2.rootName||''),'ar')||(a.b.id-b2.b.id));
+  }
+  const cellFns={
+    name_ar:r=>r.c?.full_name_ar||'-',
+    name_en:r=>r.c?.full_name_en||'-',
+    gender:r=>r.c?.gender||'-',
+    type:r=>r.b.traveler_type,
+    family:r=>{const cnt=rows.filter(x=>x.rootId===r.rootId).length;return cnt>1?`👨‍👩‍👧‍👦 ${r.rootName}`:'فردي';},
+    birth:r=>fd(r.c?.birth_date),
+    passport:r=>r.c?.passport_no||'-',
+    passport_exp:r=>{const exp=r.c?.passport_expiry_date&&new Date(r.c.passport_expiry_date)<new Date();return fd(r.c?.passport_expiry_date)+(exp?' ⚠️':'');},
+    nationality:r=>r.c?.nationality||'-',
+    phone:r=>r.c?.phone||'-',
+    program:r=>r.pg?('كود '+r.pg.code):'-',
+    room_type:r=>r.b.room_type||'-',
+    room_mecca:r=>r.b.room_number_mecca||'-',
+    room_madina:r=>r.b.room_number_madina||'-',
+    visa_status:r=>r.b.visa_status,
+    own_visa:r=>r.b.has_own_visa?'✅ معاه تأشيرة (متطلعش له)':'❌ محتاج تأشيرة',
+    own_ticket:r=>r.b.has_own_ticket?'✅':'❌',
+    own_barcode:r=>r.b.has_own_barcode?'✅':'❌',
+    vaccine:r=>r.b.vaccine_status,
+    price:r=>fn(r.b.final_price)+' '+r.b.currency,
+    paid:r=>{const p=pays.filter(x=>x.booking_id==r.b.id&&x.currency==='EGP').reduce((s,x)=>s+(+x.amount),0);return fn(p)+' ج';},
+    remaining:r=>{const p=pays.filter(x=>x.booking_id==r.b.id&&x.currency==='EGP').reduce((s,x)=>s+(+x.amount),0);return fn((+r.b.final_price)-p)+' ج';},
+    status:r=>r.b.status,
+    notes:r=>r.b.notes||'-',
+  };
+  const css=`<style>body{font-family:Arial,sans-serif;padding:20px;direction:rtl}h1{text-align:center;color:#1a6b4a;margin-bottom:5px}p.sub{text-align:center;color:#666;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 9px;text-align:right;font-size:11.5px}th{background:#1a6b4a;color:white;font-weight:bold}tr.fam-hdr td{background:#fff8e1;font-weight:bold;color:#8a6d1a}@media print{body{padding:5px}}</style>`;
+  let bodyRows='';
+  let lastRoot=null;
+  rows.forEach((r,i)=>{
+    if(groupFam && r.rootId!==lastRoot){
+      const famCnt=rows.filter(x=>x.rootId===r.rootId).length;
+      if(famCnt>1) bodyRows+=`<tr class="fam-hdr"><td colspan="${selected.length+1}">👨‍👩‍👧‍👦 أسرة ${r.rootName} (${famCnt} أفراد)</td></tr>`;
+      lastRoot=r.rootId;
+    }
+    bodyRows+=`<tr><td>${i+1}</td>${selected.map(c=>`<td>${cellFns[c.key](r)}</td>`).join('')}</tr>`;
+  });
+  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير شامل</title>${css}</head><body>
+  <h1>📋 تقرير شامل - رحلة ${trip?.name||''}</h1>
+  <p class="sub">${fd(trip?.depart_date)} | عدد المسافرين: ${rows.length}</p>
+  <table><thead><tr><th>#</th>${selected.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${bodyRows}</tbody></table>
+  <p style="text-align:center;color:#999;margin-top:20px;font-size:11px">${document.getElementById('cfg-co')?.value||'Adreska Tours'} | ${fd(new Date().toISOString())}</p>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
 }
 </script>

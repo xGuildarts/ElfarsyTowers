@@ -755,11 +755,11 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         </div>
       </div>
       <div id="clt-pp" style="display:none">
-        <div class="ocr-area" id="ocr-drop" onclick="document.getElementById('ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
+        <div class="ocr-area" id="ocr-drop" onclick="document.getElementById('ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event,'cl')">
           <div style="font-size:36px;margin-bottom:8px">📷</div>
           <div style="color:var(--text2);font-weight:600">اسحب صورة الجواز أو اضغط للاختيار</div>
-          <div style="color:var(--text3);font-size:12px;margin-top:4px">سيتم استخراج البيانات تلقائياً من رمز MRZ أسفل الجواز (OCR مجاني بالكامل - Tesseract.js) - راجعي البيانات دائماً بعد الاستخراج</div>
-          <input type="file" id="ocr-inp" accept="image/*" style="display:none" onchange="runOCR(event)">
+          <div style="color:var(--text3);font-size:12px;margin-top:4px">سيتم استخراج البيانات (بما فيها الاسم بالعربي) تلقائياً من الجواز (OCR مجاني بالكامل - Tesseract.js) - راجعي البيانات دائماً بعد الاستخراج</div>
+          <input type="file" id="ocr-inp" accept="image/*" style="display:none" onchange="runOCR(event,'cl')">
         </div>
         <div id="ocr-prg" style="display:none">
           <div style="font-size:12px;color:var(--text3)" id="ocr-stat">جاري التحليل...</div>
@@ -862,6 +862,17 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
       <!-- TAB: NEW CLIENT (inline) -->
       <div id="bkt-newclient" style="display:none">
         <div class="info-box info"><span>ℹ️</span><div>أضف العميل هنا وسيُضاف تلقائياً وتقدر تختاره في الحجز على طول</div></div>
+        <div class="ocr-area" id="nk-ocr-drop" onclick="document.getElementById('nk-ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event,'nk')">
+          <div style="font-size:36px;margin-bottom:8px">📷</div>
+          <div style="color:var(--text2);font-weight:600">اسحب صورة الجواز أو اضغط للاختيار</div>
+          <div style="color:var(--text3);font-size:12px;margin-top:4px">سيتم استخراج البيانات (بما فيها الاسم بالعربي) تلقائياً من الجواز (OCR مجاني بالكامل - Tesseract.js) - راجعي البيانات دائماً بعد الاستخراج</div>
+          <input type="file" id="nk-ocr-inp" accept="image/*" style="display:none" onchange="runOCR(event,'nk')">
+        </div>
+        <div id="nk-ocr-prg" style="display:none">
+          <div style="font-size:12px;color:var(--text3)" id="nk-ocr-stat">جاري التحليل...</div>
+          <div class="prog-bar"><div class="prog-fill" id="nk-ocr-bar" style="width:0%"></div></div>
+        </div>
+        <div id="nk-pp-preview" style="display:none;margin:10px 0"><img id="nk-pp-img" style="max-width:100%;border-radius:8px;border:1px solid var(--border)"></div>
         <div class="form-grid">
           <div class="form-group"><label>الاسم بالعربي *</label><input id="nk-ar" type="text"></div>
           <div class="form-group"><label>الاسم بالإنجليزي (كما في الجواز)</label><input id="nk-en" type="text"></div>
@@ -1469,8 +1480,13 @@ async function saveClient(){
 }
 
 // ============ OCR (Tesseract.js - مجاني بالكامل، شغال في المتصفح) ============
-function handleDrop(e){e.preventDefault();document.getElementById('ocr-drop').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)doOCR(f);}
-function runOCR(e){const f=e.target.files[0];if(f)doOCR(f);}
+// خريطة أسماء عناصر الواجهة حسب البادئة: 'cl' = مودال العميل المستقل، 'nk' = تبويب "عميل جديد" جوه مودال الحجز
+function ocrIds(prefix){
+  if(prefix==='cl')return{drop:'ocr-drop',inp:'ocr-inp',prg:'ocr-prg',bar:'ocr-bar',stat:'ocr-stat',preview:'pp-preview',img:'pp-img'};
+  return{drop:prefix+'-ocr-drop',inp:prefix+'-ocr-inp',prg:prefix+'-ocr-prg',bar:prefix+'-ocr-bar',stat:prefix+'-ocr-stat',preview:prefix+'-pp-preview',img:prefix+'-pp-img'};
+}
+function handleDrop(e,prefix){prefix=prefix||'cl';e.preventDefault();document.getElementById(ocrIds(prefix).drop).classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)doOCR(f,prefix);}
+function runOCR(e,prefix){prefix=prefix||'cl';const f=e.target.files[0];if(f)doOCR(f,prefix);}
 
 // خريطة أكواد الجنسيات الشائعة (من MRZ) لأسمائها بالعربي
 const MRZ_NAT_MAP={EGY:'مصرية',SAU:'سعودية',ARE:'إماراتية',KWT:'كويتية',QAT:'قطرية',BHR:'بحرينية',OMN:'عمانية',JOR:'أردنية',LBN:'لبنانية',SYR:'سورية',IRQ:'عراقية',PSE:'فلسطينية',YEM:'يمنية',LBY:'ليبية',TUN:'تونسية',DZA:'جزائرية',MAR:'مغربية',SDN:'سودانية',SOM:'صومالية'};
@@ -1519,46 +1535,151 @@ function parseMRZ(rawText){
   };
 }
 
-async function doOCR(file){
-  const url=URL.createObjectURL(file);document.getElementById('pp-img').src=url;document.getElementById('pp-preview').style.display='block';
-  const prg=document.getElementById('ocr-prg'),bar=document.getElementById('ocr-bar'),stat=document.getElementById('ocr-stat');
-  prg.style.display='block';stat.textContent='جاري تحميل محرك OCR...';bar.style.width='5%';
+// كلمات/عناوين مطبوعة بتظهر كتير في صفحة بيانات الجواز - لو السطر يحتوي عليها فهو مش الاسم
+const ARABIC_LABEL_BLACKLIST=['جمهورية مصر العربية','جمهورية مصر','مصر العربية','جواز سفر','جواز السفر','وزارة الداخلية','النوع','الاسم','اللقب','الجنسية','تاريخ الميلاد','تاريخ الاصدار','تاريخ الإصدار','تاريخ الانتهاء','تاريخ الانتهاي','مكان الميلاد','الرقم القومى','الرقم القومي','جهة الاصدار','جهة الإصدار','نوع الجواز','رقم الجواز','التوقيع','محل الاقامة','محل الإقامة','الديانة','المهنة','الحالة الاجتماعية'];
+
+// تنضيف النص العربي: شيل التشكيل والتطويل وأي حروف مش عربية
+function normalizeArabic(s){
+  return s
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g,'') // تشكيل
+    .replace(/\u0640/g,'') // تطويل
+    .replace(/[^\u0600-\u06FF\s]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+// يدور على الاسم بالعربي في النص المطبوع بالصفحة (مش موجود في الـ MRZ أصلاً)
+function extractArabicName(text){
+  if(!text)return null;
+  const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  // أولاً: نلاقي سطر جنبه كلمة "الاسم" ونجيب اللي بعدها
+  for(const l of lines){
+    if(/الاسم/.test(l)){
+      const after=l.split(/الاسم/)[1];
+      const c=after?normalizeArabic(after):'';
+      const words=c.split(' ').filter(Boolean);
+      if(words.length>=2&&words.length<=6)return c;
+    }
+  }
+  // تاني: نلاقي أفضل سطر عربي خالص (بدون تشويش أو كلمات العناوين) بافتراض إنه الاسم الكامل
+  let best=null,bestScore=0;
+  for(const l of lines){
+    const arabicCount=(l.match(/[\u0600-\u06FF]/g)||[]).length;
+    const totalNoSpace=l.replace(/\s/g,'').length;
+    if(totalNoSpace===0)continue;
+    const ratio=arabicCount/totalNoSpace;
+    if(ratio<0.85||arabicCount<8)continue;
+    const c=normalizeArabic(l);
+    if(!c)continue;
+    if(ARABIC_LABEL_BLACKLIST.some(w=>c.includes(w)))continue;
+    const words=c.split(' ').filter(Boolean);
+    if(words.length<2||words.length>6)continue;
+    // نفضّل الأسماء اللي فيها 3-4 كلمات (الاسم الرباعي الشائع في مصر) وأطول تطابق عربي
+    const score=arabicCount+(words.length>=3&&words.length<=4?5:0);
+    if(score>bestScore){best=c;bestScore=score;}
+  }
+  return best;
+}
+
+// تحسين جودة صورة الجواز قبل الـ OCR (تكبير + رفع تباين) عشان يقرأ الاسم العربي الصغير بدقة أعلى
+// كل ده بيتم جوه المتصفح بالـ Canvas - مجاني بالكامل ومفيش أي رفع لسيرفر خارجي
+function preprocessOcrImage(file,scale){
+  scale=scale||2.2;
+  return new Promise((resolve)=>{
+    try{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+          const canvas=document.createElement('canvas');
+          canvas.width=w;canvas.height=h;
+          const ctx=canvas.getContext('2d');
+          ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+          ctx.drawImage(img,0,0,w,h);
+          const imgData=ctx.getImageData(0,0,w,h);
+          const d=imgData.data;
+          const contrast=1.35,intercept=128*(1-contrast);
+          for(let i=0;i<d.length;i+=4){
+            const gray=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+            let v=gray*contrast+intercept;
+            v=v<0?0:(v>255?255:v);
+            d[i]=d[i+1]=d[i+2]=v;
+          }
+          ctx.putImageData(imgData,0,0);
+          canvas.toBlob(b=>resolve(b||file),'image/png',1);
+        }catch(err){console.error('preprocess failed',err);resolve(file);}
+      };
+      img.onerror=()=>resolve(file);
+      img.src=URL.createObjectURL(file);
+    }catch(err){resolve(file);}
+  });
+}
+
+async function doOCR(file,prefix){
+  prefix=prefix||'cl';
+  const ids=ocrIds(prefix);
+  const url=URL.createObjectURL(file);document.getElementById(ids.img).src=url;document.getElementById(ids.preview).style.display='block';
+  const prg=document.getElementById(ids.prg),bar=document.getElementById(ids.bar),stat=document.getElementById(ids.stat);
+  prg.style.display='block';stat.textContent='جاري تجهيز الصورة...';bar.style.width='5%';
   // تحميل Tesseract مرة واحدة فقط عند الحاجة
   if(typeof Tesseract==='undefined'){
     await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
   }
   try{
-    // القراءة الأولى: الصفحة كاملة (عربي+إنجليزي) - احتياطي لرقم الجواز لو فشل كل حاجة
-    stat.textContent='جاري تحليل الصفحة...';bar.style.width='10%';
-    const rFull=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(10+Math.round(m.progress*35))+'%';}});
+    // تحسين الصورة (تكبير + تباين) قبل أي قراءة - بيرفع دقة قراءة الاسم العربي بشكل ملحوظ
+    const proc=await preprocessOcrImage(file,2.2);
 
-    // القراءة الثانية: إنجليزي فقط (من غير عربي) - بتقلل التشويش وتحسن قراءة سطرين الـ MRZ
-    stat.textContent='جاري قراءة رمز MRZ بدقة أعلى...';bar.style.width='50%';
+    // القراءة الأولى: الصفحة كاملة (عربي+إنجليزي) - احتياطي عام ولقراءة رقم الجواز لو باقي الطرق فشلت
+    stat.textContent='جاري تحليل الصفحة...';bar.style.width='10%';
+    const rFull=await Tesseract.recognize(proc,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(10+Math.round(m.progress*25))+'%';}});
+
+    // القراءة الثانية: عربي فقط (من غير إنجليزي) على الصورة المحسّنة - مخصصة لاستخراج الاسم العربي بدقة أعلى
+    stat.textContent='جاري قراءة الاسم العربي بدقة أعلى...';bar.style.width='35%';
+    let rArText='';
+    try{
+      const rAr=await Tesseract.recognize(proc,'ara',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(35+Math.round(m.progress*25))+'%';}});
+      rArText=rAr.data.text;
+    }catch(e1){console.error('Arabic-only pass failed',e1);}
+    bar.style.width='60%';
+
+    // القراءة الثالثة: إنجليزي فقط - بتقلل التشويش وتحسن قراءة سطرين الـ MRZ
+    stat.textContent='جاري قراءة رمز MRZ بدقة أعلى...';bar.style.width='65%';
     let rMrzText='';
     try{
-      const rMrz=await Tesseract.recognize(file,'eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(50+Math.round(m.progress*40))+'%';}});
+      const rMrz=await Tesseract.recognize(proc,'eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(65+Math.round(m.progress*30))+'%';}});
       rMrzText=rMrz.data.text;
     }catch(e2){
       console.error('MRZ pass failed, falling back to full text only',e2);
     }
-    bar.style.width='90%';
+    bar.style.width='95%';
 
     const mrz=parseMRZ(rMrzText)||parseMRZ(rFull.data.text);
+    const arName=extractArabicName(rArText)||extractArabicName(rFull.data.text);
     bar.style.width='100%';
+    if(arName)document.getElementById(prefix+'-ar').value=arName;
     if(mrz){
-      if(mrz.full_name_en)document.getElementById('cl-en').value=mrz.full_name_en;
-      if(mrz.gender)document.getElementById('cl-gen').value=mrz.gender;
-      if(mrz.birth_date)document.getElementById('cl-bday').value=mrz.birth_date;
-      if(mrz.nationality)document.getElementById('cl-nat').value=mrz.nationality;
-      if(mrz.passport_no)document.getElementById('cl-ppno').value=mrz.passport_no;
-      if(mrz.passport_expiry_date)document.getElementById('cl-ppexp').value=mrz.passport_expiry_date;
-      stat.textContent='&#x2705; تم استخراج بيانات الـ MRZ - راجع البيانات';
-      toast('تم استخراج بيانات الجواز من MRZ - راجعها وأكملي الباقي يدوياً (تاريخ الإصدار وجهة الإصدار)','success');
+      if(mrz.full_name_en)document.getElementById(prefix+'-en').value=mrz.full_name_en;
+      if(mrz.gender)document.getElementById(prefix+'-gen').value=mrz.gender;
+      if(mrz.birth_date)document.getElementById(prefix+'-bday').value=mrz.birth_date;
+      if(mrz.nationality)document.getElementById(prefix+'-nat').value=mrz.nationality;
+      if(mrz.passport_no)document.getElementById(prefix+'-ppno').value=mrz.passport_no;
+      if(mrz.passport_expiry_date)document.getElementById(prefix+'-ppexp').value=mrz.passport_expiry_date;
+      stat.textContent=arName?'&#x2705; تم استخراج بيانات الجواز والاسم العربي - راجعي البيانات':'&#x2705; تم استخراج بيانات الـ MRZ - راجعي البيانات (الاسم العربي محتاج إدخال يدوي)';
+      toast(arName?'تم استخراج بيانات الجواز بما فيها الاسم العربي - راجعيها وأكملي الباقي يدوياً':'تم استخراج بيانات الـ MRZ - راجعها، والاسم العربي محتاج إدخال يدوي','success');
     }else{
       // فشل قراءة الـ MRZ - نرجع لمحاولة استخراج رقم الجواز بس بالـ regex القديم
       const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrzText.match(/[A-Z]{1,2}\d{6,8}/);
-      if(pp){document.getElementById('cl-ppno').value=pp[0];stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز فقط';toast('تعذرت قراءة كل البيانات - تم استخراج رقم الجواز فقط، أدخلي الباقي يدوياً','info');}
-      else{stat.textContent='&#x274C; تعذر الاستخراج';toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');}
+      if(pp){
+        document.getElementById(prefix+'-ppno').value=pp[0];
+        stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز'+(arName?' والاسم العربي':'')+' فقط';
+        toast('تعذرت قراءة كل البيانات - راجعي وأكملي الباقي يدوياً','info');
+      }else if(arName){
+        stat.textContent='&#x26A0;&#xFE0F; استخرجنا الاسم العربي فقط';
+        toast('استخرجنا الاسم العربي فقط - أدخلي باقي البيانات يدوياً','info');
+      }else{
+        stat.textContent='&#x274C; تعذر الاستخراج';
+        toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');
+      }
     }
   }catch(e){
     console.error(e);
@@ -1566,6 +1687,7 @@ async function doOCR(file){
     toast('حدث خطأ أثناء التحليل - أدخلي البيانات يدوياً','error');
   }
 }
+
 
 // ============ BOOKINGS ============
 async function loadBookings(){
@@ -2650,6 +2772,8 @@ async function saveInlineClient() {
     ['nk-ar','nk-en','nk-ph','nk-ppno','nk-notes'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('nk-bday').value='';
     document.getElementById('nk-ppexp').value='';
+    const nkPrev=document.getElementById('nk-pp-preview');if(nkPrev)nkPrev.style.display='none';
+    const nkPrg=document.getElementById('nk-ocr-prg');if(nkPrg)nkPrg.style.display='none';
     // go back to booking tab
     bkTab('booking');
   } catch(e) { toast('خطأ: '+e.message,'error'); }
@@ -2731,6 +2855,17 @@ async function openBkModal(id=null, preCl=null) {
   document.getElementById('bk-pay-tab').style.display = 'none';
   document.getElementById('bk-modal-footer').style.display = 'flex';
   await _openBkModalBase(id, preCl);
+  // تنضيف تبويب "عميل جديد" (بما فيه صورة الجواز السابقة) كل ما نفتح مودال حجز جديد
+  if(!id){
+    ['nk-ar','nk-en','nk-ph','nk-ppno','nk-notes'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+    ['nk-bday','nk-ppexp'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+    const nkGen=document.getElementById('nk-gen');if(nkGen)nkGen.value='ذكر';
+    const nkNat=document.getElementById('nk-nat');if(nkNat)nkNat.value='مصرية';
+    const nkLnkSel=document.getElementById('nk-lnk');if(nkLnkSel)nkLnkSel.value='';
+    const nkRel=document.getElementById('nk-rel');if(nkRel)nkRel.value='';
+    const nkPrev=document.getElementById('nk-pp-preview');if(nkPrev)nkPrev.style.display='none';
+    const nkPrg=document.getElementById('nk-ocr-prg');if(nkPrg)nkPrg.style.display='none';
+  }
   // populate inline client link
   const nkLnk = document.getElementById('nk-lnk');
   if(nkLnk) nkLnk.innerHTML = '<option value="">-- لا يوجد --</option>' +

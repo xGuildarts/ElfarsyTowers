@@ -261,18 +261,43 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 .dlg-btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .dlg-btn-cancel{background:var(--bg3);color:var(--text2);border:1px solid var(--border)!important}
 .dlg-btn-cancel:hover{background:var(--border);color:var(--text)}
+.role-staff #nav-settlement,.role-staff #nav-reports,.role-staff #nav-accounts,.role-staff #nav-settings,.role-staff #header .btn-gold{display:none!important}
 
 </style>
 </head>
 <body>
+
+<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="max-width:380px;width:100%">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:32px">🕌</div>
+      <div style="font-weight:700;font-size:18px;color:var(--gold)">Adreska Tours</div>
+      <div style="font-size:12px;color:var(--text3)">تسجيل الدخول</div>
+    </div>
+    <div id="login-form-wrap">
+      <div class="form-group"><label>اسم المستخدم</label><input id="login-user" type="text" autocomplete="username"></div>
+      <div class="form-group"><label>كلمة المرور</label><input id="login-pass" type="password" autocomplete="current-password"></div>
+      <div id="login-err" style="color:var(--red-light);font-size:12px;margin-bottom:8px;display:none"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="doLogin()">🔑 دخول</button>
+    </div>
+    <div id="login-setup-wrap" style="display:none">
+      <div class="info-box info"><span>ℹ️</span><div>أول مرة تشغيل - جهز حساب "المدير" الأساسي (صلاحيات كاملة). ممكن تضيف موظفين بعد كده من الإعدادات.</div></div>
+      <div class="form-group"><label>اسم مستخدم المدير</label><input id="setup-user" type="text" value="admin"></div>
+      <div class="form-group"><label>كلمة المرور</label><input id="setup-pass" type="password"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="doFirstSetup()">✅ إنشاء الحساب والدخول</button>
+    </div>
+  </div>
+</div>
 
 <div id="no-config-banner" onclick="showTab('settings')">⚠️ لم يتم إعداد Supabase بعد - اضغط هنا لإعداد الاتصال</div>
 <div id="header">
   <div class="logo"><div class="logo-icon">&#x1F54C;</div><div><div class="logo-text">Adreska Tours</div><div class="logo-sub">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x633;&#x64A;&#x627;&#x62D;&#x629; &#x627;&#x644;&#x62F;&#x64A;&#x646;&#x64A;&#x629;</div></div></div>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="conn-ind" style="font-size:11px;color:var(--text3)">&#x26AB; &#x63A;&#x64A;&#x631; &#x645;&#x62A;&#x635;&#x644;</span>
+    <span id="cur-user-badge" style="font-size:11px;color:var(--text2);display:none"></span>
     <button class="btn btn-outline btn-sm" onclick="toggleLightMode()" title="تبديل الوضع" id="theme-btn">☀️</button>
     <button class="btn btn-gold btn-sm" onclick="showTab('settings')">&#x2699;&#xFE0F; &#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</button>
+    <button class="btn btn-outline btn-sm" onclick="logoutUser()" id="logout-btn" style="display:none" title="تسجيل خروج">🚪</button>
   </div>
 </div>
 
@@ -603,8 +628,10 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
           <option value="unpaid">غير مسددة</option>
         </select>
         <button class="btn btn-primary btn-sm" onclick="openAddInstModal()">➕ قسط جديد</button>
+        <button class="btn btn-gold btn-sm" onclick="sendInstallmentReminders()">📤 إرسال تذكير للمستحقين قريبًا</button>
       </div>
     </div>
+    <div id="inst-auto-alert"></div>
     <div id="inst-stats" class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px"></div>
     <div id="inst-content"><div class="empty-state"><div class="empty-icon">📅</div><h3>اختر رحلة لعرض الأقساط</h3></div></div>
   </div>
@@ -641,6 +668,24 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     </div>
   </div>
   <button class="btn btn-primary" onclick="saveSettings()">💾 حفظ الإعدادات</button>
+
+  <div class="card" id="backup-card">
+    <div class="card-header"><div class="card-title">📦 نسخة احتياطية كاملة</div></div>
+    <div class="info-box info"><span>ℹ️</span><div>تصدير نسخة كاملة من كل البيانات (عملاء/حجوزات/رحلات/مدفوعات..) بضغطة واحدة، أو استعادتها لو حصلت مشكلة في الداتابيز.</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-primary" onclick="exportBackupJSON()">⬇️ تصدير نسخة كاملة (JSON)</button>
+      <button class="btn btn-gold" onclick="exportBackupExcel()">⬇️ تصدير نسخة كاملة (Excel)</button>
+      <button class="btn btn-outline" onclick="triggerRestoreFile()">⬆️ استعادة من نسخة احتياطية (JSON)</button>
+      <input type="file" id="backup-restore-inp" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
+    </div>
+    <div id="backup-last-info" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
+  </div>
+
+  <div class="card" id="users-card" style="display:none">
+    <div class="card-header"><div class="card-title">👥 صلاحيات المستخدمين</div><button class="btn btn-primary btn-sm" onclick="openAddUserModal()">➕ مستخدم جديد</button></div>
+    <div class="info-box info"><span>ℹ️</span><div>مستوى "موظف" يقدر يدخل بيانات عملاء/حجوزات/مدفوعات، ومش هيشوف التقفيلة/كشف الحسابات/التقارير المالية ومش هيقدر يحذف. مستوى "مدير" صلاحياته كاملة.</div></div>
+    <div id="users-list" style="margin-top:10px"></div>
+  </div>
 </div>
 
 </div><!-- /main -->
@@ -726,6 +771,21 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('sup-modal')">إلغاء</button><button class="btn btn-primary" onclick="saveSup()">💾 حفظ</button></div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div id="user-modal" class="modal-overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">👤 مستخدم جديد</div><button class="close-btn" onclick="closeM('user-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>اسم المستخدم *</label><input id="usr-name" type="text" autocomplete="off"></div>
+        <div class="form-group full"><label>كلمة المرور *</label><input id="usr-pass" type="password" autocomplete="new-password"></div>
+        <div class="form-group full"><label>الصلاحية</label><select id="usr-role"><option value="staff">موظف (بيانات فقط - بدون أرباح/حذف)</option><option value="admin">مدير (صلاحية كاملة)</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('user-modal')">إلغاء</button><button class="btn btn-primary" onclick="saveNewUser()">💾 حفظ</button></div>
   </div>
 </div>
 
@@ -938,9 +998,13 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="form-grid">
           <div class="form-group"><label>الرحلة *</label><select id="fam-tr" onchange="famOnTrChange()"><option value="">-- اختر الرحلة --</option></select></div>
           <div class="form-group"><label>البرنامج / الكود *</label><select id="fam-pg" onchange="famRecalcAll()"><option value="">-- اختر البرنامج --</option></select></div>
-          <div class="form-group"><label>نوع الغرفة الافتراضي (للبالغين)</label><select id="fam-rm-default" onchange="famApplyDefaultRoom()"><option value="فردي">فردي (Single)</option><option value="ثنائي">ثنائي (Double)</option><option value="ثلاثي" selected>ثلاثي (Triple)</option><option value="رباعي">رباعي (Quad)</option><option value="خماسي">خماسي (Quint)</option></select></div>
+          <div class="form-group"><label>نوع الغرفة الافتراضي (للبالغين)</label><select id="fam-rm-default" onchange="famApplyDefaultRoom(true)"><option value="فردي">فردي (Single)</option><option value="ثنائي">ثنائي (Double)</option><option value="ثلاثي" selected>ثلاثي (Triple)</option><option value="رباعي">رباعي (Quad)</option><option value="خماسي">خماسي (Quint)</option></select></div>
           <div class="form-group"><label>العملة</label><select id="fam-cur"><option value="EGP">جنيه مصري</option><option value="SAR">ريال سعودي</option><option value="USD">دولار</option></select></div>
         </div>
+        <label class="check-item" style="margin-top:4px">
+          <input type="checkbox" id="fam-rm-auto" checked onchange="famAutoSuggestRoom()"> 🤖 اقتراح حجم الغرفة تلقائياً حسب عدد بالغين الأسرة (يمكنك دايماً تغييره يدويًا)
+        </label>
+        <div id="fam-rm-suggest-note" style="font-size:12px;color:var(--text3);margin-top:4px"></div>
       </div>
 
       <div class="ocr-area" id="fam-ocr-drop" onclick="document.getElementById('fam-ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="famHandleDrop(event)">
@@ -1267,7 +1331,12 @@ function closeM(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 
 // ============ NAV ============
+const STAFF_RESTRICTED_TABS=['settlement','reports','accounts','settings'];
 function showTab(name){
+  if(currentUser && currentUser.role!=='admin' && STAFF_RESTRICTED_TABS.includes(name)){
+    toast('🔒 القسم ده متاح للمدير بس','error');
+    return;
+  }
   document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).style.display='block';
@@ -1311,6 +1380,13 @@ async function loadDash(){
     if(expiredPP.length)alerts+=`<div class="info-box danger" style="margin-bottom:10px"><span>&#x26A0;&#xFE0F;</span><div><b>${expiredPP.length} جواز منتهي الصلاحية!</b> ${expiredPP.slice(0,3).map(c=>c.full_name_ar).join('، ')}${expiredPP.length>3?` و${expiredPP.length-3} آخرين`:''}</div></div>`;
     if(soonPP.length)alerts+=`<div class="info-box warning" style="margin-bottom:10px"><span>&#x23F0;</span><div><b>${soonPP.length} جواز ينتهي خلال 90 يوم</b> - راجعهم قبل السفر</div></div>`;
     if(unpaid.length)alerts+=`<div class="info-box info" style="margin-bottom:10px"><span>&#x1F4B0;</span><div><b>${unpaid.length} حجز لم يُسدَّد بعد</b> - إجمالي متبقي: ${fn(unpaid.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0))} ج</div></div>`;
+    try{
+      const instRows = getUpcomingInstallments(3);
+      if(instRows.length){
+        const overdueCnt = instRows.filter(r=>r.overdue).length;
+        alerts+=`<div class="info-box ${overdueCnt?'danger':'warning'}" style="margin-bottom:10px"><span>📅</span><div><b>${instRows.length} قسط مستحق ${overdueCnt?`(${overdueCnt} متأخر)`:'خلال 3 أيام'}</b> - <span style="cursor:pointer;color:var(--gold);text-decoration:underline" onclick="showTab('installments')">عرض التفاصيل</span></div></div>`;
+      }
+    }catch(e){}
     if(alerts){document.getElementById('dash-alerts').innerHTML=alerts;document.getElementById('dash-alerts-card').style.display='block';}
 
     const cnt=document.getElementById('dash-trips');
@@ -1370,7 +1446,7 @@ async function saveSup(){
   if(!d.name){toast('يرجى إدخال اسم المورد','error');return;}
   try{if(ed.sup)await sb(`haj_suppliers?id=eq.${ed.sup}`,'PATCH',d);else await sb('haj_suppliers','POST',d);toast('تم الحفظ');closeM('sup-modal');loadSups();}catch(e){toast('خطأ: '+e.message,'error');}
 }
-function delSup(id){const s=aSups.find(x=>x.id==id);confirmAction(`حذف المورد "${s?.name||''}"؟`,'سيتم إلغاء ربطه بالرحلات','🏢',async()=>{try{await sb(`haj_suppliers?id=eq.${id}`,'DELETE');toast('تم');loadSups();}catch(e){toast('خطأ','error');}});}
+function delSup(id){if(!requirePerm('حذف مورد'))return;const s=aSups.find(x=>x.id==id);confirmAction(`حذف المورد "${s?.name||''}"؟`,'سيتم إلغاء ربطه بالرحلات','🏢',async()=>{try{await sb(`haj_suppliers?id=eq.${id}`,'DELETE');toast('تم');loadSups();}catch(e){toast('خطأ','error');}});}
 </script>
 <script>
 // ============ TRIPS ============
@@ -1550,7 +1626,7 @@ async function saveTrip(){
     toast(ed.trip?'تم التحديث':'تمت الإضافة');closeM('trip-modal');aProgs=await sb('haj_programs?order=trip_id.asc,code.asc&limit=1000');loadTrips();
   }catch(e){toast('خطأ: '+e.message,'error');}
 }
-function delTrip(id){const t=aTrips.find(x=>x.id==id);confirmAction(`حذف رحلة "${t?.name||''}"؟`,'سيتم حذف الرحلة وكل حجوزاتها ومدفوعاتها نهائياً','⚠️',async()=>{try{await sb(`haj_trips?id=eq.${id}`,'DELETE');toast('تم الحذف');loadTrips();}catch(e){toast('خطأ: '+e.message,'error');}});}
+function delTrip(id){if(!requirePerm('حذف رحلة'))return;const t=aTrips.find(x=>x.id==id);confirmAction(`حذف رحلة "${t?.name||''}"؟`,'سيتم حذف الرحلة وكل حجوزاتها ومدفوعاتها نهائياً','⚠️',async()=>{try{await sb(`haj_trips?id=eq.${id}`,'DELETE');toast('تم الحذف');loadTrips();}catch(e){toast('خطأ: '+e.message,'error');}});}
 </script>
 <script>
 // ============ CLIENTS ============
@@ -1920,7 +1996,7 @@ async function saveBk(){
   if(!d.client_id||!d.trip_id){toast('يرجى اختيار العميل والرحلة','error');return;}
   try{if(ed.bk)await sb(`haj_bookings?id=eq.${ed.bk}`,'PATCH',d);else await sb('haj_bookings','POST',d);toast('تم الحجز');closeM('bk-modal');loadBookings();}catch(e){toast('خطأ: '+e.message,'error');}
 }
-function confirmDelBk(id,name){confirmAction(`حذف حجز ${name||''}؟`,'سيتم حذف الحجز وكل دفعاته المرتبطة','🗑️',()=>delBk(id));}
+function confirmDelBk(id,name){if(!requirePerm('حذف حجز'))return;confirmAction(`حذف حجز ${name||''}؟`,'سيتم حذف الحجز وكل دفعاته المرتبطة','🗑️',()=>delBk(id));}
 async function delBk(id){try{await sb(`haj_bookings?id=eq.${id}`,'DELETE');toast('تم الحذف');loadBookings();}catch(e){toast('خطأ','error');}}
 </script>
 <script>
@@ -1970,7 +2046,7 @@ async function savePay(){
     toast('تم تسجيل الدفعة');closeM('pay-modal');loadPayments();
   }catch(e){toast('خطأ: '+e.message,'error');}
 }
-function confirmDelPay(id){confirmAction('حذف هذه الدفعة؟','سيتم حذف الدفعة نهائياً وتحديث حالة الحجز','💰',async()=>{try{await sb(`haj_payments?id=eq.${id}`,'DELETE');aPays=aPays.filter(p=>p.id!=id);toast('تم الحذف');loadPayments();}catch(e){toast('خطأ','error');} });}
+function confirmDelPay(id){if(!requirePerm('حذف دفعة'))return;confirmAction('حذف هذه الدفعة؟','سيتم حذف الدفعة نهائياً وتحديث حالة الحجز','💰',async()=>{try{await sb(`haj_payments?id=eq.${id}`,'DELETE');aPays=aPays.filter(p=>p.id!=id);toast('تم الحذف');loadPayments();}catch(e){toast('خطأ','error');} });}
 async function delPay(id){try{await sb(`haj_payments?id=eq.${id}`,'DELETE');toast('تم الحذف');aPays=[];loadPayments();}catch(e){toast('خطأ','error');}}
 
 let _editPayId=null;
@@ -2040,7 +2116,7 @@ async function addExp(tid){
   const amtStr=await sPrompt('المبلغ','أدخل المبلغ بالجنيه','','number');if(!+amtStr)return;const amt=+amtStr;
   try{await sb('haj_expenses','POST',{trip_id:tid,category:cat,supplier:sup,amount:amt,currency:'EGP'});toast('تم إضافة المصروف');loadSettlement();}catch(e){toast('خطأ','error');}
 }
-async function delExp(id){if(!await sConfirm('حذف المصروف؟','سيتم الحذف نهائياً','🗑️',true))return;try{await sb(`haj_expenses?id=eq.${id}`,'DELETE');toast('تم الحذف');loadSettlement();}catch(e){toast('خطأ','error');}}
+async function delExp(id){if(!requirePerm('حذف مصروف'))return;if(!await sConfirm('حذف المصروف؟','سيتم الحذف نهائياً','🗑️',true))return;try{await sb(`haj_expenses?id=eq.${id}`,'DELETE');toast('تم الحذف');loadSettlement();}catch(e){toast('خطأ','error');}}
 
 // ============ REPORTS ============
 function showRepBtns(){
@@ -2260,6 +2336,8 @@ function loadSettings(){
       <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveNotifSettings()">💾 حفظ إعدادات الإشعارات</button>`;
     settingsTab.appendChild(notifCard);
   }
+  updateBackupInfo();
+  refreshUsersUI();
 }
 function saveCfg(){
   const url=document.getElementById('cfg-url').value.trim(),key=document.getElementById('cfg-key').value.trim();
@@ -2278,17 +2356,256 @@ async function saveSettings(){
   try{await upsertSettings(s);toast('تم الحفظ');}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
+// ============ BACKUP / RESTORE ============
+const BACKUP_TABLES=['haj_trips','haj_programs','haj_suppliers','haj_clients','haj_bookings','haj_payments','haj_rooms','haj_expenses','haj_settings'];
+async function fetchAllForBackup(){
+  const data={};
+  for(const t of BACKUP_TABLES){ try{ data[t]=await sb(t+'?limit=100000'); }catch(e){ data[t]=[]; } }
+  return data;
+}
+function updateBackupInfo(){
+  const el=document.getElementById('backup-last-info'); if(!el)return;
+  const last=localStorage.getItem('hj_last_backup');
+  el.textContent = last ? ('آخر نسخة احتياطية: '+new Date(last).toLocaleString('ar-EG')) : '⚠️ لسه معملتيش أي نسخة احتياطية';
+}
+async function exportBackupJSON(){
+  toast('جاري تجهيز النسخة الاحتياطية...','info');
+  try{
+    const data=await fetchAllForBackup();
+    const payload={exported_at:new Date().toISOString(),app:'Adreska Tours',tables:data};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`adreska-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
+    localStorage.setItem('hj_last_backup', new Date().toISOString()); updateBackupInfo();
+    toast('تم تصدير النسخة الاحتياطية بنجاح ✅');
+    logAction('backup_export',{format:'json'});
+  }catch(e){toast('خطأ فى التصدير: '+e.message,'error');}
+}
+async function exportBackupExcel(){
+  toast('جاري تجهيز ملف Excel...','info');
+  try{
+    const data=await fetchAllForBackup();
+    const wb=XLSX.utils.book_new();
+    BACKUP_TABLES.forEach(t=>{
+      const rows=data[t]||[];
+      const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{}]);
+      XLSX.utils.book_append_sheet(wb,ws,t.replace('haj_','').slice(0,31));
+    });
+    XLSX.writeFile(wb,`adreska-backup-${new Date().toISOString().slice(0,10)}.xlsx`);
+    localStorage.setItem('hj_last_backup', new Date().toISOString()); updateBackupInfo();
+    toast('تم تصدير Excel بنجاح ✅');
+    logAction('backup_export',{format:'excel'});
+  }catch(e){toast('خطأ: '+e.message,'error');}
+}
+function triggerRestoreFile(){ document.getElementById('backup-restore-inp').click(); }
+async function handleRestoreFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const text=await f.text();
+    const payload=JSON.parse(text);
+    const tables=payload.tables||payload; // بيقبل الملف اللي اتصدر من هنا أو {table:[rows]} مباشرة
+    const tableNames=Object.keys(tables).filter(k=>BACKUP_TABLES.includes(k) && Array.isArray(tables[k]));
+    if(!tableNames.length){toast('ملف غير صالح للاستعادة','error');e.target.value='';return;}
+    const totalRows=tableNames.reduce((s,t)=>s+tables[t].length,0);
+    confirmAction(`استعادة نسخة احتياطية تحتوي ${totalRows} سجل في ${tableNames.length} جدول؟`,'هيتم إضافة/تحديث البيانات فوق الموجود حالياً - مفيش حذف للبيانات الحالية','📦',async()=>{
+      let ok=0, fail=0;
+      for(const t of tableNames){
+        for(const row of tables[t]){
+          try{
+            if(row.id){ const r=await sb(`${t}?id=eq.${row.id}`,'PATCH',row); if(!r||!r.length) await sb(t,'POST',row); }
+            else await sb(t,'POST',row);
+            ok++;
+          }catch(err){ try{ const {id,...rest}=row; await sb(t,'POST',rest); ok++; }catch(err2){ fail++; } }
+        }
+      }
+      toast(`تمت الاستعادة: ${ok} سجل نجح${fail?`، ${fail} سجل فشل`:''} ✅`);
+      aTrips=[];aClients=[];aBks=[];aPays=[];aSups=[];
+      loadDash();
+      logAction('backup_restore',{ok,fail});
+    },false);
+  }catch(err){toast('خطأ فى قراءة الملف: '+err.message,'error');}
+  e.target.value='';
+}
+
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded',()=>{
   if(SURL&&SKEY){
     document.getElementById('no-config-banner').classList.remove('show');
-    loadDash();testConn();
+    initAuth();
   } else {
     document.getElementById('no-config-banner').classList.add('show');
     showTab('settings');
     document.getElementById('conn-msg').innerHTML='&#x26A0;&#xFE0F; <span style="color:var(--gold)">&#x623;&#x62F;&#x62E;&#x644; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; Supabase &#x644;&#x644;&#x628;&#x62F;&#x621;</span>';
   }
 });
+
+// ============ AUTH / USER PERMISSIONS ============
+let currentUser = null;
+
+async function getAppUsers(){
+  try{
+    const s = await sb('haj_settings?key=eq.app_users&limit=1');
+    if(s && s.length && s[0].value){ try{ return JSON.parse(s[0].value); }catch(e){ return []; } }
+  }catch(e){}
+  return [];
+}
+async function saveAppUsers(list){ await upsertSetting('app_users', JSON.stringify(list)); }
+
+async function initAuth(){
+  const saved = localStorage.getItem('hj_session');
+  if(saved){
+    try{
+      currentUser = JSON.parse(saved);
+      applyRoleUI();
+      loadDash(); testConn();
+      return;
+    }catch(e){ localStorage.removeItem('hj_session'); }
+  }
+  document.getElementById('login-screen').style.display='flex';
+  try{
+    const users = await getAppUsers();
+    if(!users.length){
+      document.getElementById('login-form-wrap').style.display='none';
+      document.getElementById('login-setup-wrap').style.display='block';
+    } else {
+      document.getElementById('login-form-wrap').style.display='block';
+      document.getElementById('login-setup-wrap').style.display='none';
+    }
+  }catch(e){ /* لو فشل الاتصال هيفضل شكل الدخول العادي */ }
+}
+
+async function doFirstSetup(){
+  const u = document.getElementById('setup-user').value.trim();
+  const p = document.getElementById('setup-pass').value;
+  if(!u || !p){ toast('يرجى إدخال اسم المستخدم وكلمة المرور','error'); return; }
+  try{
+    await saveAppUsers([{username:u, password:p, role:'admin'}]);
+    loginSuccess({username:u, role:'admin'});
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
+
+async function doLogin(){
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  errEl.style.display='none';
+  if(!u || !p){ errEl.textContent='يرجى إدخال اسم المستخدم وكلمة المرور'; errEl.style.display='block'; return; }
+  try{
+    const users = await getAppUsers();
+    const match = users.find(x=>x.username===u && x.password===p);
+    if(!match){ errEl.textContent='اسم المستخدم أو كلمة المرور غير صحيحة'; errEl.style.display='block'; return; }
+    loginSuccess({username:match.username, role:match.role});
+  }catch(e){ errEl.textContent='خطأ فى الاتصال: '+e.message; errEl.style.display='block'; }
+}
+
+function loginSuccess(user){
+  currentUser = user;
+  localStorage.setItem('hj_session', JSON.stringify(user));
+  document.getElementById('login-screen').style.display='none';
+  applyRoleUI();
+  loadDash(); testConn();
+  logAction('login',{username:user.username});
+}
+
+function logoutUser(){
+  confirmAction('تسجيل الخروج من النظام؟','','🚪',()=>{
+    localStorage.removeItem('hj_session');
+    location.reload();
+  },false);
+}
+
+function isAdmin(){ return !!currentUser && currentUser.role==='admin'; }
+function requirePerm(actionLabel){
+  if(!isAdmin()){ toast('🔒 محتاج صلاحية مدير عشان تقدر ت'+(actionLabel||'نفّذ ده'),'error'); return false; }
+  return true;
+}
+
+function applyRoleUI(){
+  const badge = document.getElementById('cur-user-badge');
+  const logoutBtn = document.getElementById('logout-btn');
+  if(currentUser && badge){
+    badge.textContent = `👤 ${currentUser.username} (${currentUser.role==='admin'?'مدير':'موظف'})`;
+    badge.style.display='inline';
+  }
+  if(logoutBtn) logoutBtn.style.display='inline-block';
+  document.body.classList.toggle('role-staff', !!currentUser && currentUser.role!=='admin');
+  const usersCard = document.getElementById('users-card');
+  if(usersCard) usersCard.style.display = isAdmin() ? 'block' : 'none';
+}
+
+// ---- إدارة المستخدمين (من الإعدادات - للمدير فقط) ----
+async function refreshUsersUI(){
+  const card = document.getElementById('users-card');
+  if(!card) return;
+  card.style.display = isAdmin() ? 'block' : 'none';
+  if(!isAdmin()) return;
+  await renderUsersList();
+}
+async function renderUsersList(){
+  const wrap = document.getElementById('users-list');
+  if(!wrap) return;
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try{
+    const users = await getAppUsers();
+    if(!users.length){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">👥</div><h3>لا يوجد مستخدمين</h3></div>'; return; }
+    wrap.innerHTML = `<div class="table-wrap"><table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th></th></tr></thead><tbody>
+      ${users.map((u,i)=>`<tr>
+        <td><b>${u.username}</b>${currentUser && currentUser.username===u.username?' <small style="color:var(--text3)">(أنت)</small>':''}</td>
+        <td>${u.role==='admin'?'<span class="badge badge-gold">مدير</span>':'<span class="badge badge-blue">موظف</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-outline btn-sm btn-icon" onclick="resetUserPassword(${i})" title="تغيير كلمة المرور">🔑</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteUser(${i})" title="حذف">🗑️</button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table></div>`;
+  }catch(e){ wrap.innerHTML=`<div class="info-box danger">❌ خطأ: ${e.message}</div>`; }
+}
+function openAddUserModal(){
+  if(!requirePerm('ضيف مستخدم')) return;
+  document.getElementById('usr-name').value='';
+  document.getElementById('usr-pass').value='';
+  document.getElementById('usr-role').value='staff';
+  openM('user-modal');
+}
+async function saveNewUser(){
+  const u = document.getElementById('usr-name').value.trim();
+  const p = document.getElementById('usr-pass').value;
+  const r = document.getElementById('usr-role').value;
+  if(!u || !p){ toast('يرجى إدخال اسم المستخدم وكلمة المرور','error'); return; }
+  try{
+    const users = await getAppUsers();
+    if(users.some(x=>x.username===u)){ toast('اسم المستخدم ده موجود بالفعل','error'); return; }
+    users.push({username:u, password:p, role:r});
+    await saveAppUsers(users);
+    toast('تم إضافة المستخدم ✅');
+    closeM('user-modal');
+    renderUsersList();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
+async function deleteUser(idx){
+  try{
+    const users = await getAppUsers();
+    const u = users[idx]; if(!u) return;
+    if(currentUser && u.username===currentUser.username){ toast('مينفعش تحذف حسابك وانت داخل بيه','error'); return; }
+    confirmAction(`حذف المستخدم "${u.username}"؟`,'','🗑️',async()=>{
+      users.splice(idx,1);
+      await saveAppUsers(users);
+      toast('تم الحذف');
+      renderUsersList();
+    });
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
+async function resetUserPassword(idx){
+  try{
+    const users = await getAppUsers();
+    const u = users[idx]; if(!u) return;
+    const newPass = await sPrompt('تغيير كلمة المرور', `كلمة مرور جديدة لـ ${u.username}`, '', 'password');
+    if(!newPass) return;
+    users[idx].password = newPass;
+    await saveAppUsers(users);
+    toast('تم تغيير كلمة المرور ✅');
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
 </script>
 </body>
 </html>
@@ -2780,6 +3097,16 @@ async function initInstallments(){
   await fillTrSels();
   const sel=document.getElementById('inst-trip-f');
   if(sel&&!sel.innerHTML.includes('<option value="">'))sel.innerHTML='<option value="">كل الرحلات</option>'+aTrips.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+  try{
+    const rows = await getUpcomingInstallmentsEnriched(3);
+    const alertEl = document.getElementById('inst-auto-alert');
+    if(alertEl){
+      if(rows.length){
+        const overdueCnt = rows.filter(r=>r.overdue).length;
+        alertEl.innerHTML = `<div class="info-box ${overdueCnt?'danger':'warning'}" style="margin-bottom:10px"><span>📅</span><div><b>${rows.length} قسط مستحق قريبًا${overdueCnt?` (${overdueCnt} متأخر)`:''}</b> - اضغطي "إرسال تذكير" لتنبيه العملاء تلقائياً عبر واتساب/تليجرام</div></div>`;
+      } else alertEl.innerHTML='';
+    }
+  }catch(e){}
 }
 
 async function loadInstallments(){
@@ -2867,6 +3194,62 @@ async function saveInstallment(){
   // Save as a payment with future date - marks it as a scheduled installment via notes
   const d={booking_id:bid,amount:amt,currency:'EGP',payment_method:'كاش',payment_date:due,receipt_no:null,notes:'قسط مجدول: '+(document.getElementById('inst-notes').value.trim()||'')};
   try{await sb('haj_payments','POST',d);toast('تم إضافة القسط ✅');closeM('add-inst-modal');aPays=[];loadInstallments();}catch(e){toast('خطأ: '+e.message,'error');}
+}
+
+// ============ متابعة الأقساط التلقائية ============
+function getUpcomingInstallments(daysAhead){
+  daysAhead = daysAhead || 3;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const limit = new Date(today); limit.setDate(limit.getDate()+daysAhead);
+  return (aPays||[]).filter(p=>p.notes && p.notes.indexOf('قسط مجدول')===0 && p.payment_date).map(p=>{
+    const d = new Date(p.payment_date); d.setHours(0,0,0,0);
+    return {p, dueDate:d, overdue: d<today, soon: d>=today && d<=limit};
+  }).filter(r=>r.overdue||r.soon);
+}
+async function getUpcomingInstallmentsEnriched(daysAhead){
+  if(!aPays.length) aPays = await sb('haj_payments?limit=2000');
+  if(!aBks.length) aBks = await sb('haj_bookings?limit=1000');
+  if(!aClients.length) aClients = await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+  if(!aTrips.length) aTrips = await sb('haj_trips?limit=200');
+  return getUpcomingInstallments(daysAhead).map(r=>{
+    const b = aBks.find(x=>x.id==r.p.booking_id);
+    const c = b?aClients.find(x=>x.id==b.client_id):null;
+    return {...r, b, c};
+  }).filter(r=>r.c);
+}
+async function sendInstallmentReminders(){
+  toast('جاري تجهيز قائمة الأقساط المستحقة...','info');
+  let rows;
+  try{ rows = await getUpcomingInstallmentsEnriched(3); }catch(e){ toast('خطأ: '+e.message,'error'); return; }
+  if(!rows.length){ toast('لا يوجد أقساط مستحقة خلال الأيام القادمة ✅','success'); return; }
+  const withPhone = rows.filter(r=>r.c && r.c.phone);
+  if(!withPhone.length){ toast('الأقساط المستحقة موجودة لكن بدون أرقام هواتف للعملاء','error'); return; }
+  let settings;
+  try{ settings = await sb('haj_settings?limit=30'); }catch(e){ settings=[]; }
+  const getS=k=>(settings.find(s=>s.key===k)||{}).value||'';
+  const waBotKey=getS('callmebot_key');
+  const tgToken=getS('telegram_token'), tgChatId=getS('telegram_chat_id');
+  const platform = (tgToken&&tgChatId) ? 'telegram' : (waBotKey?'whatsapp':null);
+  if(!platform){ toast('يرجى إعداد واتساب (CallMeBot) أو تليجرام في الإعدادات أولاً','error'); return; }
+  confirmAction(`إرسال تذكير قسط مستحق لـ ${withPhone.length} عميل عبر ${platform==='telegram'?'Telegram':'WhatsApp'}؟`,'','📤',async()=>{
+    if(platform==='telegram'){
+      const list = withPhone.map(r=>`• ${r.c.full_name_ar} - ${fn(r.p.amount)} ج - استحقاق ${fd(r.p.payment_date)}${r.overdue?' ⚠️ متأخر':''}`).join('\n');
+      const tmsg = `📅 تذكير أقساط مستحقة (${withPhone.length}):\n\n${list}`;
+      try{
+        await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tgChatId,text:tmsg})});
+        toast('تم إرسال تذكير الأقساط عبر Telegram ✅');
+      }catch(e){ toast('فشل الإرسال','error'); }
+    } else {
+      const links = withPhone.map(r=>{
+        const msg = `🕌 تذكير: عندك قسط بقيمة ${fn(r.p.amount)} ج مستحق بتاريخ ${fd(r.p.payment_date)}${r.overdue?' (متأخر)':''}. برجاء السداد في أقرب وقت.\n${document.getElementById('cfg-co')?.value||'Adreska Tours'}`;
+        return `https://api.callmebot.com/whatsapp.php?phone=${r.c.phone.replace(/\D/g,'')}&text=${encodeURIComponent(msg)}&apikey=${waBotKey}`;
+      });
+      toast(`سيتم فتح روابط الإرسال لـ ${links.length} عميل`,'info');
+      for(let i=0;i<Math.min(links.length,5);i++){ setTimeout(()=>window.open(links[i],'_blank'), i*1500); }
+      if(links.length>5) toast(`تم فتح أول 5 روابط - كرري الضغط على الزر لإرسال الباقي (${links.length-5} متبقي)`,'info');
+    }
+    logAction('installment_reminder_sent',{count:withPhone.length,platform});
+  },false);
 }
 </script>
 <script>
@@ -3094,6 +3477,8 @@ async function openFamModal() {
   document.getElementById('fam-pg').innerHTML = '<option value="">-- اختري الرحلة أولاً --</option>';
   document.getElementById('fam-rm-default').value = 'ثلاثي';
   document.getElementById('fam-cur').value = 'EGP';
+  const rmAuto=document.getElementById('fam-rm-auto'); if(rmAuto) rmAuto.checked = true;
+  const rmNote=document.getElementById('fam-rm-suggest-note'); if(rmNote) rmNote.textContent = '';
   if(!aTrips.length) { try{ aTrips = await sb('haj_trips?order=depart_date.desc&limit=200'); }catch(e){} }
   const trSel = document.getElementById('fam-tr');
   trSel.innerHTML = '<option value="">-- اختر الرحلة --</option>' + aTrips.map(t=>`<option value="${t.id}">${t.name} (${fd(t.depart_date)})</option>`).join('');
@@ -3115,9 +3500,32 @@ async function famOnTrChange() {
   } catch(e) { toast('تعذر تحميل بيانات الرحلة: '+e.message,'error'); }
 }
 
-function famApplyDefaultRoom() {
+function famApplyDefaultRoom(manual) {
+  if(manual) { const cb=document.getElementById('fam-rm-auto'); if(cb) cb.checked = false; } // تدخل يدوي بيوقف الاقتراح التلقائي
   const def = document.getElementById('fam-rm-default').value;
   famMembers.forEach(m=>{ if(famTravelerType(m)==='بالغ'){ m.room_type = def; const sel=document.getElementById('fam-rm-'+m.id); if(sel) sel.value = def; } });
+  famRecalcAll();
+}
+
+// اقتراح تلقائي لحجم الغرفة حسب عدد البالغين في الأسرة (فردي=1، ثنائي=2، ثلاثي=3، رباعي=4، خماسي=5+)
+function famSuggestedRoomType() {
+  const adults = famMembers.filter(m=>famTravelerType(m)==='بالغ').length;
+  if(adults<=1) return 'فردي';
+  if(adults===2) return 'ثنائي';
+  if(adults===3) return 'ثلاثي';
+  if(adults===4) return 'رباعي';
+  return 'خماسي';
+}
+function famAutoSuggestRoom() {
+  const cb = document.getElementById('fam-rm-auto');
+  const note = document.getElementById('fam-rm-suggest-note');
+  if(!cb || !cb.checked) { if(note) note.textContent=''; return; }
+  const adults = famMembers.filter(m=>famTravelerType(m)==='بالغ').length;
+  const suggested = famSuggestedRoomType();
+  const sel = document.getElementById('fam-rm-default');
+  if(sel) sel.value = suggested;
+  famMembers.forEach(m=>{ if(famTravelerType(m)==='بالغ'){ m.room_type = suggested; const s=document.getElementById('fam-rm-'+m.id); if(s) s.value = suggested; } });
+  if(note) note.textContent = adults ? `🔎 اقتراح تلقائي: غرفة "${suggested}" بناءً على ${adults} بالغين في الأسرة` : '';
   famRecalcAll();
 }
 
@@ -3211,6 +3619,7 @@ function famAddMember(file, result) {
   if(famTravelerType(m)!=='بالغ') m.room_type = 'بدون';
   famMembers.push(m);
   famRenderMember(m);
+  famAutoSuggestRoom();
   famUpdateTotals();
 }
 
@@ -3273,6 +3682,7 @@ function famField(id, key, val) { const m = fmFind(id); if(m) m[key] = val; }
 function famRoomAutoAdjust(id) {
   const m = fmFind(id); if(!m) return;
   if(famTravelerType(m)!=='بالغ' && m.room_type!=='بدون') { m.room_type='بدون'; const sel=document.getElementById('fam-rm-'+id); if(sel) sel.value='بدون'; }
+  famAutoSuggestRoom();
   famUpdateCardPrice(m); famUpdateTotals();
 }
 
@@ -3300,6 +3710,7 @@ function famRemoveMember(id) {
     if(m.is_head && famMembers.length) famSetHead(famMembers[0].id);
     // إعادة ترقيم البطاقات المعروضة
     document.querySelectorAll('#fam-members .sbox-title > span:first-child').forEach((el,i)=>{ /* الترقيم بصري فقط */ });
+    famAutoSuggestRoom();
     famUpdateTotals();
   });
 }
@@ -3602,6 +4013,7 @@ async function saveRoom() {
 }
 
 async function deleteRoom(roomNo, city) {
+  if(!requirePerm('حذف غرفة')) return;
   if(!await sConfirm(`حذف غرفة ${roomNo}؟`,'سيتم إزالة كل العملاء منها','🛏️',true)) return;
   try {
     const field = city==='مكة' ? 'room_number_mecca' : 'room_number_madina';

@@ -1492,7 +1492,7 @@ function yymmddToISO(yymmdd,isExpiry){
 function parseMRZ(rawText){
   const lines=rawText.split(/\n/).map(l=>l.replace(/\s/g,'').toUpperCase()).filter(l=>{
     const angleCount=(l.match(/</g)||[]).length;
-    return l.length>=30&&angleCount>=4&&/^[A-Z0-9<]+$/.test(l);
+    return l.length>=25&&angleCount>=3&&/^[A-Z0-9<]+$/.test(l);
   });
   if(lines.length<2)return null;
   // نجيب آخر سطرين مرشحين (المفروض يكونوا متتاليين)
@@ -1527,11 +1527,21 @@ async function doOCR(file){
   if(typeof Tesseract==='undefined'){
     await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
   }
-  stat.textContent='جاري تحليل الصورة...';
   try{
-    const r=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=Math.round(m.progress*100)+'%';}});
+    // القراءة الأولى: الصفحة كاملة (عربي+إنجليزي) - احتياطي لرقم الجواز لو فشل كل حاجة
+    stat.textContent='جاري تحليل الصفحة...';bar.style.width='10%';
+    const rFull=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(10+Math.round(m.progress*35))+'%';}});
+
+    // القراءة الثانية: مخصصة بس لحروف MRZ (A-Z 0-9 <) من غير أي عربي - دقة أعلى بكتير لسطرين الـ MRZ
+    stat.textContent='جاري قراءة رمز MRZ بدقة أعلى...';bar.style.width='50%';
+    const worker=await Tesseract.createWorker('eng');
+    await worker.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',tessedit_pageseg_mode:'6'});
+    const rMrz=await worker.recognize(file);
+    await worker.terminate();
+    bar.style.width='90%';
+
+    const mrz=parseMRZ(rMrz.data.text)||parseMRZ(rFull.data.text);
     bar.style.width='100%';
-    const mrz=parseMRZ(r.data.text);
     if(mrz){
       if(mrz.full_name_en)document.getElementById('cl-en').value=mrz.full_name_en;
       if(mrz.gender)document.getElementById('cl-gen').value=mrz.gender;
@@ -1543,9 +1553,9 @@ async function doOCR(file){
       toast('تم استخراج بيانات الجواز من MRZ - راجعها وأكملي الباقي يدوياً (تاريخ الإصدار وجهة الإصدار)','success');
     }else{
       // فشل قراءة الـ MRZ - نرجع لمحاولة استخراج رقم الجواز بس بالـ regex القديم
-      const pp=r.data.text.match(/[A-Z]{1,2}\d{6,8}/);
+      const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrz.data.text.match(/[A-Z]{1,2}\d{6,8}/);
       if(pp){document.getElementById('cl-ppno').value=pp[0];stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز فقط';toast('تعذرت قراءة كل البيانات - تم استخراج رقم الجواز فقط، أدخلي الباقي يدوياً','info');}
-      else{stat.textContent='&#x274C; تعذر الاستخراج';toast('تعذر استخراج البيانات - أدخليها يدوياً','error');}
+      else{stat.textContent='&#x274C; تعذر الاستخراج';toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');}
     }
   }catch(e){
     console.error(e);

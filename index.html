@@ -364,7 +364,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 <div id="tab-bookings" class="tab-content" style="display:none">
   <div class="section-title"><span>📋</span> الحجوزات</div>
   <div class="card">
-    <div class="card-header"><div class="card-title">قائمة الحجوزات</div><button class="btn btn-primary" onclick="openBkModal()">➕ حجز جديد</button></div>
+    <div class="card-header"><div class="card-title">قائمة الحجوزات</div><div style="display:flex;gap:8px"><button class="btn btn-gold" onclick="openFamModal()">👪 إضافة أسرة</button><button class="btn btn-primary" onclick="openBkModal()">➕ حجز جديد</button></div></div>
     <div class="search-bar">
       <select id="bk-trip-f" onchange="loadBookings()" style="flex:0 0 200px"><option value="">كل الرحلات</option></select>
       <select id="bk-stat-f" onchange="loadBookings()"><option value="">كل الحالات</option><option value="محجوز">محجوز</option><option value="مدفوع جزئي">مدفوع جزئي</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select>
@@ -911,6 +911,51 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <div class="modal-footer" id="bk-modal-footer">
       <button class="btn btn-outline" onclick="closeM('bk-modal')">إلغاء</button>
       <button class="btn btn-primary" id="bk-save-btn" onclick="saveBk()">💾 حفظ الحجز</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAMILY (BULK) BOOKING MODAL -->
+<div id="fam-modal" class="modal-overlay">
+  <div class="modal" style="max-width:1150px">
+    <div class="modal-header"><div class="modal-title">👪 <span>إضافة أسرة (حجز جماعي)</span></div><button class="close-btn" onclick="closeFamModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="info-box info"><span>ℹ️</span><div>ارفعي كل صور جوازات أفراد الأسرة مرة واحدة، وراجعي بيانات كل فرد بعد الاستخراج - محدش هيتحفظ إلا لو اتعمله "تمت المراجعة ✅".</div></div>
+
+      <div class="sbox">
+        <div class="sbox-title">📋 بيانات الرحلة المشتركة للأسرة</div>
+        <div class="form-grid">
+          <div class="form-group"><label>الرحلة *</label><select id="fam-tr" onchange="famOnTrChange()"><option value="">-- اختر الرحلة --</option></select></div>
+          <div class="form-group"><label>البرنامج / الكود *</label><select id="fam-pg" onchange="famRecalcAll()"><option value="">-- اختر البرنامج --</option></select></div>
+          <div class="form-group"><label>نوع الغرفة الافتراضي (للبالغين)</label><select id="fam-rm-default" onchange="famApplyDefaultRoom()"><option value="فردي">فردي (Single)</option><option value="ثنائي">ثنائي (Double)</option><option value="ثلاثي" selected>ثلاثي (Triple)</option><option value="رباعي">رباعي (Quad)</option><option value="خماسي">خماسي (Quint)</option></select></div>
+          <div class="form-group"><label>العملة</label><select id="fam-cur"><option value="EGP">جنيه مصري</option><option value="SAR">ريال سعودي</option><option value="USD">دولار</option></select></div>
+        </div>
+      </div>
+
+      <div class="ocr-area" id="fam-ocr-drop" onclick="document.getElementById('fam-ocr-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="famHandleDrop(event)">
+        <div style="font-size:36px;margin-bottom:8px">📷📷📷</div>
+        <div style="color:var(--text2);font-weight:600">اسحبي كل صور جوازات أفراد الأسرة هنا أو اضغطي للاختيار (تقدري تختاري أكتر من صورة مرة واحدة)</div>
+        <div style="color:var(--text3);font-size:12px;margin-top:4px">هيتم تحليل كل صورة على حدة (بنفس دقة الـ OCR المستخدمة في إضافة عميل فردي) وإضافتها كبطاقة منفصلة تحت - راجعي كل بطاقة كويس قبل الحفظ</div>
+        <input type="file" id="fam-ocr-inp" accept="image/*" multiple style="display:none" onchange="famHandleFiles(event.target.files);event.target.value='';">
+      </div>
+      <div id="fam-batch-prg" style="display:none;margin:10px 0 18px">
+        <div style="font-size:12px;color:var(--text3)" id="fam-batch-stat">جاري التحليل...</div>
+        <div class="prog-bar"><div class="prog-fill" id="fam-batch-bar" style="width:0%"></div></div>
+      </div>
+
+      <div id="fam-empty" class="empty-state" style="padding:20px">
+        <div class="empty-icon">👪</div>
+        <div>لسه مفيش أفراد مضافين - ارفعي صور الجوازات فوق وهيتعمل لكل فرد بطاقة تحت</div>
+      </div>
+      <div id="fam-members"></div>
+
+      <div class="price-summary" id="fam-total-box" style="display:none">
+        <div class="price-row total"><span>👪 إجمالي الأسرة (<span id="fam-count">0</span> فرد)</span><span id="fam-total">0 ج</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeFamModal()">إلغاء</button>
+      <button class="btn btn-primary" id="fam-save-btn" onclick="saveFam()">💾 حفظ الأسرة</button>
     </div>
   </div>
 </div>
@@ -1615,47 +1660,56 @@ function preprocessOcrImage(file,scale){
   });
 }
 
+// النواة المشتركة لتحليل صورة الجواز - بترجع البيانات من غير ما تلمس أي عنصر في الصفحة
+// (نفس المنطق بالظبط بيستخدمه كل من "إضافة عميل فردي" و"إضافة أسرة" عشان الدقة تفضل واحدة 100%)
+async function analyzePassportImage(file, onProgress) {
+  onProgress&&onProgress(5,'جاري تجهيز الصورة...');
+  if(typeof Tesseract==='undefined'){
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  // تحسين الصورة (تكبير + تباين) قبل أي قراءة - بيرفع دقة قراءة الاسم العربي بشكل ملحوظ
+  const proc=await preprocessOcrImage(file,2.2);
+
+  // القراءة الأولى: الصفحة كاملة (عربي+إنجليزي) - احتياطي عام ولقراءة رقم الجواز لو باقي الطرق فشلت
+  onProgress&&onProgress(10,'جاري تحليل الصفحة...');
+  const rFull=await Tesseract.recognize(proc,'ara+eng',{logger:m=>{if(m.status==='recognizing text')onProgress&&onProgress(10+Math.round(m.progress*25),'جاري تحليل الصفحة...');}});
+
+  // القراءة الثانية: عربي فقط (من غير إنجليزي) على الصورة المحسّنة - مخصصة لاستخراج الاسم العربي بدقة أعلى
+  onProgress&&onProgress(35,'جاري قراءة الاسم العربي بدقة أعلى...');
+  let rArText='';
+  try{
+    const rAr=await Tesseract.recognize(proc,'ara',{logger:m=>{if(m.status==='recognizing text')onProgress&&onProgress(35+Math.round(m.progress*25),'جاري قراءة الاسم العربي بدقة أعلى...');}});
+    rArText=rAr.data.text;
+  }catch(e1){console.error('Arabic-only pass failed',e1);}
+
+  // القراءة الثالثة: إنجليزي فقط - بتقلل التشويش وتحسن قراءة سطرين الـ MRZ
+  onProgress&&onProgress(65,'جاري قراءة رمز MRZ بدقة أعلى...');
+  let rMrzText='';
+  try{
+    const rMrz=await Tesseract.recognize(proc,'eng',{logger:m=>{if(m.status==='recognizing text')onProgress&&onProgress(65+Math.round(m.progress*30),'جاري قراءة رمز MRZ بدقة أعلى...');}});
+    rMrzText=rMrz.data.text;
+  }catch(e2){console.error('MRZ pass failed, falling back to full text only',e2);}
+
+  onProgress&&onProgress(95,'جاري تجميع النتائج...');
+  const mrz=parseMRZ(rMrzText)||parseMRZ(rFull.data.text);
+  const arName=extractArabicName(rArText)||extractArabicName(rFull.data.text);
+  let passportNoFallback=null;
+  if(!mrz){
+    const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrzText.match(/[A-Z]{1,2}\d{6,8}/);
+    if(pp)passportNoFallback=pp[0];
+  }
+  onProgress&&onProgress(100,'تم التحليل');
+  return{arName,mrz,passportNoFallback};
+}
+
 async function doOCR(file,prefix){
   prefix=prefix||'cl';
   const ids=ocrIds(prefix);
   const url=URL.createObjectURL(file);document.getElementById(ids.img).src=url;document.getElementById(ids.preview).style.display='block';
   const prg=document.getElementById(ids.prg),bar=document.getElementById(ids.bar),stat=document.getElementById(ids.stat);
   prg.style.display='block';stat.textContent='جاري تجهيز الصورة...';bar.style.width='5%';
-  // تحميل Tesseract مرة واحدة فقط عند الحاجة
-  if(typeof Tesseract==='undefined'){
-    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
-  }
   try{
-    // تحسين الصورة (تكبير + تباين) قبل أي قراءة - بيرفع دقة قراءة الاسم العربي بشكل ملحوظ
-    const proc=await preprocessOcrImage(file,2.2);
-
-    // القراءة الأولى: الصفحة كاملة (عربي+إنجليزي) - احتياطي عام ولقراءة رقم الجواز لو باقي الطرق فشلت
-    stat.textContent='جاري تحليل الصفحة...';bar.style.width='10%';
-    const rFull=await Tesseract.recognize(proc,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(10+Math.round(m.progress*25))+'%';}});
-
-    // القراءة الثانية: عربي فقط (من غير إنجليزي) على الصورة المحسّنة - مخصصة لاستخراج الاسم العربي بدقة أعلى
-    stat.textContent='جاري قراءة الاسم العربي بدقة أعلى...';bar.style.width='35%';
-    let rArText='';
-    try{
-      const rAr=await Tesseract.recognize(proc,'ara',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(35+Math.round(m.progress*25))+'%';}});
-      rArText=rAr.data.text;
-    }catch(e1){console.error('Arabic-only pass failed',e1);}
-    bar.style.width='60%';
-
-    // القراءة الثالثة: إنجليزي فقط - بتقلل التشويش وتحسن قراءة سطرين الـ MRZ
-    stat.textContent='جاري قراءة رمز MRZ بدقة أعلى...';bar.style.width='65%';
-    let rMrzText='';
-    try{
-      const rMrz=await Tesseract.recognize(proc,'eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(65+Math.round(m.progress*30))+'%';}});
-      rMrzText=rMrz.data.text;
-    }catch(e2){
-      console.error('MRZ pass failed, falling back to full text only',e2);
-    }
-    bar.style.width='95%';
-
-    const mrz=parseMRZ(rMrzText)||parseMRZ(rFull.data.text);
-    const arName=extractArabicName(rArText)||extractArabicName(rFull.data.text);
-    bar.style.width='100%';
+    const {arName,mrz,passportNoFallback}=await analyzePassportImage(file,(pct,txt)=>{bar.style.width=pct+'%';stat.textContent=txt;});
     if(arName)document.getElementById(prefix+'-ar').value=arName;
     if(mrz){
       if(mrz.full_name_en)document.getElementById(prefix+'-en').value=mrz.full_name_en;
@@ -1666,20 +1720,16 @@ async function doOCR(file,prefix){
       if(mrz.passport_expiry_date)document.getElementById(prefix+'-ppexp').value=mrz.passport_expiry_date;
       stat.textContent=arName?'&#x2705; تم استخراج بيانات الجواز والاسم العربي - راجعي البيانات':'&#x2705; تم استخراج بيانات الـ MRZ - راجعي البيانات (الاسم العربي محتاج إدخال يدوي)';
       toast(arName?'تم استخراج بيانات الجواز بما فيها الاسم العربي - راجعيها وأكملي الباقي يدوياً':'تم استخراج بيانات الـ MRZ - راجعها، والاسم العربي محتاج إدخال يدوي','success');
+    }else if(passportNoFallback){
+      document.getElementById(prefix+'-ppno').value=passportNoFallback;
+      stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز'+(arName?' والاسم العربي':'')+' فقط';
+      toast('تعذرت قراءة كل البيانات - راجعي وأكملي الباقي يدوياً','info');
+    }else if(arName){
+      stat.textContent='&#x26A0;&#xFE0F; استخرجنا الاسم العربي فقط';
+      toast('استخرجنا الاسم العربي فقط - أدخلي باقي البيانات يدوياً','info');
     }else{
-      // فشل قراءة الـ MRZ - نرجع لمحاولة استخراج رقم الجواز بس بالـ regex القديم
-      const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrzText.match(/[A-Z]{1,2}\d{6,8}/);
-      if(pp){
-        document.getElementById(prefix+'-ppno').value=pp[0];
-        stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز'+(arName?' والاسم العربي':'')+' فقط';
-        toast('تعذرت قراءة كل البيانات - راجعي وأكملي الباقي يدوياً','info');
-      }else if(arName){
-        stat.textContent='&#x26A0;&#xFE0F; استخرجنا الاسم العربي فقط';
-        toast('استخرجنا الاسم العربي فقط - أدخلي باقي البيانات يدوياً','info');
-      }else{
-        stat.textContent='&#x274C; تعذر الاستخراج';
-        toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');
-      }
+      stat.textContent='&#x274C; تعذر الاستخراج';
+      toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');
     }
   }catch(e){
     console.error(e);
@@ -2900,6 +2950,293 @@ async function printLastBkCard() {
   if(!_lastSavedBkId) return;
   aBks = await sb('haj_bookings?limit=500');
   printBkCard(_lastSavedBkId);
+}
+
+// ============================================================
+// FAMILY (BULK) BOOKING - رفع كذا جواز مرة واحدة، عميل + حجز لكل فرد
+// ============================================================
+let famMembers = [];   // مصفوفة بيانات كل فرد في الأسرة
+let famTrip = null;    // الرحلة المختارة للأسرة (منفصلة عن curTrip بتاع الحجز الفردي)
+let famPrograms = [];  // برامج الرحلة المختارة
+let famSeq = 0;        // عداد لتوليد id فريد لكل بطاقة فرد
+
+async function openFamModal() {
+  famMembers = []; famTrip = null; famPrograms = []; famSeq = 0;
+  document.getElementById('fam-members').innerHTML = '';
+  document.getElementById('fam-empty').style.display = 'block';
+  document.getElementById('fam-total-box').style.display = 'none';
+  document.getElementById('fam-batch-prg').style.display = 'none';
+  document.getElementById('fam-pg').innerHTML = '<option value="">-- اختري الرحلة أولاً --</option>';
+  document.getElementById('fam-rm-default').value = 'ثلاثي';
+  document.getElementById('fam-cur').value = 'EGP';
+  if(!aTrips.length) { try{ aTrips = await sb('haj_trips?order=depart_date.desc&limit=200'); }catch(e){} }
+  const trSel = document.getElementById('fam-tr');
+  trSel.innerHTML = '<option value="">-- اختر الرحلة --</option>' + aTrips.map(t=>`<option value="${t.id}">${t.name} (${fd(t.depart_date)})</option>`).join('');
+  openM('fam-modal');
+}
+function closeFamModal() {
+  if(famMembers.some(m=>m.saved)) { loadBookings(); loadClients(); aBks=[]; }
+  closeM('fam-modal');
+}
+
+async function famOnTrChange() {
+  const tid = document.getElementById('fam-tr').value;
+  if(!tid) { famTrip=null; famPrograms=[]; document.getElementById('fam-pg').innerHTML='<option value="">-- اختري الرحلة أولاً --</option>'; return; }
+  try {
+    famTrip = aTrips.find(t=>t.id==tid) || await sb('haj_trips?id=eq.'+tid+'&limit=1').then(r=>r[0]);
+    famPrograms = await sb('haj_programs?trip_id=eq.'+tid+'&order=code.asc&limit=50');
+    document.getElementById('fam-pg').innerHTML = '<option value="">-- اختر البرنامج --</option>' + famPrograms.map(p=>`<option value="${p.id}">${p.code} - ${p.program_details||p.mecca_hotel||'برنامج'}</option>`).join('');
+    famRecalcAll();
+  } catch(e) { toast('تعذر تحميل بيانات الرحلة: '+e.message,'error'); }
+}
+
+function famApplyDefaultRoom() {
+  const def = document.getElementById('fam-rm-default').value;
+  famMembers.forEach(m=>{ if(famTravelerType(m)==='بالغ'){ m.room_type = def; const sel=document.getElementById('fam-rm-'+m.id); if(sel) sel.value = def; } });
+  famRecalcAll();
+}
+
+function famTravelerType(m) { return tt(m.birth_date); }
+
+function famCalcPrice(m) {
+  if(!famTrip) return {base:0,deduct:0,add:0,fin:0};
+  const tp = famTravelerType(m);
+  let base = 0;
+  if(tp==='رضيع') base = +famTrip.infant_price||0;
+  else if(tp==='طفل') base = +famTrip.child_price||0;
+  else {
+    const pgId = document.getElementById('fam-pg').value;
+    const pg = famPrograms.find(p=>p.id==pgId);
+    if(pg) { const rmap={فردي:pg.price_single,ثنائي:pg.price_double,ثلاثي:pg.price_triple,رباعي:pg.price_quad,خماسي:pg.price_quint}; base = +(rmap[m.room_type]||0); }
+  }
+  const deduct = (m.has_own_ticket?+famTrip.ticket_price:0)+(m.has_own_barcode?+famTrip.barcode_price:0)+(m.has_own_visa?+famTrip.visa_price:0);
+  const add = (m.has_meals?+famTrip.meals_price:0)+(m.has_train?+famTrip.train_price:0)+(m.has_makkah_view?+famTrip.makkah_view_price:0)+(m.has_haram_view?+famTrip.haram_view_price:0);
+  return {base,deduct,add,fin:base-deduct+add};
+}
+
+function famRecalcAll() {
+  famMembers.forEach(m=>famUpdateCardPrice(m));
+  famUpdateTotals();
+}
+
+function famUpdateCardPrice(m) {
+  const px = famCalcPrice(m);
+  const el = document.getElementById('fam-px-'+m.id);
+  if(el) el.textContent = fn(px.fin)+' ج';
+  const tpEl = document.getElementById('fam-tp-'+m.id);
+  if(tpEl) tpEl.textContent = famTravelerType(m);
+}
+
+function famUpdateTotals() {
+  const total = famMembers.reduce((s,m)=>s+famCalcPrice(m).fin, 0);
+  document.getElementById('fam-count').textContent = famMembers.length;
+  document.getElementById('fam-total').textContent = fn(total)+' ج';
+  document.getElementById('fam-total-box').style.display = famMembers.length ? 'flex' : 'none';
+  document.getElementById('fam-empty').style.display = famMembers.length ? 'none' : 'block';
+}
+
+function famHandleDrop(e) {
+  e.preventDefault();
+  document.getElementById('fam-ocr-drop').classList.remove('drag-over');
+  if(e.dataTransfer.files && e.dataTransfer.files.length) famHandleFiles(e.dataTransfer.files);
+}
+
+async function famHandleFiles(fileList) {
+  const files = Array.from(fileList).filter(f=>f.type.startsWith('image/'));
+  if(!files.length) return;
+  const prg=document.getElementById('fam-batch-prg'), bar=document.getElementById('fam-batch-bar'), stat=document.getElementById('fam-batch-stat');
+  prg.style.display='block';
+  // تحليل الصور واحدة واحدة (مش كلهم مع بعض) عشان الـ progress يبقى واضح ومحرك الـ OCR ميتخنقش
+  for(let i=0;i<files.length;i++) {
+    const file = files[i];
+    stat.textContent = `جاري تحليل صورة ${i+1} من ${files.length}...`;
+    bar.style.width = Math.round((i/files.length)*100)+'%';
+    let result = {arName:null, mrz:null, passportNoFallback:null};
+    try {
+      result = await analyzePassportImage(file, (pct,txt)=>{
+        bar.style.width = Math.round((i/files.length)*100 + pct/files.length)+'%';
+        stat.textContent = `صورة ${i+1} من ${files.length}: ${txt}`;
+      });
+    } catch(e) { console.error('family OCR failed for file', file.name, e); }
+    famAddMember(file, result);
+  }
+  bar.style.width='100%'; stat.textContent = `تم تحليل ${files.length} صورة ✅ - راجعي كل بطاقة قبل الحفظ`;
+  setTimeout(()=>{ prg.style.display='none'; }, 1500);
+}
+
+function famAddMember(file, result) {
+  famSeq++;
+  const id = 'fm'+famSeq;
+  const isHead = !famMembers.some(m=>m.is_head); // أول فرد بيتحط تلقائياً كرب الأسرة
+  const m = {
+    id, file, previewUrl: URL.createObjectURL(file),
+    full_name_ar: result.arName || '', full_name_en: (result.mrz&&result.mrz.full_name_en) || '',
+    gender: (result.mrz&&result.mrz.gender) || 'ذكر', birth_date: (result.mrz&&result.mrz.birth_date) || '',
+    nationality: (result.mrz&&result.mrz.nationality) || 'مصرية',
+    passport_no: (result.mrz&&result.mrz.passport_no) || result.passportNoFallback || '',
+    passport_expiry_date: (result.mrz&&result.mrz.passport_expiry_date) || '',
+    phone: '', is_head: isHead, link_relation: '',
+    room_type: document.getElementById('fam-rm-default').value || 'ثلاثي',
+    room_number_mecca:'', room_number_madina:'',
+    has_own_ticket:false, has_own_barcode:false, has_own_visa:false,
+    has_meals:false, has_train:false, has_makkah_view:false, has_haram_view:false,
+    reviewed:false, ocr_ok: !!(result.arName || result.mrz),
+    saved:false, client_id:null, booking_id:null
+  };
+  if(famTravelerType(m)!=='بالغ') m.room_type = 'بدون';
+  famMembers.push(m);
+  famRenderMember(m);
+  famUpdateTotals();
+}
+
+function famRenderMember(m) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sbox'; wrap.id = 'fam-card-'+m.id;
+  wrap.style.borderColor = m.ocr_ok ? 'var(--border)' : 'rgba(192,57,43,.5)';
+  wrap.innerHTML = `
+    <div class="sbox-title">
+      <span>👤 فرد #${famMembers.length} ${m.ocr_ok?'':' - <span style="color:var(--red-light)">⚠️ تعذر استخراج بعض البيانات، راجعيها يدوياً</span>'}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="display:flex;align-items:center;gap:5px;font-weight:600;font-size:12px;color:var(--text2)"><input type="radio" name="fam-head" ${m.is_head?'checked':''} onchange="famSetHead('${m.id}')"> رب الأسرة</label>
+        <button class="btn btn-danger btn-sm" onclick="famRemoveMember('${m.id}')">🗑️ حذف</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <img src="${m.previewUrl}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0">
+      <div class="form-grid" style="flex:1;min-width:280px">
+        <div class="form-group"><label>الاسم بالعربي *</label><input id="fam-ar-${m.id}" type="text" value="${m.full_name_ar}" oninput="famField('${m.id}','full_name_ar',this.value)"></div>
+        <div class="form-group"><label>الاسم بالإنجليزي</label><input id="fam-en-${m.id}" type="text" value="${m.full_name_en}" oninput="famField('${m.id}','full_name_en',this.value)"></div>
+        <div class="form-group"><label>الجنس</label><select id="fam-gen-${m.id}" onchange="famField('${m.id}','gender',this.value)"><option value="ذكر" ${m.gender==='ذكر'?'selected':''}>ذكر</option><option value="أنثى" ${m.gender==='أنثى'?'selected':''}>أنثى</option></select></div>
+        <div class="form-group"><label>تاريخ الميلاد (النوع: <span id="fam-tp-${m.id}">${famTravelerType(m)}</span>)</label><input id="fam-bday-${m.id}" type="date" value="${m.birth_date||''}" onchange="famField('${m.id}','birth_date',this.value);famRoomAutoAdjust('${m.id}')"></div>
+        <div class="form-group"><label>الجنسية</label><input id="fam-nat-${m.id}" type="text" value="${m.nationality}" oninput="famField('${m.id}','nationality',this.value)"></div>
+        <div class="form-group"><label>الهاتف</label><input id="fam-ph-${m.id}" type="tel" value="${m.phone}" oninput="famField('${m.id}','phone',this.value)"></div>
+        <div class="form-group"><label>رقم الجواز</label><input id="fam-ppno-${m.id}" type="text" value="${m.passport_no}" oninput="famField('${m.id}','passport_no',this.value)"></div>
+        <div class="form-group"><label>انتهاء الجواز</label><input id="fam-ppexp-${m.id}" type="date" value="${m.passport_expiry_date||''}" onchange="famField('${m.id}','passport_expiry_date',this.value)"></div>
+        <div class="form-group" id="fam-rel-wrap-${m.id}" style="${m.is_head?'display:none':''}"><label>صفة القرابة لرب الأسرة *</label><select id="fam-rel-${m.id}" onchange="famField('${m.id}','link_relation',this.value)"><option value="">-- اختر --</option><option value="زوج">زوج</option><option value="زوجة">زوجة</option><option value="أب">أب</option><option value="أم">أم</option><option value="ابن">ابن</option><option value="ابنة">ابنة</option><option value="أخ">أخ</option><option value="أخت">أخت</option><option value="محرم">محرم</option></select></div>
+        <div class="form-group"><label>نوع الغرفة</label><select id="fam-rm-${m.id}" onchange="famField('${m.id}','room_type',this.value);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"><option value="بدون" ${m.room_type==='بدون'?'selected':''}>بدون سرير (طفل/رضيع)</option><option value="فردي" ${m.room_type==='فردي'?'selected':''}>فردي</option><option value="ثنائي" ${m.room_type==='ثنائي'?'selected':''}>ثنائي</option><option value="ثلاثي" ${m.room_type==='ثلاثي'?'selected':''}>ثلاثي</option><option value="رباعي" ${m.room_type==='رباعي'?'selected':''}>رباعي</option><option value="خماسي" ${m.room_type==='خماسي'?'selected':''}>خماسي</option></select></div>
+      </div>
+    </div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;color:var(--text2);font-size:12px;font-weight:600">➕ خصومات وإضافات خاصة بهذا الفرد (اختياري)</summary>
+      <div class="check-row" style="margin-top:10px">
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_own_ticket',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> ✈️ تذكرة خاصة</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_own_barcode',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 📊 باركود خاص</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_own_visa',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 🪪 تأشيرة خاصة</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_meals',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 🍽️ وجبات</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_train',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 🚄 قطار الحرمين</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_makkah_view',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 🕌 إطلالة مكة</label>
+        <label class="check-item"><input type="checkbox" onchange="famField('${m.id}','has_haram_view',this.checked);famUpdateCardPrice(fmFind('${m.id}'));famUpdateTotals()"> 🕋 إطلالة الحرم</label>
+      </div>
+      <div class="form-grid" style="margin-top:10px">
+        <div class="form-group"><label>رقم غرفة مكة</label><input type="text" oninput="famField('${m.id}','room_number_mecca',this.value)"></div>
+        <div class="form-group"><label>رقم غرفة المدينة</label><input type="text" oninput="famField('${m.id}','room_number_madina',this.value)"></div>
+      </div>
+    </details>
+    <div class="price-row total" style="margin-top:10px"><span>💰 سعر هذا الفرد</span><span id="fam-px-${m.id}">0 ج</span></div>
+    <label class="check-item" style="margin-top:8px;font-weight:700" id="fam-rev-wrap-${m.id}">
+      <input type="checkbox" id="fam-rev-${m.id}" ${m.reviewed?'checked':''} onchange="famField('${m.id}','reviewed',this.checked);famRenderReviewState('${m.id}')"> ✅ راجعت بيانات الفرد ده وهي صح
+    </label>`;
+  document.getElementById('fam-members').appendChild(wrap);
+  famUpdateCardPrice(m);
+  famRenderReviewState(m.id);
+}
+
+function fmFind(id) { return famMembers.find(x=>x.id===id); }
+
+function famField(id, key, val) { const m = fmFind(id); if(m) m[key] = val; }
+
+function famRoomAutoAdjust(id) {
+  const m = fmFind(id); if(!m) return;
+  if(famTravelerType(m)!=='بالغ' && m.room_type!=='بدون') { m.room_type='بدون'; const sel=document.getElementById('fam-rm-'+id); if(sel) sel.value='بدون'; }
+  famUpdateCardPrice(m); famUpdateTotals();
+}
+
+function famRenderReviewState(id) {
+  const m = fmFind(id); if(!m) return;
+  const card = document.getElementById('fam-card-'+id);
+  if(card) card.style.borderColor = m.reviewed ? 'var(--green-light)' : (m.ocr_ok?'var(--border)':'rgba(192,57,43,.5)');
+}
+
+function famSetHead(id) {
+  famMembers.forEach(m=>{
+    m.is_head = (m.id===id);
+    const relWrap = document.getElementById('fam-rel-wrap-'+m.id);
+    if(relWrap) relWrap.style.display = m.is_head ? 'none' : '';
+    if(m.is_head) m.link_relation = '';
+  });
+}
+
+function famRemoveMember(id) {
+  const m = fmFind(id); if(!m) return;
+  confirmAction(`حذف ${m.full_name_ar||'هذا الفرد'} من الأسرة؟`, 'مش هيتحفظ خالص لو مكملتيش من غيره', '🗑️', ()=>{
+    famMembers = famMembers.filter(x=>x.id!==id);
+    const card = document.getElementById('fam-card-'+id); if(card) card.remove();
+    // لو مسحنا رب الأسرة، أول فرد باقي بيبقى رب الأسرة تلقائياً
+    if(m.is_head && famMembers.length) famSetHead(famMembers[0].id);
+    // إعادة ترقيم البطاقات المعروضة
+    document.querySelectorAll('#fam-members .sbox-title > span:first-child').forEach((el,i)=>{ /* الترقيم بصري فقط */ });
+    famUpdateTotals();
+  });
+}
+
+async function saveFam() {
+  const tid = document.getElementById('fam-tr').value, pid = document.getElementById('fam-pg').value;
+  if(!tid || !pid) { toast('يرجى اختيار الرحلة والبرنامج','error'); return; }
+  if(!famMembers.length) { toast('لسه مفيش أفراد مضافين','error'); return; }
+  const head = famMembers.find(m=>m.is_head);
+  if(!head) { toast('يرجى تحديد رب الأسرة','error'); return; }
+  // ------- تحقق صارم قبل أي حفظ: صفر أخطاء -------
+  for(const m of famMembers) {
+    if(m.saved) continue;
+    if(!m.full_name_ar || !m.full_name_ar.trim()) { toast(`فرد ناقصه الاسم بالعربي - راجعي البطاقة رقم ${famMembers.indexOf(m)+1}`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    if(!m.is_head && !m.link_relation) { toast(`"${m.full_name_ar}" محتاج تحديد صفة القرابة لرب الأسرة`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    if(!m.reviewed) { toast(`لازم تراجعي بيانات "${m.full_name_ar||'الفرد رقم '+(famMembers.indexOf(m)+1)}" وتعلّمي "✅ راجعت البيانات" قبل الحفظ`,'error'); document.getElementById('fam-card-'+m.id)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  }
+  const saveBtn = document.getElementById('fam-save-btn');
+  saveBtn.disabled = true;
+  const cur = document.getElementById('fam-cur').value;
+  try {
+    // رب الأسرة الأول لازم يتحفظ الأول عشان نجيب الـ id ونربط بيه الباقي
+    const ordered = [head, ...famMembers.filter(m=>m!==head)];
+    for(let i=0;i<ordered.length;i++) {
+      const m = ordered[i];
+      if(m.saved) continue;
+      saveBtn.textContent = `⏳ جاري حفظ ${i+1} من ${ordered.length}...`;
+      const clientData = {
+        full_name_ar: m.full_name_ar.trim(), full_name_en: m.full_name_en.trim()||null,
+        gender: m.gender, birth_date: m.birth_date||null, phone: m.phone.trim()||null,
+        nationality: m.nationality.trim()||'مصرية', passport_no: m.passport_no.trim()||null,
+        passport_expiry_date: m.passport_expiry_date||null,
+        linked_to: m.is_head ? null : (head.client_id||null),
+        link_relation: m.is_head ? null : m.link_relation,
+      };
+      const cRes = await sb('haj_clients','POST',clientData);
+      m.client_id = cRes[0]?.id;
+      const px = famCalcPrice(m);
+      const bkData = {
+        client_id: m.client_id, trip_id: tid, program_id: pid,
+        traveler_type: famTravelerType(m), room_type: m.room_type,
+        room_number_mecca: m.room_number_mecca.trim()||null, room_number_madina: m.room_number_madina.trim()||null,
+        has_own_ticket: m.has_own_ticket, has_own_barcode: m.has_own_barcode, has_own_visa: m.has_own_visa,
+        has_meals: m.has_meals, has_train: m.has_train, has_makkah_view: m.has_makkah_view, has_haram_view: m.has_haram_view,
+        base_price: px.base, deductions_total: px.deduct, additions_total: px.add, final_price: px.fin,
+        currency: cur, visa_status: 'لم تُقدَّم', vaccine_status: 'غير مكتملة', status: 'محجوز', notes: null
+      };
+      const bRes = await sb('haj_bookings','POST',bkData);
+      m.booking_id = bRes[0]?.id;
+      m.saved = true;
+      const card = document.getElementById('fam-card-'+m.id);
+      if(card) { card.style.borderColor='var(--green-light)'; card.style.opacity='0.75'; }
+    }
+    toast(`تم حفظ الأسرة كاملة (${ordered.length} فرد) ✅`);
+    aClients=[]; aBks=[];
+    closeFamModal();
+  } catch(e) {
+    toast('حصل خطأ أثناء الحفظ: '+e.message+' - اللي اتحفظ فعلاً مش هيتكرر، صلّحي المشكلة واضغطي حفظ تاني','error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = '💾 حفظ الأسرة';
+  }
 }
 
 // ============================================================

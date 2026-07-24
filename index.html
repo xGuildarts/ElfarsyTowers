@@ -1721,7 +1721,7 @@ function renderClients(list){
     <td style="${exp?'color:var(--red-light)':''}">${fd(c.passport_expiry_date)}${exp?' &#x26A0;&#xFE0F;':''}</td>
     <td>${c.phone||'-'}</td>
     <td>${lnk?`<span class="link-badge">&#x1F517; ${lnk.full_name_ar} (${c.link_relation})</span>`:'-'}</td>
-    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button></td>
+    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelClient(${c.id},'${c.full_name_ar.replace(/'/g,"\\'")}')" title="حذف العميل">&#x1F5D1;&#xFE0F;</button></td>
     </tr>`;
   }).join('');
 }
@@ -1750,6 +1750,71 @@ async function saveClient(){
   const dup=await checkDuplicateClient(d, ed.client);
   if(dup){toast(dupMsg(dup),'error');return;}
   try{if(ed.client)await sb(`haj_clients?id=eq.${ed.client}`,'PATCH',d);else await sb('haj_clients','POST',d);toast('تم الحفظ');closeM('cl-modal');loadClients();}catch(e){toast('خطأ: '+e.message,'error');}
+}
+
+// ============ حذف العميل ============
+async function confirmDelClient(id, name){
+  if(!requirePerm('حذف عميل')) return;
+  // فحص هل فيه حجوزات مرتبطة بالعميل
+  let bksCount = 0;
+  try {
+    const bks = await sb(`haj_bookings?client_id=eq.${id}&select=id,status`);
+    bksCount = bks.length;
+    const activeBks = bks.filter(b => b.status !== 'ملغي');
+    if(activeBks.length > 0){
+      // فيه حجوزات فعّالة - رفض الحذف
+      confirmAction(
+        `لا يمكن حذف "${name}"`,
+        `هذا العميل لديه ${activeBks.length} حجز فعّال. يجب إلغاء أو حذف جميع حجوزاته أولاً قبل حذف العميل.`,
+        '🚫',
+        () => {},
+        false
+      );
+      return;
+    }
+    if(bksCount > 0){
+      // فيه حجوزات ملغية فقط
+      const ok = await sConfirm(
+        `حذف العميل "${name}"؟`,
+        `⚠️ هذا العميل لديه ${bksCount} حجز ملغي سيتم حذفه أيضاً. هذا الإجراء لا يمكن التراجع عنه.`,
+        '🗑️', true
+      );
+      if(!ok) return;
+    } else {
+      // مفيش حجوزات خالص
+      const ok = await sConfirm(
+        `حذف العميل "${name}"؟`,
+        'سيتم حذف بيانات العميل نهائياً. هذا الإجراء لا يمكن التراجع عنه.',
+        '🗑️', true
+      );
+      if(!ok) return;
+    }
+  } catch(e) {
+    toast('خطأ في فحص حجوزات العميل: ' + e.message, 'error');
+    return;
+  }
+  await delClient(id, name);
+}
+
+async function delClient(id, name){
+  try {
+    // حذف الحجوزات الملغية والدفعات المرتبطة بها أولاً
+    const bks = await sb(`haj_bookings?client_id=eq.${id}&select=id`);
+    for(const bk of bks){
+      await sb(`haj_payments?booking_id=eq.${bk.id}`, 'DELETE');
+      await sb(`haj_bookings?id=eq.${bk.id}`, 'DELETE');
+    }
+    // حذف العميل
+    await sb(`haj_clients?id=eq.${id}`, 'DELETE');
+    // تحديث القائمة المحلية
+    aClients = aClients.filter(c => c.id != id);
+    aBks = aBks.filter(b => b.client_id != id);
+    toast(`✅ تم حذف العميل "${name}" بنجاح`);
+    renderClients(aClients);
+    fillClSels();
+  } catch(e) {
+    toast('خطأ في حذف العميل: ' + e.message, 'error');
+  }
 }
 
 // ============ OCR (Tesseract.js - مجاني بالكامل، شغال في المتصفح) ============

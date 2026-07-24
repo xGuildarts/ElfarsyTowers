@@ -102,6 +102,14 @@ input[type="checkbox"]{width:auto;accent-color:var(--green-light);transform:scal
 .info-box.danger{background:rgba(192,57,43,.09);border:1px solid rgba(192,57,43,.25);border-right-color:var(--red-light);color:#f0a0a0}
 .info-box.info{background:rgba(36,113,163,.09);border:1px solid rgba(36,113,163,.25);border-right-color:var(--blue);color:#90c4e8}
 .section-title{font-size:20px;font-weight:800;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.dash-filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+.dash-filter-bar .filter-label{font-size:12px;color:var(--text3);font-weight:700;white-space:nowrap}
+.dash-period-btn{padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--transition)}
+.dash-period-btn:hover{background:rgba(212,168,67,.1);color:var(--gold);border-color:rgba(212,168,67,.3)}
+.dash-period-btn.active{background:linear-gradient(135deg,var(--gold-dark),var(--gold));color:#0b1912;border-color:var(--gold);box-shadow:0 2px 10px rgba(212,168,67,.3)}
+.dash-month-select{background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:12px;outline:none;cursor:pointer}
+.dash-month-select:focus{border-color:rgba(212,168,67,.4)}
+.dash-filter-indicator{font-size:11px;padding:4px 11px;border-radius:20px;background:rgba(34,160,107,.15);color:#2ecc8f;border:1px solid rgba(34,160,107,.3);font-weight:700;margin-right:auto}
 .divider{border:none;border-top:1px solid var(--border);margin:16px 0}
 .trip-card{background:linear-gradient(145deg,var(--card),var(--bg3));border:1px solid var(--border);border-radius:13px;padding:17px;cursor:pointer;transition:all var(--transition)}
 .trip-card:hover{border-color:rgba(212,168,67,.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 0 1px rgba(212,168,67,.08)}
@@ -359,7 +367,29 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 <div id="main">
 <!-- DASHBOARD -->
 <div id="tab-dashboard" class="tab-content">
-  <div class="section-title"><span>📊</span> <span class="lang-ar">لوحة التحكم</span><span class="lang-en">Dashboard</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div class="section-title" style="margin-bottom:0"><span>📊</span> <span class="lang-ar">لوحة التحكم</span><span class="lang-en">Dashboard</span></div>
+  </div>
+
+  <!-- فلتر الفترة الزمنية -->
+  <div class="dash-filter-bar">
+    <span class="filter-label">📅 عرض:</span>
+    <button class="dash-period-btn active" onclick="setDashPeriod('all',this)">الإجمالي الكلي</button>
+    <button class="dash-period-btn" onclick="setDashPeriod('year',this)">هذه السنة</button>
+    <button class="dash-period-btn" onclick="setDashPeriod('month',this)">هذا الشهر</button>
+    <button class="dash-period-btn" onclick="setDashPeriod('custom',this)">شهر بعينه ▾</button>
+    <div id="dash-month-picker" style="display:none;align-items:center;gap:6px">
+      <select class="dash-month-select" id="dash-month-sel" onchange="applyCustomMonth()">
+        <option value="1">يناير</option><option value="2">فبراير</option><option value="3">مارس</option>
+        <option value="4">أبريل</option><option value="5">مايو</option><option value="6">يونيو</option>
+        <option value="7">يوليو</option><option value="8">أغسطس</option><option value="9">سبتمبر</option>
+        <option value="10">أكتوبر</option><option value="11">نوفمبر</option><option value="12">ديسمبر</option>
+      </select>
+      <select class="dash-month-select" id="dash-year-sel" onchange="applyCustomMonth()"></select>
+    </div>
+    <span class="dash-filter-indicator" id="dash-filter-indicator">كل البيانات</span>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-icon">🗓️</div><div class="stat-num" id="s-trips">-</div><div class="stat-label"><span class="lang-ar">رحلات نشطة</span><span class="lang-en">Active Trips</span></div></div>
     <div class="stat-card green"><div class="stat-icon">📋</div><div class="stat-num" id="s-bks">-</div><div class="stat-label"><span class="lang-ar">إجمالي الحجوزات</span><span class="lang-en">Total Bookings</span></div></div>
@@ -373,7 +403,10 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <div id="dash-alerts"></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title"><span class="lang-ar">🗓️ الرحلات النشطة</span><span class="lang-en">🗓️ Active Trips</span></div><button class="btn btn-primary btn-sm" onclick="showTab('trips')"><span class="lang-ar">كل الرحلات</span><span class="lang-en">All Trips</span></button></div>
+    <div class="card-header">
+      <div class="card-title"><span class="lang-ar" id="dash-trips-title">🗓️ الرحلات</span><span class="lang-en">🗓️ Trips</span></div>
+      <button class="btn btn-primary btn-sm" onclick="showTab('trips')"><span class="lang-ar">كل الرحلات</span><span class="lang-en">All Trips</span></button>
+    </div>
     <div id="dash-trips"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
@@ -1489,73 +1522,159 @@ document.addEventListener('change', e=>{
 });
 
 // ============ DASHBOARD ============
+// ============ DASHBOARD PERIOD FILTER ============
+let _dashPeriod='all', _dashMonth=null, _dashYear=null;
+let _dashAllBks=[], _dashAllPays=[], _dashAllTrips=[], _dashAllCls=[];
+
+function initDashYearSel(){
+  const sel=document.getElementById('dash-year-sel'); if(!sel||sel.options.length>1)return;
+  const y=new Date().getFullYear();
+  for(let i=y;i>=y-5;i--){const o=document.createElement('option');o.value=i;o.textContent=i;sel.appendChild(o);}
+  sel.value=y;
+  document.getElementById('dash-month-sel').value=new Date().getMonth()+1;
+}
+
+function setDashPeriod(period, btn){
+  _dashPeriod=period;
+  document.querySelectorAll('.dash-period-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const picker=document.getElementById('dash-month-picker');
+  if(period==='custom'){
+    picker.style.display='flex';
+    initDashYearSel();
+    applyCustomMonth();
+  }else{
+    picker.style.display='none';
+    _dashMonth=null; _dashYear=null;
+    renderDashStats();
+  }
+}
+
+function applyCustomMonth(){
+  _dashMonth=parseInt(document.getElementById('dash-month-sel')?.value||new Date().getMonth()+1);
+  _dashYear=parseInt(document.getElementById('dash-year-sel')?.value||new Date().getFullYear());
+  renderDashStats();
+}
+
+const MONTH_NAMES=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+function filterByPeriod(records, dateField){
+  if(_dashPeriod==='all') return records;
+  const now=new Date();
+  return records.filter(r=>{
+    const d=r[dateField]?new Date(r[dateField]):null;
+    if(!d||isNaN(d)) return false;
+    if(_dashPeriod==='year') return d.getFullYear()===now.getFullYear();
+    if(_dashPeriod==='month') return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+    if(_dashPeriod==='custom') return d.getFullYear()===_dashYear&&d.getMonth()===(_dashMonth-1);
+    return true;
+  });
+}
+
+function renderDashStats(){
+  const bks=_dashAllBks, pays=_dashAllPays, trips=_dashAllTrips, cls=_dashAllCls;
+
+  // فلترة حسب تاريخ الإنشاء
+  const fBks = filterByPeriod(bks.filter(b=>b.status!=='ملغي'), 'created_at');
+  const fPays = filterByPeriod(pays, 'payment_date');
+  const fTrips = _dashPeriod==='all'
+    ? trips.filter(t=>t.status==='مفتوحة')
+    : filterByPeriod(trips, 'depart_date');
+
+  // label للمؤشر
+  let label='كل البيانات';
+  if(_dashPeriod==='year') label=`سنة ${new Date().getFullYear()}`;
+  if(_dashPeriod==='month') label=`${MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  if(_dashPeriod==='custom'&&_dashMonth) label=`${MONTH_NAMES[_dashMonth-1]} ${_dashYear}`;
+  const indEl=document.getElementById('dash-filter-indicator');
+  if(indEl)indEl.textContent=label;
+
+  // title للرحلات
+  const tEl=document.getElementById('dash-trips-title');
+  if(tEl)tEl.textContent=_dashPeriod==='all'?'🗓️ الرحلات النشطة':`🗓️ رحلات - ${label}`;
+
+  document.getElementById('s-trips').textContent=fTrips.length;
+  document.getElementById('s-bks').textContent=fBks.length;
+  document.getElementById('s-cls').textContent=_dashPeriod==='all'?cls.length:fBks.map(b=>b.client_id).filter((v,i,a)=>a.indexOf(v)===i).length;
+
+  const tot=fBks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
+  const coll=fPays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
+  document.getElementById('s-paid').textContent=fn(coll);
+  document.getElementById('s-rem').textContent=fn(Math.max(0,tot-coll));
+  const rate=tot>0?Math.round(coll/tot*100):0;
+  document.getElementById('s-rate').textContent=rate+'%';
+  const pendingBks=fBks.filter(b=>b.status!=='مكتمل').length;
+  document.getElementById('s-inst').textContent=pendingBks;
+
+  // عرض كروت الرحلات
+  const cnt=document.getElementById('dash-trips');
+  const displayTrips=_dashPeriod==='all'?trips.slice(0,8):fTrips.slice(0,12);
+  if(!displayTrips.length){cnt.innerHTML='<div class="empty-state"><div class="empty-icon">🗓️</div><h3>لا توجد رحلات في هذه الفترة</h3></div>';return;}
+  let h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">';
+  displayTrips.forEach(t=>{
+    const tb=bks.filter(b=>b.trip_id==t.id&&b.status!=='ملغي');
+    const ftb=_dashPeriod==='all'?tb:filterByPeriod(tb,'created_at');
+    const ad=ftb.filter(b=>b.traveler_type==='بالغ').length,ch=ftb.filter(b=>b.traveler_type==='طفل').length,inf=ftb.filter(b=>b.traveler_type==='رضيع').length;
+    const progs=aProgs.filter(p=>p.trip_id==t.id);
+    const totalSeats=progs.reduce((s,p)=>s+(+p.pax_on_trip||0),0);
+    const pct=totalSeats>0?Math.round(tb.length/totalSeats*100):0;
+    const pctCol=pct>=100?'var(--red-light)':pct>=80?'var(--gold)':'var(--green-light)';
+    const tripBkIds=tb.map(b=>b.id);
+    const paid=pays.filter(p=>tripBkIds.includes(p.booking_id)&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
+    const rem=tb.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0)-paid;
+    h+=`<div class="trip-card" onclick="viewTrBks(${t.id})">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:700;font-size:14px">${t.name}</span>${bdg(t.status)}</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${fd(t.depart_date)} ${trbdg(t.trip_type)}</div>
+      ${totalSeats>0?`<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:var(--text3)">الإشغال</span>
+          <span style="color:${pctCol};font-weight:700">${tb.length}/${totalSeats} (${pct}%)</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${Math.min(pct,100)}%;background:${pctCol};border-radius:3px;transition:width .3s"></div></div>
+      </div>`:''}
+      <div class="mini-stats">
+        <div class="mini-stat"><div class="mini-num" style="color:#2ecc8f">${ad}</div><div class="mini-lbl">بالغين</div></div>
+        <div class="mini-stat"><div class="mini-num" style="color:var(--gold)">${ch}</div><div class="mini-lbl">أطفال</div></div>
+        <div class="mini-stat"><div class="mini-num" style="color:#bb8fce">${inf}</div><div class="mini-lbl">رضع</div></div>
+        <div class="mini-stat"><div class="mini-num" style="color:${rem>0?'var(--red-light)':'#2ecc8f'};font-size:14px">${fn(rem)}</div><div class="mini-lbl">متبقي ج</div></div>
+      </div>
+    </div>`;
+  });
+  h+='</div>';cnt.innerHTML=h;
+}
+
 async function loadDash(){
   try{
-    const[trips,bks,cls,pays,allTrips]=await Promise.all([sb('haj_trips?status=eq.مفتوحة&limit=100'),sb('haj_bookings?limit=1000'),sb('haj_clients?is_cancelled=eq.false&limit=1000'),sb('haj_payments?limit=2000'),sb('haj_trips?order=depart_date.desc&limit=200')]);
+    const[trips,bks,cls,pays,allTrips]=await Promise.all([
+      sb('haj_trips?status=eq.مفتوحة&limit=100'),
+      sb('haj_bookings?limit=5000'),
+      sb('haj_clients?is_cancelled=eq.false&limit=2000'),
+      sb('haj_payments?limit=10000'),
+      sb('haj_trips?order=depart_date.desc&limit=200')
+    ]);
     aTrips=allTrips; aPays=pays; aClients=cls; aBks=bks;
-    document.getElementById('s-trips').textContent=trips.length;
-    document.getElementById('s-bks').textContent=bks.filter(b=>b.status!=='ملغي').length;
-    document.getElementById('s-cls').textContent=cls.length;
-    const tot=bks.filter(b=>b.status!=='ملغي'&&b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
-    const coll=pays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
-    document.getElementById('s-paid').textContent=fn(coll);
-    document.getElementById('s-rem').textContent=fn(tot-coll);
-    const rate=tot>0?Math.round(coll/tot*100):0;
-    document.getElementById('s-rate').textContent=rate+'%';
-    const pendingBks=bks.filter(b=>b.status!=='ملغي'&&b.status!=='مكتمل').length;
-    document.getElementById('s-inst').textContent=pendingBks;
-    // تنبيهات الجوازات المنتهية/قريبة الانتهاء
+    _dashAllBks=bks; _dashAllPays=pays; _dashAllTrips=allTrips; _dashAllCls=cls;
+
+    // تنبيهات الداشبورد (دايمًا كلية مش مفلترة)
     const today=new Date(), in90=new Date();in90.setDate(today.getDate()+90);
     const expiredPP=cls.filter(c=>c.passport_expiry_date&&new Date(c.passport_expiry_date)<today);
     const soonPP=cls.filter(c=>c.passport_expiry_date&&new Date(c.passport_expiry_date)>=today&&new Date(c.passport_expiry_date)<=in90);
-    // تنبيه حجوزات بدون دفع
     const unpaid=bks.filter(b=>b.status==='محجوز'&&b.final_price>0);
-
     let alerts='';
     if(expiredPP.length)alerts+=`<div class="info-box danger" style="margin-bottom:10px"><span>&#x26A0;&#xFE0F;</span><div><b>${expiredPP.length} جواز منتهي الصلاحية!</b> ${expiredPP.slice(0,3).map(c=>c.full_name_ar).join('، ')}${expiredPP.length>3?` و${expiredPP.length-3} آخرين`:''}</div></div>`;
     if(soonPP.length)alerts+=`<div class="info-box warning" style="margin-bottom:10px"><span>&#x23F0;</span><div><b>${soonPP.length} جواز ينتهي خلال 90 يوم</b> - راجعهم قبل السفر</div></div>`;
     if(unpaid.length)alerts+=`<div class="info-box info" style="margin-bottom:10px"><span>&#x1F4B0;</span><div><b>${unpaid.length} حجز لم يُسدَّد بعد</b> - إجمالي متبقي: ${fn(unpaid.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0))} ج</div></div>`;
     try{
-      const instRows = getUpcomingInstallments(3);
+      const instRows=getUpcomingInstallments(3);
       if(instRows.length){
-        const overdueCnt = instRows.filter(r=>r.overdue).length;
+        const overdueCnt=instRows.filter(r=>r.overdue).length;
         alerts+=`<div class="info-box ${overdueCnt?'danger':'warning'}" style="margin-bottom:10px"><span>📅</span><div><b>${instRows.length} قسط مستحق ${overdueCnt?`(${overdueCnt} متأخر)`:'خلال 3 أيام'}</b> - <span style="cursor:pointer;color:var(--gold);text-decoration:underline" onclick="showTab('installments')">عرض التفاصيل</span></div></div>`;
       }
     }catch(e){}
     if(alerts){document.getElementById('dash-alerts').innerHTML=alerts;document.getElementById('dash-alerts-card').style.display='block';}
 
-    const cnt=document.getElementById('dash-trips');
-    if(!aTrips.length){cnt.innerHTML='<div class="empty-state"><div class="empty-icon">&#x1F5D3;&#xFE0F;</div><h3>&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x631;&#x62D;&#x644;&#x627;&#x62A;</h3></div>';return;}
-    let h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">';
-    aTrips.slice(0,8).forEach(t=>{
-      const tb=bks.filter(b=>b.trip_id==t.id&&b.status!=='ملغي');
-      const ad=tb.filter(b=>b.traveler_type==='بالغ').length,ch=tb.filter(b=>b.traveler_type==='طفل').length,inf=tb.filter(b=>b.traveler_type==='رضيع').length;
-      const progs=aProgs.filter(p=>p.trip_id==t.id);
-      const totalSeats=progs.reduce((s,p)=>s+(+p.pax_on_trip||0),0);
-      const pct=totalSeats>0?Math.round(tb.length/totalSeats*100):0;
-      const pctCol=pct>=100?'var(--red-light)':pct>=80?'var(--gold)':'var(--green-light)';
-      const paid=pays.filter(p=>tb.map(b=>b.id).includes(p.booking_id)&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
-      const rem=tb.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0)-paid;
-      h+=`<div class="trip-card" onclick="viewTrBks(${t.id})">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:700;font-size:14px">${t.name}</span>${bdg(t.status)}</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${fd(t.depart_date)} ${trbdg(t.trip_type)}</div>
-        ${totalSeats>0?`<div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-            <span style="color:var(--text3)">الإشغال</span>
-            <span style="color:${pctCol};font-weight:700">${tb.length}/${totalSeats} (${pct}%)</span>
-          </div>
-          <div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${Math.min(pct,100)}%;background:${pctCol};border-radius:3px;transition:width .3s"></div></div>
-        </div>`:''}
-        <div class="mini-stats">
-          <div class="mini-stat"><div class="mini-num" style="color:#4caf84">${ad}</div><div class="mini-lbl">بالغين</div></div>
-          <div class="mini-stat"><div class="mini-num" style="color:var(--gold)">${ch}</div><div class="mini-lbl">أطفال</div></div>
-          <div class="mini-stat"><div class="mini-num" style="color:#bb8fce">${inf}</div><div class="mini-lbl">رضع</div></div>
-          <div class="mini-stat"><div class="mini-num" style="color:${rem>0?'var(--red-light)':'#4caf84'};font-size:14px">${fn(rem)}</div><div class="mini-lbl">متبقي ج</div></div>
-        </div>
-      </div>`;
-    });
-    h+='</div>';cnt.innerHTML=h;
-  }catch(e){document.getElementById('dash-trips').innerHTML='<div class="info-box danger">&#x274C; &#x62A;&#x639;&#x630;&#x631; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644; - &#x62A;&#x62D;&#x642;&#x642; &#x645;&#x646; Supabase</div>';}
+    renderDashStats();
+  }catch(e){document.getElementById('dash-trips').innerHTML='<div class="info-box danger">&#x274C; تعذر التحميل - تحقق من Supabase</div>';}
 }
 function viewTrBks(id){showTab('bookings');setTimeout(()=>{document.getElementById('bk-trip-f').value=id;loadBookings();},200);}
 

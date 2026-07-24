@@ -1532,15 +1532,18 @@ async function doOCR(file){
     stat.textContent='جاري تحليل الصفحة...';bar.style.width='10%';
     const rFull=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(10+Math.round(m.progress*35))+'%';}});
 
-    // القراءة الثانية: مخصصة بس لحروف MRZ (A-Z 0-9 <) من غير أي عربي - دقة أعلى بكتير لسطرين الـ MRZ
+    // القراءة الثانية: إنجليزي فقط (من غير عربي) - بتقلل التشويش وتحسن قراءة سطرين الـ MRZ
     stat.textContent='جاري قراءة رمز MRZ بدقة أعلى...';bar.style.width='50%';
-    const worker=await Tesseract.createWorker('eng');
-    await worker.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',tessedit_pageseg_mode:'6'});
-    const rMrz=await worker.recognize(file);
-    await worker.terminate();
+    let rMrzText='';
+    try{
+      const rMrz=await Tesseract.recognize(file,'eng',{logger:m=>{if(m.status==='recognizing text')bar.style.width=(50+Math.round(m.progress*40))+'%';}});
+      rMrzText=rMrz.data.text;
+    }catch(e2){
+      console.error('MRZ pass failed, falling back to full text only',e2);
+    }
     bar.style.width='90%';
 
-    const mrz=parseMRZ(rMrz.data.text)||parseMRZ(rFull.data.text);
+    const mrz=parseMRZ(rMrzText)||parseMRZ(rFull.data.text);
     bar.style.width='100%';
     if(mrz){
       if(mrz.full_name_en)document.getElementById('cl-en').value=mrz.full_name_en;
@@ -1553,7 +1556,7 @@ async function doOCR(file){
       toast('تم استخراج بيانات الجواز من MRZ - راجعها وأكملي الباقي يدوياً (تاريخ الإصدار وجهة الإصدار)','success');
     }else{
       // فشل قراءة الـ MRZ - نرجع لمحاولة استخراج رقم الجواز بس بالـ regex القديم
-      const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrz.data.text.match(/[A-Z]{1,2}\d{6,8}/);
+      const pp=rFull.data.text.match(/[A-Z]{1,2}\d{6,8}/)||rMrzText.match(/[A-Z]{1,2}\d{6,8}/);
       if(pp){document.getElementById('cl-ppno').value=pp[0];stat.textContent='&#x26A0;&#xFE0F; استخرجنا رقم الجواز فقط';toast('تعذرت قراءة كل البيانات - تم استخراج رقم الجواز فقط، أدخلي الباقي يدوياً','info');}
       else{stat.textContent='&#x274C; تعذر الاستخراج';toast('تعذر استخراج البيانات - أدخليها يدوياً، حاولي بصورة أوضح للـ MRZ (السطرين تحت في الجواز)','error');}
     }

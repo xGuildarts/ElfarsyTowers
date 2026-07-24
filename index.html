@@ -647,6 +647,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 <!-- ===== MODALS ===== -->
 
 <!-- TRIP MODAL -->
+<datalist id="hotels-datalist"></datalist>
 <div id="trip-modal" class="modal-overlay">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -838,6 +839,13 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
           <div class="check-item"><input type="checkbox" id="bk-hrv" onchange="calcPx()"><label for="bk-hrv">🕋 إطلالة الحرم</label><span id="bk-hrv-a" style="color:#4caf84;font-size:12px"></span></div>
         </div>
       </div>
+      <div class="sbox">
+        <div class="sbox-title">💸 خصم إضافي (اختياري - أي مبلغ عاوزة تنزليه من السعر)</div>
+        <div class="form-grid">
+          <div class="form-group"><label>قيمة الخصم</label><input id="bk-exdisc" type="number" min="0" step="0.01" placeholder="0" oninput="calcPx()"></div>
+          <div class="form-group col2"><label>سبب الخصم (اختياري)</label><input id="bk-exdisc-r" type="text" placeholder="مثال: عرض خاص / عميل قديم"></div>
+        </div>
+      </div>
       <div class="price-summary">
         <div class="price-row"><span>💺 سعر التسكين الأساسي</span><span id="px-base">0 ج</span></div>
         <div class="price-row deduct" id="px-tkt-r" style="display:none"><span>- ✈️ تذكرة طيران</span><span id="px-tkt">0 ج</span></div>
@@ -847,6 +855,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="price-row add" id="px-trn-r" style="display:none"><span>+ 🚄 قطار</span><span id="px-trn">0 ج</span></div>
         <div class="price-row add" id="px-mkv-r" style="display:none"><span>+ 🕌 إطلالة مكة</span><span id="px-mkv">0 ج</span></div>
         <div class="price-row add" id="px-hrv-r" style="display:none"><span>+ 🕋 إطلالة الحرم</span><span id="px-hrv">0 ج</span></div>
+        <div class="price-row deduct" id="px-exdisc-r" style="display:none"><span>- 💸 خصم إضافي</span><span id="px-exdisc">0 ج</span></div>
         <div class="price-row total"><span>💰 السعر النهائي</span><span id="px-fin">0 ج</span></div>
         <div class="price-row" id="px-profit-r" style="display:none"><span>📈 مكسبك (بعد تكلفة المورد)</span><span id="px-profit">0 ج</span></div>
       </div>
@@ -1071,6 +1080,15 @@ async function sb(path,method='GET',body=null){
   if(!r.ok)throw new Error(await r.text());
   const t=await r.text();return t?JSON.parse(t):[];
 }
+// إعدادات (haj_settings) بتتحفظ بنظام key/value - لو المفتاح موجود بيتحدّث (PATCH)، ولو مش موجود بيتضاف (POST)
+// كده مش هيحصل خطأ "تكرار المفتاح" لما تحفظي إعدادات كنتي حفظتيها قبل كده
+async function upsertSetting(key,value){
+  const r=await sb(`haj_settings?key=eq.${encodeURIComponent(key)}`,'PATCH',{value});
+  if(!r||!r.length) await sb('haj_settings','POST',{key,value});
+}
+async function upsertSettings(list){
+  for(const x of list) await upsertSetting(x.key,x.value);
+}
 
 // ============ LIGHT MODE ============
 function toggleLightMode(){
@@ -1117,20 +1135,23 @@ async function checkDuplicateClient(data, excludeId){
 }
 function dupMsg(dup){return `⚠️ العميل موجود بالفعل: ${dup.full_name_ar}${dup.passport_no?' - جواز رقم '+dup.passport_no:''}${dup.phone?' - هاتف '+dup.phone:''}`;}
 
-// ============ SAFE BOOKING SAVE (supplier_cost column may not exist yet in DB) ============
-// لو عمود supplier_cost لسه مش متضاف في جدول haj_bookings في Supabase، بيحاول يحفظ من غيره
+// ============ SAFE BOOKING SAVE (بعض الأعمدة زي supplier_cost / extra_discount ممكن متكونش لسه متضافة في قاعدة البيانات) ============
+// لو عمود مش موجود في جدول haj_bookings في Supabase، بيحاول يحفظ من غيره تلقائياً
 // بدل ما يمنع حفظ الحجز خالص، ويطلع تنبيه للمستخدم إنه لازم يضيف العمود.
+const OPTIONAL_BK_COLS=['supplier_cost','extra_discount','extra_discount_reason'];
 async function saveBookingSafe(bkId, d){
-  try{
-    return bkId ? await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',d) : await sb('haj_bookings','POST',d);
-  }catch(e){
-    if(/supplier_cost/i.test(e.message||'') && ('supplier_cost' in d)){
-      const d2={...d}; delete d2.supplier_cost;
-      const r = bkId ? await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',d2) : await sb('haj_bookings','POST',d2);
-      toast('تم الحفظ، لكن تكلفة المورد لم تُحفظ - يجب إضافة عمود supplier_cost لجدول haj_bookings في قاعدة البيانات','error');
+  let data={...d}, missing=[];
+  for(let tries=0;tries<OPTIONAL_BK_COLS.length+1;tries++){
+    try{
+      const r = bkId ? await sb(`haj_bookings?id=eq.${bkId}`,'PATCH',data) : await sb('haj_bookings','POST',data);
+      if(missing.length) toast(`تم الحفظ، لكن (${missing.join('، ')}) لم تُحفظ - يجب إضافة الأعمدة دي لجدول haj_bookings في قاعدة البيانات`,'error');
       return r;
+    }catch(e){
+      const msg=e.message||'';
+      const badCol=OPTIONAL_BK_COLS.find(c=>(c in data) && msg.toLowerCase().includes(c.toLowerCase()));
+      if(badCol){ delete data[badCol]; missing.push(badCol); continue; }
+      throw e;
     }
-    throw e;
   }
 }
 function trbdg(t){return t==='حج'?'<span class="badge badge-gold">&#x1F54B; &#x62D;&#x62C;</span>':'<span class="badge badge-green">&#x1F319; &#x639;&#x645;&#x631;&#x629;</span>';}
@@ -1461,14 +1482,14 @@ function addProgRow(d=null){
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
     <div><div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px">&#x1F54B; مكة</div>
       <div class="form-grid">
-        <div class="form-group"><label>الفندق</label><input id="pc-mh-${idx}" type="text" value="${di.mecca_hotel||''}"></div>
+        <div class="form-group"><label>الفندق</label><input id="pc-mh-${idx}" type="text" value="${di.mecca_hotel||''}" list="hotels-datalist" placeholder="اكتبي اسم الفندق أو اختاري من القايمة"></div>
         <div class="form-group"><label>الليالي</label><input id="pc-mn-${idx}" type="number" value="${di.mecca_nights||0}" min="0"></div>
         <div class="form-group full"><label>نوع الوجبات</label><input id="pc-mm-${idx}" type="text" value="${di.mecca_meal_plan||''}" placeholder="Bed & Breakfast"></div>
       </div>
     </div>
     <div><div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px">&#x1F54C; المدينة</div>
       <div class="form-grid">
-        <div class="form-group"><label>الفندق</label><input id="pc-dh-${idx}" type="text" value="${di.madina_hotel||''}"></div>
+        <div class="form-group"><label>الفندق</label><input id="pc-dh-${idx}" type="text" value="${di.madina_hotel||''}" list="hotels-datalist" placeholder="اكتبي اسم الفندق أو اختاري من القايمة"></div>
         <div class="form-group"><label>الليالي</label><input id="pc-dn-${idx}" type="number" value="${di.madina_nights||0}" min="0"></div>
         <div class="form-group full"><label>نوع الوجبات</label><input id="pc-dm-${idx}" type="text" value="${di.madina_meal_plan||''}" placeholder="Bed & Breakfast"></div>
       </div>
@@ -1493,8 +1514,21 @@ function getProgRows(){
     return{_id:document.getElementById('pc-id-'+i)?.value,code:+document.getElementById('pc-c-'+i)?.value||1,program_details:document.getElementById('pc-d-'+i)?.value.trim()||null,pax_on_trip:+document.getElementById('pc-p-'+i)?.value||0,mecca_hotel:document.getElementById('pc-mh-'+i)?.value.trim()||null,mecca_nights:+document.getElementById('pc-mn-'+i)?.value||0,mecca_meal_plan:document.getElementById('pc-mm-'+i)?.value.trim()||null,madina_hotel:document.getElementById('pc-dh-'+i)?.value.trim()||null,madina_nights:+document.getElementById('pc-dn-'+i)?.value||0,madina_meal_plan:document.getElementById('pc-dm-'+i)?.value.trim()||null,transfer_type:document.getElementById('pc-tr-'+i)?.value.trim()||null,price_single:+document.getElementById('pc-p1-'+i)?.value||0,price_double:+document.getElementById('pc-p2-'+i)?.value||0,price_triple:+document.getElementById('pc-p3-'+i)?.value||0,price_quad:+document.getElementById('pc-p4-'+i)?.value||0,price_quint:+document.getElementById('pc-p5-'+i)?.value||0};
   });
 }
+// بيجيب كل أسماء الفنادق اللي اتكتبت قبل كده في أي رحلة (مكة أو المدينة) ويحطها في قايمة اقتراحات
+let _hotelsLoaded=false;
+async function loadHotelSuggestions(){
+  try{
+    const progs=await sb('haj_programs?select=mecca_hotel,madina_hotel&limit=3000');
+    const set=new Set();
+    progs.forEach(p=>{if(p.mecca_hotel&&p.mecca_hotel.trim())set.add(p.mecca_hotel.trim());if(p.madina_hotel&&p.madina_hotel.trim())set.add(p.madina_hotel.trim());});
+    const dl=document.getElementById('hotels-datalist');
+    if(dl)dl.innerHTML=Array.from(set).sort((a,b)=>a.localeCompare(b,'ar')).map(h=>`<option value="${h.replace(/"/g,'&quot;')}">`).join('');
+    _hotelsLoaded=true;
+  }catch(e){}
+}
 function openTripModal(id=null){
   ed.trip=id;pRowIdx=0;document.getElementById('progs-cnt').innerHTML='';
+  loadHotelSuggestions();
   document.getElementById('tr-modal-ttl').textContent=id?'تعديل الرحلة':'رحلة جديدة';
   document.getElementById('tr-sup').innerHTML='<option value="">-- بدون مورد --</option>'+aSups.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   if(!id){['tr-name','tr-file','tr-pnotes','tr-fnotes'].forEach(f=>document.getElementById(f).value='');['tr-infant','tr-child','tr-cocc','tr-ticket','tr-barcode','tr-visa','tr-meals','tr-train','tr-mview','tr-hview'].forEach(f=>document.getElementById(f).value=0);document.getElementById('tr-type').value='عمرة';document.getElementById('tr-stat').value='مفتوحة';document.getElementById('tr-curr').value='EGP';document.getElementById('tr-crate').value=1;document.getElementById('tr-date').value='';document.getElementById('tr-sup').value='';addProgRow();}
@@ -1836,8 +1870,8 @@ async function _openBkModalBase(id=null,preCl=null){
   if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
   fillClSels();fillTrSels();
   ['bk-tkt','bk-brc','bk-vis','bk-mls','bk-trn','bk-mkv','bk-hrv'].forEach(f=>document.getElementById(f).checked=false);
-  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
-  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';calcPx();}
+  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-exdisc').value='';document.getElementById('bk-exdisc-r').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
+  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';document.getElementById('bk-exdisc').value=b.extra_discount||'';document.getElementById('bk-exdisc-r').value=b.extra_discount_reason||'';calcPx();}
   openM('bk-modal');
 }
 function editBk(id){openBkModal(id);}
@@ -1868,12 +1902,14 @@ function calcPx(){
   const gt=id=>document.getElementById(id).checked;
   const deduct=(gt('bk-tkt')?+curTrip.ticket_price:0)+(gt('bk-brc')?+curTrip.barcode_price:0)+(gt('bk-vis')?+curTrip.visa_price:0);
   const add=(gt('bk-mls')?+curTrip.meals_price:0)+(gt('bk-trn')?+curTrip.train_price:0)+(gt('bk-mkv')?+curTrip.makkah_view_price:0)+(gt('bk-hrv')?+curTrip.haram_view_price:0);
-  const fin=base-deduct+add;
+  const exdisc=+document.getElementById('bk-exdisc')?.value||0;
+  const fin=base-deduct+add-exdisc;
   document.getElementById('px-base').textContent=fn(base)+' ج';
   document.getElementById('px-fin').textContent=fn(fin)+' ج';
   const sw=(id,cond,amt)=>{document.getElementById(id+'-r').style.display=cond?'flex':'none';if(cond)document.getElementById(id).textContent=fn(amt)+' ج';};
   sw('px-tkt',gt('bk-tkt'),curTrip.ticket_price);sw('px-brc',gt('bk-brc'),curTrip.barcode_price);sw('px-vis',gt('bk-vis'),curTrip.visa_price);sw('px-mls',gt('bk-mls'),curTrip.meals_price);sw('px-trn',gt('bk-trn'),curTrip.train_price);sw('px-mkv',gt('bk-mkv'),curTrip.makkah_view_price);sw('px-hrv',gt('bk-hrv'),curTrip.haram_view_price);
-  prc={base,deduct,add,fin};
+  sw('px-exdisc',exdisc>0,exdisc);
+  prc={base,deduct,add,exdisc,fin};
   const supEl=document.getElementById('bk-supcost'),supCost=supEl?(+supEl.value||0):0;
   const profitR=document.getElementById('px-profit-r');
   if(supCost>0){profitR.style.display='flex';const prof=fin-supCost;document.getElementById('px-profit').textContent=fn(prof)+' ج';document.getElementById('px-profit').style.color=prof>=0?'#4caf84':'var(--red-light)';}
@@ -2239,7 +2275,7 @@ async function testConn(){
 }
 async function saveSettings(){
   const s=[{key:'company_name',value:document.getElementById('cfg-co').value},{key:'company_phone',value:document.getElementById('cfg-ph').value},{key:'company_address',value:document.getElementById('cfg-addr').value},{key:'rate_sar_to_egp',value:document.getElementById('cfg-sar').value},{key:'rate_usd_to_egp',value:document.getElementById('cfg-usd').value}];
-  try{for(const x of s)await sb('haj_settings','POST',x);toast('تم الحفظ');}catch(e){toast('خطأ','error');}
+  try{await upsertSettings(s);toast('تم الحفظ');}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
 // ============ INIT ============
@@ -2627,7 +2663,7 @@ async function saveNotifSettings(){
     {key:'telegram_token',value:document.getElementById('cfg-tg-token')?.value||''},
     {key:'telegram_chat_id',value:document.getElementById('cfg-tg-chat')?.value||''},
   ];
-  try{for(const x of s)await sb('haj_settings','POST',x);toast('تم حفظ إعدادات الإشعارات ✅');}catch(e){toast('خطأ','error');}
+  try{await upsertSettings(s);toast('تم حفظ إعدادات الإشعارات ✅');}catch(e){toast('خطأ: '+e.message,'error');}
 }
 
 // ============ AUDIT LOG ============
@@ -2944,7 +2980,9 @@ async function saveBkAndPay() {
     vaccine_status: document.getElementById('bk-vac').value,
     status: document.getElementById('bk-st').value,
     notes: document.getElementById('bk-nts').value.trim()||null,
-    supplier_cost: +document.getElementById('bk-supcost').value||0
+    supplier_cost: +document.getElementById('bk-supcost').value||0,
+    extra_discount: +document.getElementById('bk-exdisc').value||0,
+    extra_discount_reason: document.getElementById('bk-exdisc-r').value.trim()||null
   };
   try {
     let bkId = ed.bk;

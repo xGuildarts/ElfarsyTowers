@@ -104,6 +104,26 @@ input[type="checkbox"]{width:auto;accent-color:var(--green-light);transform:scal
 @media(max-width:768px){#sidebar{display:none}#main{margin-right:0;padding:12px}}
 @media print{#sidebar,#header,.no-print{display:none!important}#main{margin-right:0;padding:0}body{background:white;color:black}}
 
+
+/* ====== LANGUAGE SWITCH ====== */
+.lang-en { display: none !important; }
+.lang-ar { display: inline !important; }
+html.ltr { direction: ltr; }
+html.ltr .lang-en { display: inline !important; }
+html.ltr .lang-ar { display: none !important; }
+html.ltr .logo-sub,html.ltr .nav-label,html.ltr .nav-btn,
+html.ltr label,html.ltr thead th,html.ltr .card-title,
+html.ltr .section-title,html.ltr .stat-label,html.ltr .badge,
+html.ltr .btn,html.ltr td,html.ltr .tab-btn,
+html.ltr .modal-title,html.ltr .price-row span { text-align: left; }
+html.ltr #sidebar { right: auto; left: 0; border-left: none; border-right: 1px solid var(--border); }
+html.ltr #main { margin-right: 0; margin-left: 220px; }
+html.ltr #toast-cnt { left: auto; right: 24px; }
+html.ltr .profile-header { flex-direction: row; }
+html.ltr #dlg-box { direction: ltr; }
+html.ltr #dlg-input-wrap, html.ltr #dlg-select-wrap { text-align: left; }
+@media(max-width:768px){ html.ltr #main { margin-left: 0; } }
+
 /* ====== LIGHT MODE ====== */
 body.light-mode{--bg:#f0f4f0;--bg2:#ffffff;--bg3:#e8f0e8;--card:#ffffff;--border:#c8d8c8;--text:#1a2a1e;--text2:#3a5a3e;--text3:#6a8070}
 body.light-mode #header{background:linear-gradient(135deg,#1a4a30 0%,#2a6a40 100%)}
@@ -289,65 +309,66 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
   </div>
 </div>
 
-<div id="no-config-banner" onclick="showTab('settings')">⚠️ لم يتم إعداد Supabase بعد - اضغط هنا لإعداد الاتصال</div>
+<div id="no-config-banner" onclick="showTab('settings')"><span class="lang-ar">⚠️ لم يتم إعداد Supabase بعد - اضغط هنا لإعداد الاتصال</span><span class="lang-en">⚠️ Supabase not configured — click here to set up connection</span></div>
 <div id="header">
-  <div class="logo"><div class="logo-icon">&#x1F54C;</div><div><div class="logo-text">Adreska Tours</div><div class="logo-sub">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x633;&#x64A;&#x627;&#x62D;&#x629; &#x627;&#x644;&#x62F;&#x64A;&#x646;&#x64A;&#x629;</div></div></div>
+  <div class="logo"><div class="logo-icon">&#x1F54C;</div><div><div class="logo-text">Adreska Tours</div><div class="logo-sub"><span class="lang-ar">إدارة السياحة الدينية</span><span class="lang-en">Religious Tourism Management</span></div></div></div>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="conn-ind" style="font-size:11px;color:var(--text3)">&#x26AB; &#x63A;&#x64A;&#x631; &#x645;&#x62A;&#x635;&#x644;</span>
     <span id="cur-user-badge" style="font-size:11px;color:var(--text2);display:none"></span>
     <button class="btn btn-outline btn-sm" onclick="toggleLightMode()" title="تبديل الوضع" id="theme-btn">☀️</button>
-    <button class="btn btn-gold btn-sm" onclick="showTab('settings')">&#x2699;&#xFE0F; &#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</button>
+    <button class="btn btn-outline btn-sm" onclick="toggleLang()" id="lang-btn" title="Switch Language">🌐 EN</button>
+    <button class="btn btn-gold btn-sm" onclick="showTab('settings')"><span class="lang-ar"><span class="lang-ar">⚙️ الإعدادات</span><span class="lang-en">⚙️ Settings</span></span><span class="lang-en">⚙️ Settings</span></button>
     <button class="btn btn-outline btn-sm" onclick="logoutUser()" id="logout-btn" style="display:none" title="تسجيل خروج">🚪</button>
   </div>
 </div>
 
 <div id="sidebar">
-  <div class="nav-label">&#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
-  <button class="nav-btn active" onclick="showTab('dashboard')" id="nav-dashboard">&#x1F4CA; &#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x62A;&#x62D;&#x643;&#x645;</button>
-  <div class="nav-label">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;</div>
-  <button class="nav-btn" onclick="showTab('trips')" id="nav-trips">&#x1F5D3;&#xFE0F; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;</button>
-  <button class="nav-btn" onclick="showTab('suppliers')" id="nav-suppliers">&#x1F3E2; &#x627;&#x644;&#x645;&#x648;&#x631;&#x62F;&#x64A;&#x646;</button>
-  <div class="nav-label">&#x627;&#x644;&#x639;&#x645;&#x644;&#x627;&#x621; &#x648;&#x627;&#x644;&#x62D;&#x62C;&#x648;&#x632;&#x627;&#x62A;</div>
-  <button class="nav-btn" onclick="showTab('clients')" id="nav-clients">&#x1F464; &#x627;&#x644;&#x639;&#x645;&#x644;&#x627;&#x621;</button>
-  <button class="nav-btn" onclick="showTab('bookings')" id="nav-bookings">&#x1F4CB; &#x627;&#x644;&#x62D;&#x62C;&#x648;&#x632;&#x627;&#x62A;</button>
-  <button class="nav-btn" onclick="showTab('payments')" id="nav-payments">&#x1F4B0; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</button>
-  <div class="nav-label">&#x627;&#x644;&#x62A;&#x634;&#x63A;&#x64A;&#x644;</div>
-  <button class="nav-btn" onclick="showTab('rooms')" id="nav-rooms">&#x1F6CF;&#xFE0F; &#x627;&#x644;&#x62A;&#x633;&#x643;&#x64A;&#x646;</button>
-  <button class="nav-btn" onclick="showTab('settlement')" id="nav-settlement">&#x1F4C8; &#x627;&#x644;&#x62A;&#x642;&#x641;&#x64A;&#x644;&#x629;</button>
-  <button class="nav-btn" onclick="showTab('reports')" id="nav-reports">&#x1F5A8;&#xFE0F; &#x627;&#x644;&#x62A;&#x642;&#x627;&#x631;&#x64A;&#x631;</button>
-  <button class="nav-btn" onclick="showTab('accounts')" id="nav-accounts">&#x1F4D2; &#x643;&#x634;&#x641; &#x627;&#x644;&#x62D;&#x633;&#x627;&#x628;&#x627;&#x62A;</button>
-  <button class="nav-btn" onclick="showTab('installments')" id="nav-installments">📅 الأقساط</button>
-  <div class="nav-label">&#x627;&#x644;&#x646;&#x638;&#x627;&#x645;</div>
-  <button class="nav-btn" onclick="showTab('settings')" id="nav-settings">&#x2699;&#xFE0F; &#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</button>
+  <div class="nav-label"><span class="lang-ar">&#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</span><span class="lang-en">Main</span></div>
+  <button class="nav-btn active" onclick="showTab('dashboard')" id="nav-dashboard"><span class="lang-ar">&#x1F4CA; &#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x62A;&#x62D;&#x643;&#x645;</span><span class="lang-en">📊 Dashboard</span></button>
+  <div class="nav-label"><span class="lang-ar">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;</span><span class="lang-en">Trips</span></div>
+  <button class="nav-btn" onclick="showTab('trips')" id="nav-trips"><span class="lang-ar">&#x1F5D3;&#xFE0F; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;</span><span class="lang-en">🗓️ Trips</span></button>
+  <button class="nav-btn" onclick="showTab('suppliers')" id="nav-suppliers"><span class="lang-ar">&#x1F3E2; &#x627;&#x644;&#x645;&#x648;&#x631;&#x62F;&#x64A;&#x646;</span><span class="lang-en">🏢 Suppliers</span></button>
+  <div class="nav-label"><span class="lang-ar">&#x627;&#x644;&#x639;&#x645;&#x644;&#x627;&#x621; &#x648;&#x627;&#x644;&#x62D;&#x62C;&#x648;&#x632;&#x627;&#x62A;</span><span class="lang-en">Clients & Bookings</span></div>
+  <button class="nav-btn" onclick="showTab('clients')" id="nav-clients"><span class="lang-ar">&#x1F464; &#x627;&#x644;&#x639;&#x645;&#x644;&#x627;&#x621;</span><span class="lang-en">👥 Clients</span></button>
+  <button class="nav-btn" onclick="showTab('bookings')" id="nav-bookings"><span class="lang-ar">&#x1F4CB; &#x627;&#x644;&#x62D;&#x62C;&#x648;&#x632;&#x627;&#x62A;</span><span class="lang-en">📋 Bookings</span></button>
+  <button class="nav-btn" onclick="showTab('payments')" id="nav-payments"><span class="lang-ar">&#x1F4B0; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</span><span class="lang-en">💰 Payments</span></button>
+  <div class="nav-label"><span class="lang-ar">&#x627;&#x644;&#x62A;&#x634;&#x63A;&#x64A;&#x644;</span><span class="lang-en">Operations</span></div>
+  <button class="nav-btn" onclick="showTab('rooms')" id="nav-rooms"><span class="lang-ar">&#x1F6CF;&#xFE0F; &#x627;&#x644;&#x62A;&#x633;&#x643;&#x64A;&#x646;</span><span class="lang-en">🛏️ Rooms</span></button>
+  <button class="nav-btn" onclick="showTab('settlement')" id="nav-settlement"><span class="lang-ar">&#x1F4C8; &#x627;&#x644;&#x62A;&#x642;&#x641;&#x64A;&#x644;&#x629;</span><span class="lang-en">📈 Settlement</span></button>
+  <button class="nav-btn" onclick="showTab('reports')" id="nav-reports"><span class="lang-ar">&#x1F5A8;&#xFE0F; &#x627;&#x644;&#x62A;&#x642;&#x627;&#x631;&#x64A;&#x631;</span><span class="lang-en">🖨️ Reports</span></button>
+  <button class="nav-btn" onclick="showTab('accounts')" id="nav-accounts"><span class="lang-ar">&#x1F4D2; &#x643;&#x634;&#x641; &#x627;&#x644;&#x62D;&#x633;&#x627;&#x628;&#x627;&#x62A;</span><span class="lang-en">📒 Accounts</span></button>
+  <button class="nav-btn" onclick="showTab('installments')" id="nav-installments"><span class="lang-ar">📅 الأقساط</span><span class="lang-en">📅 Installments</span></button>
+  <div class="nav-label"><span class="lang-ar">&#x627;&#x644;&#x646;&#x638;&#x627;&#x645;</span><span class="lang-en">System</span></div>
+  <button class="nav-btn" onclick="showTab('settings')" id="nav-settings"><span class="lang-ar">⚙️ الإعدادات</span><span class="lang-en">⚙️ Settings</span></button>
 </div>
 
 <div id="main">
 <!-- DASHBOARD -->
 <div id="tab-dashboard" class="tab-content">
-  <div class="section-title"><span>📊</span> لوحة التحكم</div>
+  <div class="section-title"><span>📊</span> <span class="lang-ar">لوحة التحكم</span><span class="lang-en">Dashboard</span></div>
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-icon">🗓️</div><div class="stat-num" id="s-trips">-</div><div class="stat-label">رحلات نشطة</div></div>
-    <div class="stat-card green"><div class="stat-icon">📋</div><div class="stat-num" id="s-bks">-</div><div class="stat-label">إجمالي الحجوزات</div></div>
-    <div class="stat-card blue"><div class="stat-icon">👤</div><div class="stat-num" id="s-cls">-</div><div class="stat-label">العملاء</div></div>
-    <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="s-paid">-</div><div class="stat-label">المحصّل (ج)</div></div>
-    <div class="stat-card red"><div class="stat-icon">⏳</div><div class="stat-num" id="s-rem">-</div><div class="stat-label">المتبقي (ج)</div></div>
-    <div class="stat-card green"><div class="stat-icon">📈</div><div class="stat-num" id="s-rate">-</div><div class="stat-label">نسبة التحصيل</div></div>
-    <div class="stat-card blue"><div class="stat-icon">📅</div><div class="stat-num" id="s-inst">-</div><div class="stat-label">أقساط معلقة</div></div>
+    <div class="stat-card"><div class="stat-icon">🗓️</div><div class="stat-num" id="s-trips">-</div><div class="stat-label"><span class="lang-ar">رحلات نشطة</span><span class="lang-en">Active Trips</span></div></div>
+    <div class="stat-card green"><div class="stat-icon">📋</div><div class="stat-num" id="s-bks">-</div><div class="stat-label"><span class="lang-ar">إجمالي الحجوزات</span><span class="lang-en">Total Bookings</span></div></div>
+    <div class="stat-card blue"><div class="stat-icon">👤</div><div class="stat-num" id="s-cls">-</div><div class="stat-label"><span class="lang-ar">العملاء</span><span class="lang-en">Clients</span></div></div>
+    <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="s-paid">-</div><div class="stat-label"><span class="lang-ar">المحصّل (ج)</span><span class="lang-en">Collected (EGP)</span></div></div>
+    <div class="stat-card red"><div class="stat-icon">⏳</div><div class="stat-num" id="s-rem">-</div><div class="stat-label"><span class="lang-ar">المتبقي (ج)</span><span class="lang-en">Remaining (EGP)</span></div></div>
+    <div class="stat-card green"><div class="stat-icon">📈</div><div class="stat-num" id="s-rate">-</div><div class="stat-label"><span class="lang-ar">نسبة التحصيل</span><span class="lang-en">Collection Rate</span></div></div>
+    <div class="stat-card blue"><div class="stat-icon">📅</div><div class="stat-num" id="s-inst">-</div><div class="stat-label"><span class="lang-ar">أقساط معلقة</span><span class="lang-en">Pending Installments</span></div></div>
   </div>
   <div id="dash-alerts-card" style="display:none">
     <div id="dash-alerts"></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">🗓️ الرحلات النشطة</div><button class="btn btn-primary btn-sm" onclick="showTab('trips')">كل الرحلات</button></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">🗓️ الرحلات النشطة</span><span class="lang-en">🗓️ Active Trips</span></div><button class="btn btn-primary btn-sm" onclick="showTab('trips')"><span class="lang-ar">كل الرحلات</span><span class="lang-en">All Trips</span></button></div>
     <div id="dash-trips"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
 <!-- TRIPS -->
 <div id="tab-trips" class="tab-content" style="display:none">
-  <div class="section-title"><span>🗓️</span> الرحلات</div>
+  <div class="section-title"><span>🗓️</span> <span class="lang-ar">الرحلات</span><span class="lang-en">Trips</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title">قائمة الرحلات</div><button class="btn btn-primary" onclick="openTripModal()">➕ رحلة جديدة</button></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة الرحلات</span><span class="lang-en">Trips List</span></div><button class="btn btn-primary" onclick="openTripModal()"><span class="lang-ar">➕ رحلة جديدة</span><span class="lang-en">➕ New Trip</span></button></div>
     <div class="search-bar">
       <input type="text" id="tr-search" placeholder="🔍 بحث..." oninput="filterTrips()">
       <select id="tr-type-f" onchange="filterTrips()"><option value="">الكل</option><option value="عمرة">عمرة</option><option value="حج">حج</option></select>
@@ -359,11 +380,11 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- SUPPLIERS -->
 <div id="tab-suppliers" class="tab-content" style="display:none">
-  <div class="section-title"><span>🏢</span> الموردين</div>
+  <div class="section-title"><span>🏢</span> <span class="lang-ar">الموردين</span><span class="lang-en">Suppliers</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title">قائمة الموردين</div><button class="btn btn-primary" onclick="openSupModal()">➕ مورد جديد</button></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة الموردين</span><span class="lang-en">Suppliers List</span></div><button class="btn btn-primary" onclick="openSupModal()"><span class="lang-ar">➕ مورد جديد</span><span class="lang-en">➕ New Supplier</span></button></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>#</th><th>اسم المورد</th><th>الهاتف</th><th>البريد</th><th>الرحلات</th><th>إجراءات</th></tr></thead>
+      <thead><tr><th>#</th><th><span class="lang-ar">اسم المورد</span><span class="lang-en">Supplier Name</span></th><th><span class="lang-ar">الهاتف</span><span class="lang-en">Phone</span></th><th><span class="lang-ar">البريد</span><span class="lang-en">Email</span></th><th><span class="lang-ar">الرحلات</span><span class="lang-en">Trips</span></th><th><span class="lang-ar">إجراءات</span><span class="lang-en">Actions</span></th></tr></thead>
       <tbody id="sup-tbody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
     </table></div>
   </div>
@@ -371,11 +392,11 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- CLIENTS -->
 <div id="tab-clients" class="tab-content" style="display:none">
-  <div class="section-title"><span>👤</span> العملاء</div>
+  <div class="section-title"><span>👤</span> <span class="lang-ar">العملاء</span><span class="lang-en">Clients</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title">قائمة العملاء</div><button class="btn btn-primary" onclick="openClientModal()">➕ عميل جديد</button></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة العملاء</span><span class="lang-en">Clients List</span></div><button class="btn btn-primary" onclick="openClientModal()"><span class="lang-ar">➕ عميل جديد</span><span class="lang-en">➕ New Client</span></button></div>
     <div class="search-bar">
-      <input type="text" id="cl-search" placeholder="🔍 بحث بالاسم أو الجواز..." oninput="filterClients()">
+      <input type="text" id="cl-search" placeholder="🔍 Search / بحث..." oninput="filterClients()">
       <select id="cl-gen-f" onchange="filterClients()"><option value="">الكل</option><option value="ذكر">ذكور</option><option value="أنثى">إناث</option></select>
     </div>
     <div class="table-wrap"><table>
@@ -387,9 +408,9 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- BOOKINGS -->
 <div id="tab-bookings" class="tab-content" style="display:none">
-  <div class="section-title"><span>📋</span> الحجوزات</div>
+  <div class="section-title"><span>📋</span> <span class="lang-ar">الحجوزات</span><span class="lang-en">Bookings</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title">قائمة الحجوزات</div><div style="display:flex;gap:8px"><button class="btn btn-gold" onclick="openFamModal()">👪 إضافة أسرة</button><button class="btn btn-primary" onclick="openBkModal()">➕ حجز جديد</button></div></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة الحجوزات</span><span class="lang-en">Bookings List</span></div><div style="display:flex;gap:8px"><button class="btn btn-gold" onclick="openFamModal()">👪 إضافة أسرة</button><button class="btn btn-primary" onclick="openBkModal()"><span class="lang-ar">➕ حجز جديد</span><span class="lang-en">➕ New Booking</span></button></div></div>
     <div class="search-bar">
       <select id="bk-trip-f" onchange="loadBookings()" style="flex:0 0 200px"><option value="">كل الرحلات</option></select>
       <select id="bk-stat-f" onchange="loadBookings()"><option value="">كل الحالات</option><option value="محجوز">محجوز</option><option value="مدفوع جزئي">مدفوع جزئي</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select>
@@ -406,9 +427,9 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- PAYMENTS -->
 <div id="tab-payments" class="tab-content" style="display:none">
-  <div class="section-title"><span>💰</span> المدفوعات</div>
+  <div class="section-title"><span>💰</span> <span class="lang-ar">المدفوعات</span><span class="lang-en">Payments</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title">سجل المدفوعات</div><button class="btn btn-primary" onclick="openPayModal()">➕ دفعة جديدة</button></div>
+    <div class="card-header"><div class="card-title">سجل المدفوعات</div><button class="btn btn-primary" onclick="openPayModal()"><span class="lang-ar">➕ دفعة جديدة</span><span class="lang-en">➕ New Payment</span></button></div>
     <div class="search-bar">
       <select id="pay-trip-f" onchange="loadPayments()" style="flex:0 0 200px"><option value="">كل الرحلات</option></select>
       <select id="pay-meth-f" onchange="loadPayments()"><option value="">كل طرق الدفع</option><option value="كاش">كاش</option><option value="تحويل">تحويل</option><option value="فيزا">فيزا</option><option value="شيك">شيك</option></select>
@@ -429,8 +450,8 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <select id="rm-trip-f" onchange="loadRooms()" style="width:220px"><option value="">-- اختر الرحلة --</option></select>
         <select id="rm-city-f" onchange="renderRoomView()" style="width:130px">
-          <option value="مكة">🕋 مكة</option>
-          <option value="المدينة">🕌 المدينة</option>
+          <option value="مكة"><span class="lang-ar">🕋 مكة</span><span class="lang-en">🕋 Mecca</span></option>
+          <option value="المدينة"><span class="lang-ar">🕌 المدينة</span><span class="lang-en">🕌 Madinah</span></option>
         </select>
         <button class="btn btn-primary btn-sm" onclick="openAddRoomModal()">➕ غرفة جديدة</button>
         <button class="btn btn-outline btn-sm" onclick="printRoomsReport()">🖨️ طباعة التسكين</button>
@@ -487,13 +508,13 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- REPORTS -->
 <div id="tab-reports" class="tab-content" style="display:none">
-  <div class="section-title"><span>🖨️</span> التقارير</div>
+  <div class="section-title"><span>🖨️</span> <span class="lang-ar">التقارير</span><span class="lang-en">Reports</span></div>
 
   <!-- Alerts Panel -->
   <div class="alerts-panel" id="alerts-config-panel">
     <div class="alerts-panel-header">
-      <div class="card-title">🔔 لوحة التنبيهات التلقائية</div>
-      <button class="btn btn-primary btn-sm" onclick="saveAlertSettings()">💾 حفظ الإعدادات</button>
+      <div class="card-title"><span class="lang-ar">🔔 لوحة التنبيهات التلقائية</span><span class="lang-en">🔔 Automatic Alerts</span></div>
+      <button class="btn btn-primary btn-sm" onclick="saveAlertSettings()"><span class="lang-ar">💾 حفظ الإعدادات</span><span class="lang-en">💾 Save Settings</span></button>
     </div>
     <div id="alerts-rules-list">
       <div class="alert-rule-row">
@@ -534,14 +555,14 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">التنبيهات الحالية:</div>
       <div id="live-alerts-output"><div style="color:var(--text3);font-size:12px">اضغط "فحص التنبيهات" لعرض النتائج</div></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="runLiveAlerts()">🔍 فحص التنبيهات الآن</button>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="runLiveAlerts()"><span class="lang-ar">🔍 فحص التنبيهات الآن</span><span class="lang-en">🔍 Check Alerts Now</span></button>
     </div>
   </div>
 
   <!-- Reports Section -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title">📊 تقارير الرحلة</div>
+      <div class="card-title"><span class="lang-ar">📊 تقارير الرحلة</span><span class="lang-en">📊 Trip Reports</span></div>
       <select id="rep-trip-f" onchange="showRepBtns()" style="width:230px"><option value="">-- اختر الرحلة --</option></select>
     </div>
     <div id="rep-content"><div class="empty-state"><div class="empty-icon">🖨️</div><h3>اختر رحلة لعرض التقارير</h3></div></div>
@@ -550,12 +571,12 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- ACCOUNTS -->
 <div id="tab-accounts" class="tab-content" style="display:none">
-  <div class="section-title"><span>📒</span> كشف الحسابات</div>
+  <div class="section-title"><span>📒</span> <span class="lang-ar">كشف الحسابات</span><span class="lang-en">Accounts</span></div>
   <div class="tabs">
-    <button class="tab-btn active" onclick="accTab('clients')">👤 كشف حساب عميل</button>
-    <button class="tab-btn" onclick="accTab('trips')">🗓️ كشف حساب رحلة</button>
-    <button class="tab-btn" onclick="accTab('journal')">📋 القيود اليومية</button>
-    <button class="tab-btn" onclick="accTab('balance')">⚖️ ميزان المراجعة</button>
+    <button class="tab-btn active" onclick="accTab('clients')"><span class="lang-ar"><span class="lang-ar">👤 كشف حساب عميل</span><span class="lang-en">👤 Client Statement</span></span><span class="lang-en">👤 Client Statement</span></button>
+    <button class="tab-btn" onclick="accTab('trips')"><span class="lang-ar"><span class="lang-ar">🗓️ كشف حساب رحلة</span><span class="lang-en">🗓️ Trip Statement</span></span><span class="lang-en">🗓️ Trip Statement</span></button>
+    <button class="tab-btn" onclick="accTab('journal')"><span class="lang-ar">📋 القيود اليومية</span><span class="lang-en">📋 Daily Journal</span></button>
+    <button class="tab-btn" onclick="accTab('balance')"><span class="lang-ar">⚖️ ميزان المراجعة</span><span class="lang-en">⚖️ Trial Balance</span></button>
   </div>
 
   <!-- CLIENT STATEMENT -->
@@ -589,7 +610,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div style="display:flex;gap:8px">
           <input type="date" id="acc-jrn-from" style="width:140px">
           <input type="date" id="acc-jrn-to" style="width:140px">
-          <button class="btn btn-primary btn-sm" onclick="loadJournal()">عرض</button>
+          <button class="btn btn-primary btn-sm" onclick="loadJournal()"><span class="lang-ar">عرض</span><span class="lang-en">View</span></button>
           <button class="btn btn-outline btn-sm" onclick="exportJournalExcel()">📊 Excel</button>
         </div>
       </div>
@@ -604,7 +625,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="card-title">⚖️ ميزان المراجعة</div>
         <div style="display:flex;gap:8px">
           <select id="acc-bal-trip" style="width:200px"><option value="">كل الرحلات</option></select>
-          <button class="btn btn-primary btn-sm" onclick="loadBalance()">عرض</button>
+          <button class="btn btn-primary btn-sm" onclick="loadBalance()"><span class="lang-ar">عرض</span><span class="lang-en">View</span></button>
           <button class="btn btn-outline btn-sm" onclick="printBalance()">🖨️ طباعة</button>
         </div>
       </div>
@@ -639,7 +660,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tab-content" style="display:none">
-  <div class="section-title"><span>⚙️</span> الإعدادات</div>
+  <div class="section-title"><span>⚙️</span> <span class="lang-ar">الإعدادات</span><span class="lang-en">Settings</span></div>
   <div class="card">
     <div class="card-header"><div class="card-title">🔌 اتصال Supabase</div></div>
     <div class="form-grid">
@@ -892,13 +913,13 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
           <input type="text" id="bk-cl-search" placeholder="ابحث بالاسم..." style="display:none;margin-top:4px" oninput="filterBkClients()">
         </div>
         <div class="form-group"><label>الرحلة *</label><select id="bk-tr" onchange="onTrChange()"><option value="">-- اختر الرحلة --</option></select></div>
-        <div class="form-group"><label>البرنامج / الكود *</label><select id="bk-pg" onchange="calcPx()"><option value="">-- اختر البرنامج --</option></select></div>
+        <div class="form-group"><label>البرنامج / الكود *</label><select id="bk-pg" onchange="resetSupCostOverride();calcPx()"><option value="">-- اختر البرنامج --</option></select></div>
         <div class="form-group"><label>نوع المسافر (تلقائي من الميلاد)</label><input id="bk-tp" type="text" readonly style="background:var(--bg3)"></div>
       </div>
       <div class="sbox" style="margin-top:14px">
         <div class="sbox-title">🛏️ التسكين</div>
         <div class="form-grid">
-          <div class="form-group"><label>نوع الغرفة</label><select id="bk-rm" onchange="calcPx()"><option value="بدون">بدون سرير (طفل/رضيع)</option><option value="فردي">فردي (Single)</option><option value="ثنائي" selected>ثنائي (Double)</option><option value="ثلاثي">ثلاثي (Triple)</option><option value="رباعي">رباعي (Quad)</option><option value="خماسي">خماسي (Quint)</option></select></div>
+          <div class="form-group"><label>نوع الغرفة</label><select id="bk-rm" onchange="resetSupCostOverride();calcPx()"><option value="بدون">بدون سرير (طفل/رضيع)</option><option value="فردي">فردي (Single)</option><option value="ثنائي" selected>ثنائي (Double)</option><option value="ثلاثي">ثلاثي (Triple)</option><option value="رباعي">رباعي (Quad)</option><option value="خماسي">خماسي (Quint)</option></select></div>
           <div class="form-group"><label>رقم غرفة مكة</label><input id="bk-rm-mc" type="text"></div>
           <div class="form-group"><label>رقم غرفة المدينة</label><input id="bk-rm-md" type="text"></div>
         </div>
@@ -945,7 +966,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="form-group"><label>حالة التأشيرة</label><select id="bk-vstat"><option value="لم تُقدَّم">لم تُقدَّم</option><option value="قُدِّمت">قُدِّمت</option><option value="موافق عليها">موافق عليها</option><option value="مرفوضة">مرفوضة</option></select></div>
         <div class="form-group"><label>التطعيمات</label><select id="bk-vac"><option value="غير مكتملة">غير مكتملة</option><option value="مكتملة">مكتملة</option></select></div>
         <div class="form-group"><label>حالة الحجز</label><select id="bk-st"><option value="محجوز">محجوز</option><option value="مدفوع جزئي">مدفوع جزئي</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select></div>
-        <div class="form-group"><label>💵 تكلفة المورد (اللي بتسلمه له)</label><input id="bk-supcost" type="number" min="0" step="0.01" placeholder="0" oninput="calcPx()"><small style="color:var(--text3)">الفرق بينها وبين السعر النهائي = مكسبك على هذا الجواز</small></div>
+        <div class="form-group"><label>💵 تكلفة المورد (اللي بتسلمه له)</label><input id="bk-supcost" type="number" min="0" step="0.01" placeholder="0 (تلقائي من البرنامج)" oninput="onSupCostInput()"><small style="color:var(--text3)">الفرق بينها وبين السعر النهائي = مكسبك على هذا الجواز</small></div>
         <div class="form-group full"><label>ملاحظات</label><textarea id="bk-nts" rows="2"></textarea></div>
       </div>
     </div>
@@ -1177,6 +1198,28 @@ async function upsertSettings(list){
 }
 
 // ============ LIGHT MODE ============
+
+// ============ LANGUAGE SWITCH ============
+const _LANG_KEY = 'hj_lang';
+function toggleLang(){
+  const isEn = document.documentElement.classList.toggle('ltr');
+  localStorage.setItem(_LANG_KEY, isEn ? 'en' : 'ar');
+  document.getElementById('lang-btn').textContent = isEn ? '🌐 AR' : '🌐 EN';
+  document.documentElement.lang = isEn ? 'en' : 'ar';
+  document.documentElement.dir  = isEn ? 'ltr' : 'rtl';
+}
+(function(){
+  if(localStorage.getItem(_LANG_KEY)==='en'){
+    document.documentElement.classList.add('ltr');
+    document.documentElement.lang='en';
+    document.documentElement.dir='ltr';
+    document.addEventListener('DOMContentLoaded',()=>{
+      const b=document.getElementById('lang-btn');
+      if(b) b.textContent='🌐 AR';
+    });
+  }
+})();
+
 function toggleLightMode(){
   document.body.classList.toggle('light-mode');
   const isLight=document.body.classList.contains('light-mode');
@@ -1224,7 +1267,7 @@ function dupMsg(dup){return `⚠️ العميل موجود بالفعل: ${dup.
 // ============ SAFE BOOKING SAVE (بعض الأعمدة زي supplier_cost / extra_discount ممكن متكونش لسه متضافة في قاعدة البيانات) ============
 // لو عمود مش موجود في جدول haj_bookings في Supabase، بيحاول يحفظ من غيره تلقائياً
 // بدل ما يمنع حفظ الحجز خالص، ويطلع تنبيه للمستخدم إنه لازم يضيف العمود.
-const OPTIONAL_BK_COLS=['supplier_cost','extra_discount','extra_discount_reason'];
+const OPTIONAL_BK_COLS=['supplier_cost','extra_discount','extra_discount_reason','sup_cost_single','sup_cost_double','sup_cost_triple','sup_cost_quad','sup_cost_quint'];
 async function saveBookingSafe(bkId, d){
   let data={...d}, missing=[];
   for(let tries=0;tries<OPTIONAL_BK_COLS.length+1;tries++){
@@ -1578,6 +1621,8 @@ function renderTrips(list){
   if(!list.length){cnt.innerHTML='<div class="empty-state"><div class="empty-icon">&#x1F5D3;&#xFE0F;</div><h3>&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x631;&#x62D;&#x644;&#x627;&#x62A;</h3></div>';return;}
   cnt.innerHTML=list.map(t=>{
     const sup=aSups.find(s=>s.id==t.supplier_id),progs=aProgs.filter(p=>p.trip_id==t.id);
+    // تلميح تكاليف الموردين للبرامج
+    const hasSupCosts=progs.some(p=>p.sup_cost_double>0||p.sup_cost_triple>0||p.sup_cost_quad>0);
     return`<div class="card" style="margin-bottom:14px">
       <div class="card-header">
         <div><div class="card-title">${t.name} ${trbdg(t.trip_type)} ${bdg(t.status)}</div>
@@ -1648,13 +1693,24 @@ function addProgRow(d=null){
   </div>
   <div style="margin-top:10px"><div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px">&#x1F4B0; أسعار التسكين (بالجنيه)</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
-      <div class="form-group"><label>فردي</label><input id="pc-p1-${idx}" type="number" value="${di.price_single||0}" min="0"></div>
-      <div class="form-group"><label>ثنائي</label><input id="pc-p2-${idx}" type="number" value="${di.price_double||0}" min="0"></div>
-      <div class="form-group"><label>ثلاثي</label><input id="pc-p3-${idx}" type="number" value="${di.price_triple||0}" min="0"></div>
-      <div class="form-group"><label>رباعي</label><input id="pc-p4-${idx}" type="number" value="${di.price_quad||0}" min="0"></div>
-      <div class="form-group"><label>خماسي</label><input id="pc-p5-${idx}" type="number" value="${di.price_quint||0}" min="0"></div>
+      <div class="form-group"><label>فردي</label><input id="pc-p1-${idx}" type="number" value="${di.price_single||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
+      <div class="form-group"><label>ثنائي</label><input id="pc-p2-${idx}" type="number" value="${di.price_double||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
+      <div class="form-group"><label>ثلاثي</label><input id="pc-p3-${idx}" type="number" value="${di.price_triple||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
+      <div class="form-group"><label>رباعي</label><input id="pc-p4-${idx}" type="number" value="${di.price_quad||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
+      <div class="form-group"><label>خماسي</label><input id="pc-p5-${idx}" type="number" value="${di.price_quint||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
     </div>
     <div class="form-group" style="margin-top:8px"><label>نوع النقل</label><input id="pc-tr-${idx}" type="text" value="${di.transfer_type||'bus'}" placeholder="bus / سيرا بالأقدام"></div>
+  </div>
+  <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+    <div style="font-size:12px;font-weight:700;color:#5dade2;margin-bottom:6px">💵 تكلفة المورد لهذا البرنامج (اللي بتسلمه للمورد)</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+      <div class="form-group"><label>فردي</label><input id="pc-sc1-${idx}" type="number" value="${di.sup_cost_single||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>ثنائي</label><input id="pc-sc2-${idx}" type="number" value="${di.sup_cost_double||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>ثلاثي</label><input id="pc-sc3-${idx}" type="number" value="${di.sup_cost_triple||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>رباعي</label><input id="pc-sc4-${idx}" type="number" value="${di.sup_cost_quad||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>خماسي</label><input id="pc-sc5-${idx}" type="number" value="${di.sup_cost_quint||0}" min="0" placeholder="0"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">💡 هيتحسب تلقائياً في الحجز بناءً على نوع الغرفة المختارة — ممكن تعدّله في الحجز لو احتجت</div>
   </div>
   <input type="hidden" id="pc-id-${idx}" value="${di.id||''}">`;
   document.getElementById('progs-cnt').appendChild(div);
@@ -1662,7 +1718,7 @@ function addProgRow(d=null){
 function getProgRows(){
   return[...document.querySelectorAll('[id^="pr-"]')].map(row=>{
     const i=row.id.replace('pr-','');
-    return{_id:document.getElementById('pc-id-'+i)?.value,code:+document.getElementById('pc-c-'+i)?.value||1,program_details:document.getElementById('pc-d-'+i)?.value.trim()||null,pax_on_trip:+document.getElementById('pc-p-'+i)?.value||0,mecca_hotel:document.getElementById('pc-mh-'+i)?.value.trim()||null,mecca_nights:+document.getElementById('pc-mn-'+i)?.value||0,mecca_meal_plan:document.getElementById('pc-mm-'+i)?.value.trim()||null,madina_hotel:document.getElementById('pc-dh-'+i)?.value.trim()||null,madina_nights:+document.getElementById('pc-dn-'+i)?.value||0,madina_meal_plan:document.getElementById('pc-dm-'+i)?.value.trim()||null,transfer_type:document.getElementById('pc-tr-'+i)?.value.trim()||null,price_single:+document.getElementById('pc-p1-'+i)?.value||0,price_double:+document.getElementById('pc-p2-'+i)?.value||0,price_triple:+document.getElementById('pc-p3-'+i)?.value||0,price_quad:+document.getElementById('pc-p4-'+i)?.value||0,price_quint:+document.getElementById('pc-p5-'+i)?.value||0};
+    return{_id:document.getElementById('pc-id-'+i)?.value,code:+document.getElementById('pc-c-'+i)?.value||1,program_details:document.getElementById('pc-d-'+i)?.value.trim()||null,pax_on_trip:+document.getElementById('pc-p-'+i)?.value||0,mecca_hotel:document.getElementById('pc-mh-'+i)?.value.trim()||null,mecca_nights:+document.getElementById('pc-mn-'+i)?.value||0,mecca_meal_plan:document.getElementById('pc-mm-'+i)?.value.trim()||null,madina_hotel:document.getElementById('pc-dh-'+i)?.value.trim()||null,madina_nights:+document.getElementById('pc-dn-'+i)?.value||0,madina_meal_plan:document.getElementById('pc-dm-'+i)?.value.trim()||null,transfer_type:document.getElementById('pc-tr-'+i)?.value.trim()||null,price_single:+document.getElementById('pc-p1-'+i)?.value||0,price_double:+document.getElementById('pc-p2-'+i)?.value||0,price_triple:+document.getElementById('pc-p3-'+i)?.value||0,price_quad:+document.getElementById('pc-p4-'+i)?.value||0,price_quint:+document.getElementById('pc-p5-'+i)?.value||0,sup_cost_single:+document.getElementById('pc-sc1-'+i)?.value||0,sup_cost_double:+document.getElementById('pc-sc2-'+i)?.value||0,sup_cost_triple:+document.getElementById('pc-sc3-'+i)?.value||0,sup_cost_quad:+document.getElementById('pc-sc4-'+i)?.value||0,sup_cost_quint:+document.getElementById('pc-sc5-'+i)?.value||0};
   });
 }
 // بيجيب كل أسماء الفنادق اللي اتكتبت قبل كده في أي رحلة (مكة أو المدينة) ويحطها في قايمة اقتراحات
@@ -1721,7 +1777,7 @@ function renderClients(list){
     <td style="${exp?'color:var(--red-light)':''}">${fd(c.passport_expiry_date)}${exp?' &#x26A0;&#xFE0F;':''}</td>
     <td>${c.phone||'-'}</td>
     <td>${lnk?`<span class="link-badge">&#x1F517; ${lnk.full_name_ar} (${c.link_relation})</span>`:'-'}</td>
-    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelClient(${c.id},'${c.full_name_ar.replace(/'/g,"\\'")}')" title="حذف العميل">&#x1F5D1;&#xFE0F;</button></td>
+    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button></td>
     </tr>`;
   }).join('');
 }
@@ -1750,71 +1806,6 @@ async function saveClient(){
   const dup=await checkDuplicateClient(d, ed.client);
   if(dup){toast(dupMsg(dup),'error');return;}
   try{if(ed.client)await sb(`haj_clients?id=eq.${ed.client}`,'PATCH',d);else await sb('haj_clients','POST',d);toast('تم الحفظ');closeM('cl-modal');loadClients();}catch(e){toast('خطأ: '+e.message,'error');}
-}
-
-// ============ حذف العميل ============
-async function confirmDelClient(id, name){
-  if(!requirePerm('حذف عميل')) return;
-  // فحص هل فيه حجوزات مرتبطة بالعميل
-  let bksCount = 0;
-  try {
-    const bks = await sb(`haj_bookings?client_id=eq.${id}&select=id,status`);
-    bksCount = bks.length;
-    const activeBks = bks.filter(b => b.status !== 'ملغي');
-    if(activeBks.length > 0){
-      // فيه حجوزات فعّالة - رفض الحذف
-      confirmAction(
-        `لا يمكن حذف "${name}"`,
-        `هذا العميل لديه ${activeBks.length} حجز فعّال. يجب إلغاء أو حذف جميع حجوزاته أولاً قبل حذف العميل.`,
-        '🚫',
-        () => {},
-        false
-      );
-      return;
-    }
-    if(bksCount > 0){
-      // فيه حجوزات ملغية فقط
-      const ok = await sConfirm(
-        `حذف العميل "${name}"؟`,
-        `⚠️ هذا العميل لديه ${bksCount} حجز ملغي سيتم حذفه أيضاً. هذا الإجراء لا يمكن التراجع عنه.`,
-        '🗑️', true
-      );
-      if(!ok) return;
-    } else {
-      // مفيش حجوزات خالص
-      const ok = await sConfirm(
-        `حذف العميل "${name}"؟`,
-        'سيتم حذف بيانات العميل نهائياً. هذا الإجراء لا يمكن التراجع عنه.',
-        '🗑️', true
-      );
-      if(!ok) return;
-    }
-  } catch(e) {
-    toast('خطأ في فحص حجوزات العميل: ' + e.message, 'error');
-    return;
-  }
-  await delClient(id, name);
-}
-
-async function delClient(id, name){
-  try {
-    // حذف الحجوزات الملغية والدفعات المرتبطة بها أولاً
-    const bks = await sb(`haj_bookings?client_id=eq.${id}&select=id`);
-    for(const bk of bks){
-      await sb(`haj_payments?booking_id=eq.${bk.id}`, 'DELETE');
-      await sb(`haj_bookings?id=eq.${bk.id}`, 'DELETE');
-    }
-    // حذف العميل
-    await sb(`haj_clients?id=eq.${id}`, 'DELETE');
-    // تحديث القائمة المحلية
-    aClients = aClients.filter(c => c.id != id);
-    aBks = aBks.filter(b => b.client_id != id);
-    toast(`✅ تم حذف العميل "${name}" بنجاح`);
-    renderClients(aClients);
-    fillClSels();
-  } catch(e) {
-    toast('خطأ في حذف العميل: ' + e.message, 'error');
-  }
 }
 
 // ============ OCR (Tesseract.js - مجاني بالكامل، شغال في المتصفح) ============
@@ -2086,7 +2077,7 @@ async function _openBkModalBase(id=null,preCl=null){
   if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
   fillClSels();fillTrSels();
   ['bk-tkt','bk-brc','bk-vis','bk-mls','bk-trn','bk-mkv','bk-hrv'].forEach(f=>document.getElementById(f).checked=false);
-  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-exdisc').value='';document.getElementById('bk-exdisc-r').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
+  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-exdisc').value='';resetSupCostOverride();document.getElementById('bk-exdisc-r').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
   else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';document.getElementById('bk-exdisc').value=b.extra_discount||'';document.getElementById('bk-exdisc-r').value=b.extra_discount_reason||'';calcPx();}
   openM('bk-modal');
 }
@@ -2126,11 +2117,32 @@ function calcPx(){
   sw('px-tkt',gt('bk-tkt'),curTrip.ticket_price);sw('px-brc',gt('bk-brc'),curTrip.barcode_price);sw('px-vis',gt('bk-vis'),curTrip.visa_price);sw('px-mls',gt('bk-mls'),curTrip.meals_price);sw('px-trn',gt('bk-trn'),curTrip.train_price);sw('px-mkv',gt('bk-mkv'),curTrip.makkah_view_price);sw('px-hrv',gt('bk-hrv'),curTrip.haram_view_price);
   sw('px-exdisc',exdisc>0,exdisc);
   prc={base,deduct,add,exdisc,fin};
-  const supEl=document.getElementById('bk-supcost'),supCost=supEl?(+supEl.value||0):0;
+  // --- تكلفة المورد التلقائية من البرنامج ---
+  const supEl=document.getElementById('bk-supcost');
+  if(supEl && pg && !supEl.dataset.manualOverride){
+    const scMap={فردي:pg.sup_cost_single,ثنائي:pg.sup_cost_double,ثلاثي:pg.sup_cost_triple,رباعي:pg.sup_cost_quad,خماسي:pg.sup_cost_quint};
+    const autoSc=+(scMap[rm]||0);
+    if(autoSc>0 && supEl.value==='') supEl.value=autoSc;
+  }
+  const supCost=supEl?(+supEl.value||0):0;
   const profitR=document.getElementById('px-profit-r');
   if(supCost>0){profitR.style.display='flex';const prof=fin-supCost;document.getElementById('px-profit').textContent=fn(prof)+' ج';document.getElementById('px-profit').style.color=prof>=0?'#4caf84':'var(--red-light)';}
   else profitR.style.display='none';
 }
+// لو المستخدم عدّل تكلفة المورد يدوياً نحط flag عشان مانعملوش override
+function onSupCostInput(){
+  const el=document.getElementById('bk-supcost');
+  if(el) el.dataset.manualOverride = el.value?'1':'';
+  calcPx();
+}
+// لما تتغير الرحلة أو البرنامج نمسح الـ override
+function resetSupCostOverride(){
+  const el=document.getElementById('bk-supcost');
+  if(el){el.dataset.manualOverride='';el.value='';}
+}
+// autoFillSupCost: بيملّي تكلفة المورد تلقائياً في صف البرنامج لما تكتب سعر التسكين
+// (placeholder بس — المستخدم يكتب القيمة هو بإيده في خانة تكلفة المورد)
+function autoFillSupCost(idx){ /* placeholder */ }
 async function saveBk(){
   const d={client_id:document.getElementById('bk-cl').value,trip_id:document.getElementById('bk-tr').value,program_id:document.getElementById('bk-pg').value||null,traveler_type:document.getElementById('bk-tp').value,room_type:document.getElementById('bk-rm').value,room_number_mecca:document.getElementById('bk-rm-mc').value.trim()||null,room_number_madina:document.getElementById('bk-rm-md').value.trim()||null,has_own_ticket:document.getElementById('bk-tkt').checked,has_own_barcode:document.getElementById('bk-brc').checked,has_own_visa:document.getElementById('bk-vis').checked,has_meals:document.getElementById('bk-mls').checked,has_train:document.getElementById('bk-trn').checked,has_makkah_view:document.getElementById('bk-mkv').checked,has_haram_view:document.getElementById('bk-hrv').checked,base_price:prc.base||0,deductions_total:prc.deduct||0,additions_total:prc.add||0,final_price:prc.fin||0,currency:document.getElementById('bk-cur').value,visa_status:document.getElementById('bk-vstat').value,vaccine_status:document.getElementById('bk-vac').value,status:document.getElementById('bk-st').value,notes:document.getElementById('bk-nts').value.trim()||null};
   if(!d.client_id||!d.trip_id){toast('يرجى اختيار العميل والرحلة','error');return;}

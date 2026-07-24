@@ -93,12 +93,14 @@ input[type="checkbox"]{width:auto;accent-color:var(--green-light);transform:scal
 .sbox-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:6px}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
-.modal{background:var(--card);border:1px solid rgba(36,61,42,.9);border-radius:15px;width:90%;max-width:900px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 0 1px rgba(212,168,67,.06)}
+.modal{background:var(--card);border:1px solid rgba(36,61,42,.9);border-radius:16px;width:92%;max-width:900px;max-height:92vh;overflow-y:auto;box-shadow:0 28px 80px rgba(0,0,0,.75),0 0 0 1px rgba(212,168,67,.08)}
 .modal-lg{max-width:1100px}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,#192b1f,#162419);border-radius:15px 15px 0 0;position:sticky;top:0;z-index:10}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,#192b1f,#162419);border-radius:16px 16px 0 0;position:sticky;top:0;z-index:10}
+.modal-title{font-size:16px;font-weight:700;color:var(--gold-light);display:flex;align-items:center;gap:10px;letter-spacing:.2px}
 .modal-title{font-size:16px;font-weight:700;color:var(--gold-light);display:flex;align-items:center;gap:8px}
 .modal-body{padding:20px}
-.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;background:linear-gradient(135deg,#192b1f,#162419);border-radius:0 0 15px 15px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;align-items:center;background:linear-gradient(135deg,#192b1f,#162419);border-radius:0 0 15px 15px}
+.modal-footer .btn{min-width:110px;justify-content:center;padding:10px 20px;font-size:13px}
 .close-btn{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:5px}.close-btn:hover{color:var(--text);background:var(--bg)}
 .tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto}
 .tab-btn{padding:9px 16px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all var(--transition);border-radius:6px 6px 0 0}
@@ -326,6 +328,20 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 .dlg-btn-cancel{background:var(--bg3);color:var(--text2);border:1px solid var(--border)!important}
 .dlg-btn-cancel:hover{background:var(--border);color:var(--text)}
 /* nav visibility per-permission is now handled dynamically in JS via applyNavVisibility() */
+
+/* ====== IMPROVED BOOKING MODAL ====== */
+#bk-modal .modal{max-width:970px}
+#bk-modal .modal-body{padding:22px 24px}
+#bk-modal .sbox{border-radius:10px;margin-bottom:12px;padding:14px 16px}
+#bk-modal .price-summary{border-radius:10px;padding:14px 16px}
+#bk-modal .modal-footer{padding:16px 24px;gap:14px;justify-content:center}
+#bk-modal .tabs{margin-bottom:14px}
+/* delete button in client row */
+.cl-del-btn{opacity:.6;transition:opacity .15s}
+.cl-del-btn:hover{opacity:1}
+/* improved modal overlay */
+.modal-overlay{animation:overlayIn .2s ease}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
 
 </style>
 </head>
@@ -1093,9 +1109,9 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
       </div>
 
     </div><!-- /modal-body -->
-    <div class="modal-footer" id="bk-modal-footer">
-      <button class="btn btn-outline" onclick="closeM('bk-modal')">إلغاء</button>
-      <button class="btn btn-primary" id="bk-save-btn" onclick="saveBk()">💾 حفظ الحجز</button>
+    <div class="modal-footer" id="bk-modal-footer" style="justify-content:center;gap:16px;padding:18px 24px">
+      <button class="btn btn-outline" onclick="closeM('bk-modal')" style="min-width:120px;padding:10px 22px">❌ إلغاء</button>
+      <button class="btn btn-primary" id="bk-save-btn" onclick="saveBk()" style="min-width:160px;padding:10px 26px;font-size:14px">💾 حفظ الحجز</button>
     </div>
   </div>
 </div>
@@ -1217,9 +1233,12 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div class="form-group"><label>ملاحظات</label><input id="ep-nts" type="text"></div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeM('edit-pay-modal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveEditPay()">💾 حفظ التعديل</button>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-danger" onclick="delPayFromEditModal()" style="min-width:110px">🗑️ حذف الدفعة</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline" onclick="closeM('edit-pay-modal')">إلغاء</button>
+        <button class="btn btn-primary" onclick="saveEditPay()">💾 حفظ التعديل</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1940,7 +1959,7 @@ function renderClients(list){
     <td style="${exp?'color:var(--red-light)':''}">${fd(c.passport_expiry_date)}${exp?' &#x26A0;&#xFE0F;':''}</td>
     <td>${c.phone||'-'}</td>
     <td>${lnk?`<span class="link-badge">&#x1F517; ${lnk.full_name_ar} (${c.link_relation})</span>`:'-'}</td>
-    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button></td>
+    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editCl(${c.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="quickBk(${c.id})" title="حجز جديد">&#x1F4CB;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="openClientProfile(${c.id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon cl-del-btn" onclick="delClient(${c.id},'${c.full_name_ar.replace(/'/g,"&#39;")}')" title="حذف العميل">&#x1F5D1;&#xFE0F;</button></td>
     </tr>`;
   }).join('');
 }
@@ -1969,6 +1988,20 @@ async function saveClient(){
   const dup=await checkDuplicateClient(d, ed.client);
   if(dup){toast(dupMsg(dup),'error');return;}
   try{if(ed.client)await sb(`haj_clients?id=eq.${ed.client}`,'PATCH',d);else await sb('haj_clients','POST',d);toast('تم الحفظ');closeM('cl-modal');loadClients();}catch(e){toast('خطأ: '+e.message,'error');}
+}
+
+function delClient(id, name){
+  if(!requirePerm('حذف عميل')) return;
+  confirmAction(`حذف العميل "${name}"؟`, 'سيتم إلغاء تفعيل العميل نهائياً ولن يظهر في قوائم الحجز', '👤', async()=>{
+    try{
+      // soft delete: بنحط is_cancelled=true عشان الحجوزات القديمة تفضل موجودة
+      await sb(`haj_clients?id=eq.${id}`,'PATCH',{is_cancelled:true});
+      aClients = aClients.filter(c=>c.id!=id);
+      toast('تم حذف العميل ✅');
+      renderClients(aClients);
+      fillClSels();
+    }catch(e){ toast('خطأ: '+e.message,'error'); }
+  });
 }
 
 // ============ OCR (Tesseract.js - مجاني بالكامل، شغال في المتصفح) ============
@@ -2381,6 +2414,20 @@ async function saveEditPay(){
   const d={amount:+document.getElementById('ep-amt').value,currency:document.getElementById('ep-cur').value,payment_method:document.getElementById('ep-mth').value,payment_date:document.getElementById('ep-dt').value,receipt_no:document.getElementById('ep-rc').value.trim()||null,notes:document.getElementById('ep-nts').value.trim()||null};
   if(!d.amount){toast('يرجى إدخال المبلغ','error');return;}
   try{await sb(`haj_payments?id=eq.${_editPayId}`,'PATCH',d);const idx=aPays.findIndex(p=>p.id==_editPayId);if(idx>-1)aPays[idx]={...aPays[idx],...d};toast('تم التعديل ✅');closeM('edit-pay-modal');loadPayments();}catch(e){toast('خطأ: '+e.message,'error');}
+}
+function delPayFromEditModal(){
+  if(!_editPayId||!requirePerm('حذف دفعة')) return;
+  const p=aPays.find(x=>x.id==_editPayId);
+  const amtLabel = p ? fn(p.amount)+' '+p.currency : '';
+  confirmAction(`حذف الدفعة${amtLabel?' ('+amtLabel+')':''}؟`,'سيتم حذف الدفعة نهائياً وتحديث حالة الحجز','💰',async()=>{
+    try{
+      await sb(`haj_payments?id=eq.${_editPayId}`,'DELETE');
+      aPays=aPays.filter(p=>p.id!=_editPayId);
+      toast('تم حذف الدفعة ✅');
+      closeM('edit-pay-modal');
+      loadPayments();
+    }catch(e){toast('خطأ','error');}
+  });
 }
 
 // loadRooms - defined in v4 rooms section below

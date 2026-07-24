@@ -261,7 +261,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 .dlg-btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .dlg-btn-cancel{background:var(--bg3);color:var(--text2);border:1px solid var(--border)!important}
 .dlg-btn-cancel:hover{background:var(--border);color:var(--text)}
-.role-staff #nav-settlement,.role-staff #nav-reports,.role-staff #nav-accounts,.role-staff #nav-settings,.role-staff #header .btn-gold{display:none!important}
+/* nav visibility per-permission is now handled dynamically in JS via applyNavVisibility() */
 
 </style>
 </head>
@@ -657,7 +657,18 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <div class="form-grid">
       <div class="form-group"><label>اسم الشركة</label><input id="cfg-co" type="text"></div>
       <div class="form-group"><label>الهاتف</label><input id="cfg-ph" type="text"></div>
+      <div class="form-group"><label>رقم الترخيص / السجل</label><input id="cfg-license" type="text" placeholder="مثال: ترخيص وزارة السياحة رقم 1234"></div>
       <div class="form-group full"><label>العنوان</label><input id="cfg-addr" type="text"></div>
+      <div class="form-group full">
+        <label>شعار الشركة (Logo)</label>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <img id="cfg-logo-preview" src="" alt="" style="display:none;max-height:70px;max-width:160px;border-radius:8px;border:1px solid var(--border);background:#fff;padding:4px">
+          <input type="file" id="cfg-logo-file" accept="image/*" onchange="handleLogoUpload(event)">
+          <button type="button" class="btn btn-outline btn-sm" onclick="removeLogo()">🗑️ إزالة الشعار</button>
+        </div>
+        <input type="hidden" id="cfg-logo">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">الشعار هيظهر في رأس التقارير والبطاقات المطبوعة. الأفضل صورة مربعة أو أفقية بخلفية بيضاء.</div>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -683,7 +694,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
   <div class="card" id="users-card" style="display:none">
     <div class="card-header"><div class="card-title">👥 صلاحيات المستخدمين</div><button class="btn btn-primary btn-sm" onclick="openAddUserModal()">➕ مستخدم جديد</button></div>
-    <div class="info-box info"><span>ℹ️</span><div>مستوى "موظف" يقدر يدخل بيانات عملاء/حجوزات/مدفوعات، ومش هيشوف التقفيلة/كشف الحسابات/التقارير المالية ومش هيقدر يحذف. مستوى "مدير" صلاحياته كاملة.</div></div>
+    <div class="info-box info"><span>ℹ️</span><div>مستوى "مدير" صلاحياته كاملة على كل شيء. مستوى "موظف" ممكن تحددي له بنفسك بالظبط أي أقسام يشوفها وهل يقدر يحذف بيانات أو يدير المستخدمين ولا لأ.</div></div>
     <div id="users-list" style="margin-top:10px"></div>
   </div>
 </div>
@@ -776,16 +787,26 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 
 <!-- USER MODAL -->
 <div id="user-modal" class="modal-overlay">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header"><div class="modal-title">👤 مستخدم جديد</div><button class="close-btn" onclick="closeM('user-modal')">✕</button></div>
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header"><div class="modal-title">👤 <span id="usr-modal-ttl">مستخدم جديد</span></div><button class="close-btn" onclick="closeM('user-modal')">✕</button></div>
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-group full"><label>اسم المستخدم *</label><input id="usr-name" type="text" autocomplete="off"></div>
-        <div class="form-group full"><label>كلمة المرور *</label><input id="usr-pass" type="password" autocomplete="new-password"></div>
-        <div class="form-group full"><label>الصلاحية</label><select id="usr-role"><option value="staff">موظف (بيانات فقط - بدون أرباح/حذف)</option><option value="admin">مدير (صلاحية كاملة)</option></select></div>
+        <div class="form-group full"><label id="usr-pass-lbl">كلمة المرور *</label><input id="usr-pass" type="password" autocomplete="new-password"></div>
+        <div class="form-group full"><label>الصلاحية</label><select id="usr-role" onchange="toggleUsrPermsBox()"><option value="staff">موظف (صلاحيات مخصصة)</option><option value="admin">مدير (صلاحية كاملة)</option></select></div>
+      </div>
+      <div class="sbox" id="usr-perms-box" style="margin-top:14px">
+        <div class="sbox-title">
+          <span>🔑 صلاحيات الموظف - حددي اللي عاوزاه</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button type="button" class="btn btn-outline btn-sm" onclick="usrPermsToggleAll(true)">تحديد الكل</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="usrPermsToggleAll(false)">إلغاء الكل</button>
+        </div>
+        <div id="usr-perms-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('user-modal')">إلغاء</button><button class="btn btn-primary" onclick="saveNewUser()">💾 حفظ</button></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeM('user-modal')">إلغاء</button><button class="btn btn-primary" onclick="saveUserModal()">💾 حفظ</button></div>
   </div>
 </div>
 
@@ -1119,6 +1140,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <div id="dlg-title">هل أنت متأكد؟</div>
     <div id="dlg-sub">لا يمكن التراجع عن هذا الإجراء</div>
     <div id="dlg-input-wrap"><label id="dlg-input-label">القيمة</label><input id="dlg-input" type="text" autocomplete="off"></div>
+    <div id="dlg-textarea-wrap" style="margin-bottom:20px;display:none;text-align:right"><label id="dlg-textarea-label" style="font-size:12px;color:var(--text3);font-weight:600;display:block;margin-bottom:6px">ملاحظات</label><textarea id="dlg-textarea" rows="4" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:11px 14px;font-size:13px;outline:none;resize:vertical"></textarea></div>
     <div id="dlg-select-wrap"><label id="dlg-select-label">اختر</label><select id="dlg-select"></select></div>
     <div id="dlg-btns">
       <button class="dlg-btn dlg-btn-ok" id="dlg-ok-btn">تأكيد</button>
@@ -1253,7 +1275,7 @@ function toast(msg, type='success', sub=''){
 // --- Core dialog engine ---
 let _dlgResolve = null;
 
-function _dlgOpen({icon='⚠️', iconType='', title, sub='', okLabel='تأكيد', okClass='dlg-btn-ok', cancelLabel='إلغاء', showCancel=true, inputLabel='', inputVal='', inputType='text', selectLabel='', selectOpts=[], defaultSelect=''}={}){
+function _dlgOpen({icon='⚠️', iconType='', title, sub='', okLabel='تأكيد', okClass='dlg-btn-ok', cancelLabel='إلغاء', showCancel=true, inputLabel='', inputVal='', inputType='text', selectLabel='', selectOpts=[], defaultSelect='', textareaLabel='', textareaVal=''}={}){
   return new Promise(resolve => {
     _dlgResolve = resolve;
     const wrap = document.getElementById('dlg-icon-wrap');
@@ -1267,6 +1289,11 @@ function _dlgOpen({icon='⚠️', iconType='', title, sub='', okLabel='تأكي�
     const inp = document.getElementById('dlg-input');
     if(inputLabel){ iw.style.display='block'; document.getElementById('dlg-input-label').textContent=inputLabel; inp.value=inputVal; inp.type=inputType; } else { iw.style.display='none'; }
 
+    // textarea
+    const tw = document.getElementById('dlg-textarea-wrap');
+    const tarea = document.getElementById('dlg-textarea');
+    if(textareaLabel){ tw.style.display='block'; document.getElementById('dlg-textarea-label').textContent=textareaLabel; tarea.value=textareaVal; } else { tw.style.display='none'; }
+
     // select
     const sw = document.getElementById('dlg-select-wrap');
     const sel = document.getElementById('dlg-select');
@@ -1277,7 +1304,8 @@ function _dlgOpen({icon='⚠️', iconType='', title, sub='', okLabel='تأكي�
     okBtn.className = 'dlg-btn ' + okClass;
     okBtn.onclick = () => {
       _dlgClose();
-      if(inputLabel) resolve(inp.value.trim());
+      if(textareaLabel) resolve(tarea.value.trim());
+      else if(inputLabel) resolve(inp.value.trim());
       else if(selectOpts.length) resolve(sel.value);
       else resolve(true);
     };
@@ -1295,6 +1323,7 @@ function _dlgOpen({icon='⚠️', iconType='', title, sub='', okLabel='تأكي�
 
     // Enter / Escape
     const onKey = (e) => {
+      if(e.key==='Enter' && document.activeElement===tarea) return; // اسمحي بسطر جديد جوه textarea الملاحظات
       if(e.key==='Enter'){ e.preventDefault(); okBtn.click(); document.removeEventListener('keydown',onKey); }
       if(e.key==='Escape'){ cancelBtn.click(); document.removeEventListener('keydown',onKey); }
     };
@@ -1326,21 +1355,58 @@ async function sSelect(title, label, opts, defaultVal='', sub=''){
   return _dlgOpen({icon:'📋', iconType:'info', title, sub, selectLabel: label, selectOpts: opts, defaultSelect: defaultVal, okLabel:'تأكيد', okClass:'dlg-btn dlg-btn-ok', cancelLabel:'إلغاء'});
 }
 
+// --- styled multi-line textarea prompt ---
+async function sTextarea(title, label, defaultVal='', sub=''){
+  return _dlgOpen({icon:'📝', iconType:'info', title, sub, textareaLabel: label||title, textareaVal: defaultVal, okLabel:'متابعة الطباعة', okClass:'dlg-btn dlg-btn-ok', cancelLabel:'تخطي'});
+}
+
+// --- ملاحظات إضافية قبل الطباعة: بتظهر لأي تقرير قبل ما يتفتح، لو المستخدم سابها فاضية أو ضغط "تخطي" التقرير بيتطبع عادي بدون ملاحظات ---
+async function askPrintNotes(reportTitle){
+  const res = await sTextarea('ملاحظات على التقرير', `أي ملاحظات عايزة تظهر في "${reportTitle||'التقرير'}"؟ (اختياري)`, '');
+  return res || '';
+}
+// بيرجع بلوك HTML جاهز للحقن في التقرير المطبوع لو فيه ملاحظات
+function notesBlockHtml(notes){
+  if(!notes) return '';
+  return `<div style="background:#fffde7;border:1px solid #f9a825;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13px;color:#555;white-space:pre-wrap"><b style="color:#8a6d1a">📝 ملاحظات:</b><br>${notes.replace(/</g,'&lt;')}</div>`;
+}
+
 function openM(id){document.getElementById(id).classList.add('open');}
-function closeM(id){document.getElementById(id).classList.remove('open');}
+function closeM(id){document.getElementById(id).classList.remove('open'); _formDirty=false;}
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 
+// ============ تنبيه فقدان البيانات غير المحفوظة ============
+// لو المستخدم بيكتب بيانات في مودال مفتوح أو في صفحة الإعدادات وعمل ريفريش/إقفال للصفحة، نديله تنبيه إن البيانات هتتمسح
+let _formDirty=false;
+document.addEventListener('input', e=>{
+  const t=e.target; if(!t || !t.id) return;
+  if(t.closest('.search-bar')) return; // مش عايزين نعتبر البحث/الفلترة "بيانات" هتضيع
+  if(t.id.startsWith('cfg-url')||t.id.startsWith('cfg-key')||t.id.startsWith('login-')) return;
+  const inOpenModal = t.closest('.modal-overlay.open');
+  const inSettingsTab = t.closest('#tab-settings') && document.getElementById('tab-settings').style.display!=='none';
+  if(inOpenModal || inSettingsTab){
+    _formDirty=true;
+  }
+});
+window.addEventListener('beforeunload', e=>{
+  if(_formDirty){
+    e.preventDefault();
+    e.returnValue='في بيانات مكتوبة ومش متحفوظة، لو خرجت أو عملت ريفريش هتتمسح. متأكد؟';
+    return e.returnValue;
+  }
+});
+
 // ============ NAV ============
-const STAFF_RESTRICTED_TABS=['settlement','reports','accounts','settings'];
 function showTab(name){
-  if(currentUser && currentUser.role!=='admin' && STAFF_RESTRICTED_TABS.includes(name)){
-    toast('🔒 القسم ده متاح للمدير بس','error');
+  if(currentUser && currentUser.role!=='admin' && !hasPerm(name)){
+    toast('🔒 القسم ده متاح حسب صلاحيتك بس، كلمي المدير لو محتاج توسيع الصلاحية','error');
     return;
   }
   document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).style.display='block';
   const nb=document.getElementById('nav-'+name);if(nb)nb.classList.add('active');
+  try{ localStorage.setItem('hj_last_tab', name); }catch(e){}
   ({dashboard:loadDash,trips:loadTrips,suppliers:loadSups,clients:loadClients,bookings:loadBookings,payments:loadPayments,rooms:fillTrSels,settlement:fillTrSels,reports:fillTrSels,settings:loadSettings,accounts:initAccountsTab,installments:initInstallments})[name]?.();
 }
 
@@ -1349,9 +1415,18 @@ async function fillTrSels(){
   ['bk-trip-f','pay-trip-f','rm-trip-f','set-trip-f','rep-trip-f','bk-tr'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const isAll=id!=='bk-tr';
+    const keepVal=el.value; // نحافظ على الاختيار الحالي عشان مايتصفّرش كل مرة نعيد ملء القايمة
     el.innerHTML=(isAll?'<option value="">كل الرحلات</option>':'<option value="">-- اختر الرحلة --</option>')+aTrips.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    if(keepVal && aTrips.some(t=>String(t.id)===String(keepVal))) el.value=keepVal;
   });
 }
+// نحفظ آخر رحلة تم اختيارها في كل تاب عشان نرجّعها تلقائيًا بعد الريفريش
+document.addEventListener('change', e=>{
+  const id=e.target && e.target.id;
+  if(['bk-trip-f','pay-trip-f','rm-trip-f','set-trip-f','rep-trip-f'].includes(id)){
+    try{ localStorage.setItem('hj_sel_'+id, e.target.value); }catch(err){}
+  }
+});
 
 // ============ DASHBOARD ============
 async function loadDash(){
@@ -2147,6 +2222,7 @@ async function _printRepBase(type,tid){
   if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
   if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
   const trip=aTrips.find(x=>x.id==tid);
+  const REP_TITLES={travelers:'قائمة المسافرين',passports:'قائمة الجوازات',visa:'متابعة التأشيرات',vaccine:'متابعة التطعيمات',financial:'الحساب المالي'};
   const css=`<style>body{font-family:Arial,sans-serif;padding:20px;direction:rtl}h1{text-align:center;color:#1a6b4a;margin-bottom:15px}p.sub{text-align:center;color:#666;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 10px;text-align:right;font-size:12px}th{background:#f0f0f0;font-weight:bold}.exp{color:red}@media print{body{padding:5px}}</style>`;
   const rows=bks.map((b,i)=>{const c=aClients.find(x=>x.id==b.client_id),pg=aProgs.find(x=>x.id==b.program_id);return{i:i+1,b,c,pg};});
   let body='';
@@ -2177,7 +2253,12 @@ async function _printRepBase(type,tid){
     ${rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid,sc=+r.b.supplier_cost||0,pr=sc>0?(+r.b.final_price)-sc:null;return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:green">${fn(paid)} ج</td><td style="${rem>0?'color:red':''}">${fn(rem)} ج</td><td>${sc>0?fn(sc)+' ج':'-'}</td><td style="${pr!==null?(pr>=0?'color:green':'color:red'):''}">${pr!==null?fn(pr)+' ج':'-'}</td><td>${r.b.status}</td></tr>`;}).join('')}
     </tbody></table>`;
   }
-  const w=window.open('','_blank');w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير</title>${css}</head><body>${body}<p style="text-align:center;color:#999;margin-top:20px;font-size:11px">Adreska Tours | ${fd(new Date().toISOString())}</p></body></html>`);w.document.close();w.print();
+  const _pn = await askPrintNotes(REP_TITLES[type]||'التقرير');
+  const w=window.open('','_blank');w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير</title>${css}</head><body>
+  <div style="text-align:center;margin-bottom:8px">${coLogoImgHtml(50)}</div>
+  ${body}
+  ${notesBlockHtml(_pn)}
+  <p style="text-align:center;color:#999;margin-top:20px;font-size:11px">${getCoName()}${getCoLicense()?' | ترخيص: '+getCoLicense():''} | ${fd(new Date().toISOString())}</p></body></html>`);w.document.close();w.print();
 }
 
 // ============ PRINT CARDS ============
@@ -2189,11 +2270,11 @@ async function printBkCard(bid){
   const rem=(+b.final_price)-paid;
   const disc=[b.has_own_ticket&&'✈️ تذكرة طيران',b.has_own_barcode&&'📊 باركود',b.has_own_visa&&'🪪 تأشيرة'].filter(Boolean).join(' | ');
   const add=[b.has_meals&&'🍽️ وجبات',b.has_train&&'🚄 قطار الحرمين',b.has_makkah_view&&'🕌 إطلالة مكة',b.has_haram_view&&'🕋 إطلالة الحرم'].filter(Boolean).join(' | ');
-  const coName=document.getElementById('cfg-co')?.value||'Adreska Tours';
-  const coPh=document.getElementById('cfg-ph')?.value||'';
+  const coName=getCoName(), coPh=getCoPhone();
   const rcpNo='BK-'+String(bid).padStart(5,'0');
   const qrData=`${rcpNo}|${c?.full_name_ar||''}|${t?.name||''}|${b.final_price}`;
   const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+  const _pn = await askPrintNotes('بطاقة الحجز');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>بطاقة حجز ${rcpNo}</title>
   <style>
     *{box-sizing:border-box}
@@ -2232,7 +2313,10 @@ async function printBkCard(bid){
   </style></head><body>
   <div class="page">
     <div class="header">
-      <div><div class="co-name">🕌 ${coName}</div><div class="co-sub">إدارة السياحة الدينية${coPh?' | '+coPh:''}</div></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        ${coLogoImgHtml(46)}
+        <div><div class="co-name">🕌 ${coName}</div><div class="co-sub">إدارة السياحة الدينية${coPh?' | '+coPh:''}</div>${coLicenseLineHtml()}</div>
+      </div>
       <div style="text-align:left"><div class="rcpno">${rcpNo}</div><div style="font-size:11px;margin-top:4px;opacity:.7">بطاقة حجز</div></div>
     </div>
     <div class="gold-bar"></div>
@@ -2279,6 +2363,7 @@ async function printBkCard(bid){
       </div>
 
       ${t?.form_notes?`<div class="notes"><b>📋 شروط الحجز:</b><br>${t.form_notes.replace(/\n/g,'<br>')}</div>`:''}
+      ${notesBlockHtml(_pn)}
     </div>
     <div class="footer">
       <span>🗓️ تاريخ الطباعة: ${fd(new Date().toISOString())}</span>
@@ -2293,15 +2378,20 @@ async function printBkCard(bid){
 async function printPayRcp(pid){
   if(!aPays.length)return;const p=aPays.find(x=>x.id==pid);if(!p)return;
   const bk=aBks.find(x=>x.id==p.booking_id),c=bk?aClients.find(x=>x.id==bk.client_id):null,t=bk?aTrips.find(x=>x.id==bk.trip_id):null;
+  const coName=getCoName();
+  const _pn = await askPrintNotes('إيصال الدفع');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>إيصال</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:400px;margin:auto}h1{color:#1a6b4a;text-align:center}.r{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}.amt{font-size:32px;font-weight:800;color:#1a6b4a;text-align:center;padding:20px;background:#f9f5e7;border-radius:8px;margin:15px 0}</style></head><body>
+  <div style="text-align:center;margin-bottom:10px">${coLogoImgHtml(55)}</div>
   <h1>🕌 إيصال دفع</h1>
+  <div style="text-align:center;font-size:12px;color:#666;margin-bottom:8px">${coName}${coLicenseLineHtml()}</div>
   <div class="r"><span>العميل</span><b>${c?.full_name_ar||'-'}</b></div>
   <div class="r"><span>الرحلة</span><b>${t?.name||'-'}</b></div>
   <div class="r"><span>طريقة الدفع</span><b>${p.payment_method}</b></div>
   <div class="r"><span>التاريخ</span><b>${fd(p.payment_date)}</b></div>
   ${p.receipt_no?`<div class="r"><span>رقم الإيصال</span><b>${p.receipt_no}</b></div>`:''}
   <div class="amt">${fn(p.amount)} ${p.currency}</div>
-  <p style="text-align:center;color:#999;font-size:11px">Adreska Tours | ${fd(new Date().toISOString())}</p>
+  ${notesBlockHtml(_pn)}
+  <p style="text-align:center;color:#999;font-size:11px">${coName} | ${fd(new Date().toISOString())}</p>
   </body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
 }
@@ -2314,6 +2404,11 @@ function loadSettings(){
     document.getElementById('cfg-co').value=g('company_name');
     document.getElementById('cfg-ph').value=g('company_phone');
     document.getElementById('cfg-addr').value=g('company_address');
+    document.getElementById('cfg-license').value=g('company_license');
+    document.getElementById('cfg-logo').value=g('company_logo');
+    const logoVal=g('company_logo');
+    const prev=document.getElementById('cfg-logo-preview');
+    if(logoVal){ prev.src=logoVal; prev.style.display='inline-block'; } else { prev.style.display='none'; }
     document.getElementById('cfg-sar').value=g('rate_sar_to_egp')||13.5;
     document.getElementById('cfg-usd').value=g('rate_usd_to_egp')||49;
     if(document.getElementById('cfg-wb-key'))document.getElementById('cfg-wb-key').value=g('callmebot_key');
@@ -2352,8 +2447,44 @@ async function testConn(){
   catch(e){msg.innerHTML='&#x274C; <span style="color:var(--red-light)">فشل: '+e.message+'</span>';ind.innerHTML='&#x1F534; غير متصل';ind.style.color='var(--red-light)';}
 }
 async function saveSettings(){
-  const s=[{key:'company_name',value:document.getElementById('cfg-co').value},{key:'company_phone',value:document.getElementById('cfg-ph').value},{key:'company_address',value:document.getElementById('cfg-addr').value},{key:'rate_sar_to_egp',value:document.getElementById('cfg-sar').value},{key:'rate_usd_to_egp',value:document.getElementById('cfg-usd').value}];
-  try{await upsertSettings(s);toast('تم الحفظ');}catch(e){toast('خطأ: '+e.message,'error');}
+  const s=[
+    {key:'company_name',value:document.getElementById('cfg-co').value},
+    {key:'company_phone',value:document.getElementById('cfg-ph').value},
+    {key:'company_address',value:document.getElementById('cfg-addr').value},
+    {key:'company_license',value:document.getElementById('cfg-license')?.value||''},
+    {key:'company_logo',value:document.getElementById('cfg-logo')?.value||''},
+    {key:'rate_sar_to_egp',value:document.getElementById('cfg-sar').value},
+    {key:'rate_usd_to_egp',value:document.getElementById('cfg-usd').value}
+  ];
+  try{
+    await upsertSettings(s);
+    await loadCoCache();
+    _formDirty=false;
+    toast('تم الحفظ');
+  }catch(e){toast('خطأ: '+e.message,'error');}
+}
+
+// ---- رفع/إزالة شعار الشركة (بيتحفظ base64 داخل haj_settings) ----
+function handleLogoUpload(ev){
+  const file=ev.target.files && ev.target.files[0];
+  if(!file) return;
+  if(file.size > 900*1024){ toast('حجم الصورة كبير، اختاري صورة أصغر من 900KB','error'); ev.target.value=''; return; }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    document.getElementById('cfg-logo').value = e.target.result;
+    const prev=document.getElementById('cfg-logo-preview');
+    prev.src=e.target.result; prev.style.display='inline-block';
+    _formDirty=true;
+    toast('الشعار جاهز، متنسيش تدوسي "حفظ الإعدادات" 💾');
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo(){
+  document.getElementById('cfg-logo').value='';
+  document.getElementById('cfg-logo-file').value='';
+  const prev=document.getElementById('cfg-logo-preview');
+  prev.src=''; prev.style.display='none';
+  _formDirty=true;
 }
 
 // ============ BACKUP / RESTORE ============
@@ -2442,6 +2573,24 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ============ AUTH / USER PERMISSIONS ============
 let currentUser = null;
 
+// ---- كاش بيانات الشركة (اسم/هاتف/ترخيص/شعار) عشان تكون جاهزة في التقارير حتى لو المستخدم مفتحش تاب الإعدادات ----
+let CO_CACHE = {name:'', phone:'', address:'', license:'', logo:''};
+async function loadCoCache(){
+  if(!SURL||!SKEY) return;
+  try{
+    const s = await sb('haj_settings?limit=30');
+    const g=k=>(s.find(x=>x.key===k)||{}).value||'';
+    CO_CACHE = { name:g('company_name'), phone:g('company_phone'), address:g('company_address'), license:g('company_license'), logo:g('company_logo') };
+  }catch(e){}
+}
+function getCoName(){ return document.getElementById('cfg-co')?.value || CO_CACHE.name || 'Adreska Tours'; }
+function getCoPhone(){ return document.getElementById('cfg-ph')?.value || CO_CACHE.phone || ''; }
+function getCoLicense(){ return document.getElementById('cfg-license')?.value || CO_CACHE.license || ''; }
+function getCoLogo(){ return document.getElementById('cfg-logo')?.value || CO_CACHE.logo || ''; }
+// شريط شعار+ترخيص جاهز للحقن في رأس أي تقرير مطبوع
+function coLogoImgHtml(maxH){ const l=getCoLogo(); return l?`<img src="${l}" style="max-height:${maxH||50}px;max-width:150px;object-fit:contain;background:#fff;border-radius:6px;padding:3px">`:''; }
+function coLicenseLineHtml(){ const lic=getCoLicense(); return lic?`<div style="font-size:11px;opacity:.85">🪪 ترخيص رقم: ${lic}</div>`:''; }
+
 async function getAppUsers(){
   try{
     const s = await sb('haj_settings?key=eq.app_users&limit=1');
@@ -2457,7 +2606,8 @@ async function initAuth(){
     try{
       currentUser = JSON.parse(saved);
       applyRoleUI();
-      loadDash(); testConn();
+      loadCoCache();
+      restoreLastState(); testConn();
       return;
     }catch(e){ localStorage.removeItem('hj_session'); }
   }
@@ -2503,8 +2653,29 @@ function loginSuccess(user){
   localStorage.setItem('hj_session', JSON.stringify(user));
   document.getElementById('login-screen').style.display='none';
   applyRoleUI();
-  loadDash(); testConn();
+  loadCoCache();
+  restoreLastState(); testConn();
   logAction('login',{username:user.username});
+}
+
+// ---- استعادة آخر تاب وآخر بيانات (رحلة مختارة) بعد الريفريش أو تسجيل الدخول ----
+function restoreLastState(){
+  loadDash(); // نضمن إن الإحصائيات العامة اتحمّلت دايمًا كخلفية آمنة
+  let tab='dashboard';
+  try{ tab = localStorage.getItem('hj_last_tab') || 'dashboard'; }catch(e){}
+  if(currentUser && currentUser.role!=='admin' && !hasPerm(tab)) tab='dashboard';
+  if(tab!=='dashboard') showTab(tab);
+  setTimeout(()=>{
+    const selMap={'bk-trip-f':loadBookings,'pay-trip-f':loadPayments,'rm-trip-f':loadRooms,'set-trip-f':loadSettlement,'rep-trip-f':showRepBtns};
+    const tabSelMap={bookings:'bk-trip-f',payments:'pay-trip-f',rooms:'rm-trip-f',settlement:'set-trip-f',reports:'rep-trip-f'};
+    const selId=tabSelMap[tab];
+    if(!selId) return;
+    try{
+      const saved=localStorage.getItem('hj_sel_'+selId);
+      const el=document.getElementById(selId);
+      if(saved && el){ el.value=saved; selMap[selId]?.(); }
+    }catch(e){}
+  }, 700);
 }
 
 function logoutUser(){
@@ -2514,10 +2685,36 @@ function logoutUser(){
   },false);
 }
 
+// ---- نظام الصلاحيات التفصيلي ----
+const PERMISSIONS_DEF=[
+  {key:'dashboard', label:'📊 لوحة التحكم'},
+  {key:'trips', label:'🗓️ الرحلات'},
+  {key:'suppliers', label:'🏢 الموردين'},
+  {key:'clients', label:'👤 العملاء'},
+  {key:'bookings', label:'📋 الحجوزات'},
+  {key:'payments', label:'💰 المدفوعات'},
+  {key:'rooms', label:'🛏️ التسكين'},
+  {key:'installments', label:'📅 الأقساط'},
+  {key:'settlement', label:'📈 التقفيلة'},
+  {key:'reports', label:'🖨️ التقارير'},
+  {key:'accounts', label:'📒 كشف الحسابات'},
+  {key:'settings', label:'⚙️ الإعدادات'},
+  {key:'can_delete', label:'🗑️ صلاحية الحذف'},
+  {key:'manage_users', label:'👥 إدارة المستخدمين'},
+];
+const STAFF_DEFAULT_PERMS={dashboard:true,trips:true,suppliers:true,clients:true,bookings:true,payments:true,rooms:true,installments:true,settlement:false,reports:false,accounts:false,settings:false,can_delete:false,manage_users:false};
+
 function isAdmin(){ return !!currentUser && currentUser.role==='admin'; }
-function requirePerm(actionLabel){
-  if(!isAdmin()){ toast('🔒 محتاج صلاحية مدير عشان تقدر ت'+(actionLabel||'نفّذ ده'),'error'); return false; }
-  return true;
+function hasPerm(key){
+  if(!currentUser) return false;
+  if(currentUser.role==='admin') return true;
+  return !!(currentUser.perms && currentUser.perms[key]);
+}
+function requirePerm(actionLabel, key='can_delete'){
+  if(isAdmin() || hasPerm(key)) return true;
+  const permLabel = (PERMISSIONS_DEF.find(p=>p.key===key)||{}).label || key;
+  toast(`🔒 محتاج صلاحية "${permLabel}" عشان تقدر ت${actionLabel||'نفّذ ده'}`,'error');
+  return false;
 }
 
 function applyRoleUI(){
@@ -2529,16 +2726,29 @@ function applyRoleUI(){
   }
   if(logoutBtn) logoutBtn.style.display='inline-block';
   document.body.classList.toggle('role-staff', !!currentUser && currentUser.role!=='admin');
+  applyNavVisibility();
   const usersCard = document.getElementById('users-card');
-  if(usersCard) usersCard.style.display = isAdmin() ? 'block' : 'none';
+  if(usersCard) usersCard.style.display = (isAdmin()||hasPerm('manage_users')) ? 'block' : 'none';
 }
 
-// ---- إدارة المستخدمين (من الإعدادات - للمدير فقط) ----
+// إظهار/إخفاء أزرار القائمة الجانبية حسب صلاحيات المستخدم الفعلية (مش بس مدير/موظف)
+function applyNavVisibility(){
+  if(!currentUser) return;
+  PERMISSIONS_DEF.forEach(p=>{
+    const nb=document.getElementById('nav-'+p.key);
+    if(nb) nb.style.display = (isAdmin()||hasPerm(p.key)) ? '' : 'none';
+  });
+  const headerGold=document.querySelector('#header .btn-gold');
+  if(headerGold) headerGold.style.display = (isAdmin()||hasPerm('settings')) ? '' : 'none';
+}
+
+// ---- إدارة المستخدمين (من الإعدادات) ----
 async function refreshUsersUI(){
   const card = document.getElementById('users-card');
   if(!card) return;
-  card.style.display = isAdmin() ? 'block' : 'none';
-  if(!isAdmin()) return;
+  const allowed = isAdmin()||hasPerm('manage_users');
+  card.style.display = allowed ? 'block' : 'none';
+  if(!allowed) return;
   await renderUsersList();
 }
 async function renderUsersList(){
@@ -2548,41 +2758,98 @@ async function renderUsersList(){
   try{
     const users = await getAppUsers();
     if(!users.length){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">👥</div><h3>لا يوجد مستخدمين</h3></div>'; return; }
-    wrap.innerHTML = `<div class="table-wrap"><table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th></th></tr></thead><tbody>
-      ${users.map((u,i)=>`<tr>
+    wrap.innerHTML = `<div class="table-wrap"><table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>الأقسام المتاحة</th><th></th></tr></thead><tbody>
+      ${users.map((u,i)=>{
+        const permsSummary = u.role==='admin' ? 'كل شيء' : PERMISSIONS_DEF.filter(p=>u.perms&&u.perms[p.key]).map(p=>p.label.split(' ')[0]).join(' ')||'—';
+        return `<tr>
         <td><b>${u.username}</b>${currentUser && currentUser.username===u.username?' <small style="color:var(--text3)">(أنت)</small>':''}</td>
         <td>${u.role==='admin'?'<span class="badge badge-gold">مدير</span>':'<span class="badge badge-blue">موظف</span>'}</td>
+        <td style="font-size:12px;color:var(--text3);max-width:220px">${permsSummary}</td>
         <td style="white-space:nowrap">
+          <button class="btn btn-outline btn-sm btn-icon" onclick="editUserModal(${i})" title="تعديل">✏️</button>
           <button class="btn btn-outline btn-sm btn-icon" onclick="resetUserPassword(${i})" title="تغيير كلمة المرور">🔑</button>
           <button class="btn btn-danger btn-sm btn-icon" onclick="deleteUser(${i})" title="حذف">🗑️</button>
         </td>
-      </tr>`).join('')}
+      </tr>`;}).join('')}
     </tbody></table></div>`;
   }catch(e){ wrap.innerHTML=`<div class="info-box danger">❌ خطأ: ${e.message}</div>`; }
 }
+
+function renderUsrPermsCheckboxes(perms){
+  const wrap=document.getElementById('usr-perms-list');
+  wrap.innerHTML = PERMISSIONS_DEF.map(p=>`<label class="check-item" style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="usr-perm-${p.key}" ${perms&&perms[p.key]?'checked':''}> ${p.label}</label>`).join('');
+}
+function usrPermsToggleAll(val){ PERMISSIONS_DEF.forEach(p=>{const el=document.getElementById('usr-perm-'+p.key); if(el) el.checked=val;}); }
+function toggleUsrPermsBox(){
+  const role=document.getElementById('usr-role').value;
+  document.getElementById('usr-perms-box').style.display = role==='admin' ? 'none' : 'block';
+}
+function collectUsrPerms(){
+  const perms={};
+  PERMISSIONS_DEF.forEach(p=>{ perms[p.key]=!!document.getElementById('usr-perm-'+p.key)?.checked; });
+  return perms;
+}
+
+let _userEditIdx = null; // null = إضافة مستخدم جديد، رقم = تعديل مستخدم موجود
 function openAddUserModal(){
-  if(!requirePerm('ضيف مستخدم')) return;
+  if(!requirePerm('ضيف مستخدم','manage_users')) return;
+  _userEditIdx = null;
+  document.getElementById('usr-modal-ttl').textContent='مستخدم جديد';
+  document.getElementById('usr-pass-lbl').textContent='كلمة المرور *';
   document.getElementById('usr-name').value='';
   document.getElementById('usr-pass').value='';
   document.getElementById('usr-role').value='staff';
+  renderUsrPermsCheckboxes(STAFF_DEFAULT_PERMS);
+  toggleUsrPermsBox();
   openM('user-modal');
 }
-async function saveNewUser(){
+async function editUserModal(idx){
+  if(!requirePerm('تعدّل مستخدم','manage_users')) return;
+  try{
+    const users = await getAppUsers();
+    const u = users[idx]; if(!u) return;
+    _userEditIdx = idx;
+    document.getElementById('usr-modal-ttl').textContent='تعديل مستخدم';
+    document.getElementById('usr-pass-lbl').textContent='كلمة المرور (سيبها فاضية لو مش هتغيّرها)';
+    document.getElementById('usr-name').value=u.username;
+    document.getElementById('usr-pass').value='';
+    document.getElementById('usr-role').value=u.role==='admin'?'admin':'staff';
+    renderUsrPermsCheckboxes(u.perms||STAFF_DEFAULT_PERMS);
+    toggleUsrPermsBox();
+    openM('user-modal');
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
+async function saveUserModal(){
   const u = document.getElementById('usr-name').value.trim();
   const p = document.getElementById('usr-pass').value;
   const r = document.getElementById('usr-role').value;
-  if(!u || !p){ toast('يرجى إدخال اسم المستخدم وكلمة المرور','error'); return; }
+  const perms = r==='admin' ? null : collectUsrPerms();
+  if(!u){ toast('يرجى إدخال اسم المستخدم','error'); return; }
+  if(_userEditIdx===null && !p){ toast('يرجى إدخال كلمة المرور','error'); return; }
   try{
     const users = await getAppUsers();
-    if(users.some(x=>x.username===u)){ toast('اسم المستخدم ده موجود بالفعل','error'); return; }
-    users.push({username:u, password:p, role:r});
+    const dup = users.some((x,i)=>x.username===u && i!==_userEditIdx);
+    if(dup){ toast('اسم المستخدم ده موجود بالفعل','error'); return; }
+    if(_userEditIdx===null){
+      users.push({username:u, password:p, role:r, perms});
+    } else {
+      const old = users[_userEditIdx];
+      users[_userEditIdx] = {username:u, password: p?p:old.password, role:r, perms};
+      // لو المستخدم بيعدّل نفسه، حدّثي بيانات الجلسة الحالية عشان الاسم يتغير فورًا
+      if(currentUser && old.username===currentUser.username){
+        currentUser = {username:u, role:r, perms};
+        localStorage.setItem('hj_session', JSON.stringify(currentUser));
+        applyRoleUI();
+      }
+    }
     await saveAppUsers(users);
-    toast('تم إضافة المستخدم ✅');
+    toast(_userEditIdx===null?'تم إضافة المستخدم ✅':'تم حفظ التعديلات ✅');
     closeM('user-modal');
     renderUsersList();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
 }
 async function deleteUser(idx){
+  if(!requirePerm('حذف مستخدم','manage_users')) return;
   try{
     const users = await getAppUsers();
     const u = users[idx]; if(!u) return;
@@ -2596,6 +2863,7 @@ async function deleteUser(idx){
   }catch(e){ toast('خطأ: '+e.message,'error'); }
 }
 async function resetUserPassword(idx){
+  if(!requirePerm('تغيير كلمة مرور مستخدم','manage_users')) return;
   try{
     const users = await getAppUsers();
     const u = users[idx]; if(!u) return;
@@ -2761,8 +3029,9 @@ async function printTripProgram(tid){
   const trip=aTrips.find(x=>x.id==tid);if(!trip)return;
   const progs=aProgs.filter(p=>p.trip_id==tid);
   const sup=aSups.find(s=>s.id==trip.supplier_id);
-  const coName=document.getElementById('cfg-co')?.value||'Adreska Tours';
-  const coPh=document.getElementById('cfg-ph')?.value||'';
+  const coName=getCoName();
+  const coPh=getCoPhone();
+  const _pn = await askPrintNotes('برنامج الرحلة');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>برنامج الرحلة</title>
   <style>
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f5f5f5}
@@ -2801,8 +3070,13 @@ async function printTripProgram(tid){
   </style></head><body>
   <div class="page">
     <div class="header">
-      <div class="co">🕌 ${coName}${coPh?' | '+coPh:''}</div>
-      <div class="trip-name">${trip.name}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <div class="co">🕌 ${coName}${coPh?' | '+coPh:''}</div>
+          <div class="trip-name">${trip.name}</div>
+        </div>
+        ${coLogoImgHtml(50)}
+      </div>
       <div class="meta">
         <span>📅 ${fd(trip.depart_date)}</span>
         <span>${trip.trip_type==='حج'?'🕋 رحلة حج':'🌙 رحلة عمرة'}</span>
@@ -2885,9 +3159,10 @@ async function printTripProgram(tid){
 
       ${trip.program_notes?`<div class="section"><div class="section-title">📝 معلومات الرحلة</div><div class="notes-box">${trip.program_notes}</div></div>`:''}
       ${trip.form_notes?`<div class="section"><div class="section-title">📋 شروط الحجز</div><div class="notes-box">${trip.form_notes}</div></div>`:''}
+      ${notesBlockHtml(_pn)}
     </div>
     <div class="footer">
-      <span>${coName}${coPh?' | '+coPh:''}</span>
+      <span>${coName}${coPh?' | '+coPh:''}${getCoLicense()?' | ترخيص: '+getCoLicense():''}</span>
       <span>تاريخ الطباعة: ${fd(new Date().toISOString())}</span>
     </div>
   </div>

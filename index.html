@@ -1522,7 +1522,12 @@ function showTab(name){
   document.getElementById('tab-'+name).style.display='block';
   const nb=document.getElementById('nav-'+name);if(nb)nb.classList.add('active');
   try{ localStorage.setItem('hj_last_tab', name); }catch(e){}
-  ({dashboard:loadDash,trips:loadTrips,suppliers:loadSups,clients:loadClients,bookings:loadBookings,payments:loadPayments,rooms:fillTrSels,settlement:fillTrSels,reports:fillTrSels,settings:loadSettings,accounts:initAccountsTab,installments:initInstallments})[name]?.();
+  ({dashboard:loadDash,trips:loadTrips,suppliers:loadSups,clients:loadClients,bookings:loadBookings,payments:loadPayments,rooms:fillTrSels,settlement:fillTrSels,reports:loadReportsTab,settings:loadSettings,accounts:initAccountsTab,installments:initInstallments})[name]?.();
+}
+
+async function loadReportsTab(){
+  await fillTrSels();
+  await loadAlertSettings();
 }
 
 async function fillTrSels(){

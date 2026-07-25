@@ -904,6 +904,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
             <div class="form-group"><label>العملة</label><select id="spm-cur"><option value="EGP">جنيه (EGP)</option><option value="USD">دولار (USD)</option><option value="SAR">ريال (SAR)</option><option value="EUR">يورو (EUR)</option></select></div>
             <div class="form-group"><label>التاريخ *</label><input id="spm-dt" type="date"></div>
             <div class="form-group"><label>طريقة الدفع</label><select id="spm-mth"><option value="كاش">كاش</option><option value="تحويل">تحويل</option><option value="شيك">شيك</option><option value="فيزا">فيزا</option></select></div>
+            <div class="form-group full"><label>🏦 الدفع من حساب *</label><select id="spm-account" required><option value="">-- اختر الحساب --</option><option value="كاش">🪙 الخزنة (كاش)</option><option value="تحويل">🏦 البنك (تحويل بنكي)</option><option value="فيزا">💳 فيزا / بطاقة</option><option value="شيك">📄 شيك</option></select></div>
             <div class="form-group full"><label>رقم المرجع / الإيصال</label><input id="spm-ref" type="text" placeholder="رقم التحويل أو الإيصال"></div>
             <div class="form-group full"><label>ملاحظات</label><input id="spm-nts" type="text" placeholder="ملاحظات اختيارية"></div>
           </div>
@@ -7059,8 +7060,15 @@ async function loadSupplierAccount() {
       pgBks.forEach(b=>{
         const rt=b.room_type||'ثنائي';
         dist[rt]=(dist[rt]||0)+1;
-        const key='sup_cost_'+(roomMap[rt]||'double');
-        pgObl+=(+pg[key]||0);
+        let cost=0;
+        if(rt==='بدون'){
+          // طفل بدون سرير — يستخدم sup_cost_child أو child_cost إن وُجد، وإلا صفر
+          cost=(+pg.sup_cost_child||+pg.child_cost||0);
+        } else {
+          const key='sup_cost_'+(roomMap[rt]||'double');
+          cost=(+pg[key]||0);
+        }
+        pgObl+=cost;
       });
       totalObligation+=pgObl;
       const distStr=Object.entries(dist).map(([k,v])=>`${k}: ${v}`).join(' | ');
@@ -7089,7 +7097,7 @@ async function loadSupplierAccount() {
     if(progRows.length){
       html+=`<div class="card-title" style="margin:16px 0 8px">📋 تفاصيل الالتزام بالبرنامج</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>كود البرنامج</th><th>عدد الأفراد</th><th>التوزيع</th><th>تكلفة الثنائي</th><th>تكلفة الثلاثي</th><th>تكلفة الرباعي</th><th>الالتزام</th></tr></thead>
+        <thead><tr><th>كود البرنامج</th><th>عدد الأفراد</th><th>التوزيع</th><th>تكلفة الثنائي</th><th>تكلفة الثلاثي</th><th>تكلفة الرباعي</th><th>تكلفة الخماسي</th><th>تكلفة الطفل</th><th>الالتزام</th></tr></thead>
         <tbody>`;
       progRows.forEach(r=>{
         html+=`<tr>
@@ -7099,10 +7107,12 @@ async function loadSupplierAccount() {
           <td>${fn(r.pg.sup_cost_double||0)} ج</td>
           <td>${fn(r.pg.sup_cost_triple||0)} ج</td>
           <td>${fn(r.pg.sup_cost_quad||0)} ج</td>
+          <td>${fn(r.pg.sup_cost_quint||0)} ج</td>
+          <td>${fn(r.pg.sup_cost_child||r.pg.child_cost||0)} ج</td>
           <td><b style="color:var(--gold)">${fn(r.pgObl)} ج</b></td>
         </tr>`;
       });
-      html+=`<tr style="background:var(--side-2)"><td colspan="6"><b>إجمالي الالتزام</b></td><td><b style="color:var(--red-light);font-size:16px">${fn(totalObligation)} ج</b></td></tr>
+      html+=`<tr style="background:var(--side-2)"><td colspan="8"><b>إجمالي الالتزام</b></td><td><b style="color:var(--red-light);font-size:16px">${fn(totalObligation)} ج</b></td></tr>
       </tbody></table></div>`;
     }
 
@@ -7114,16 +7124,19 @@ async function loadSupplierAccount() {
     if(supPays.length){
       let running=0;
       html+=`<div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>التاريخ</th><th>المبلغ</th><th>العملة</th><th>طريقة الدفع</th><th>مرجع</th><th>ملاحظات</th><th>الرصيد المتبقي</th><th>إجراءات</th></tr></thead>
+        <thead><tr><th>#</th><th>التاريخ</th><th>المبلغ</th><th>العملة</th><th>من حساب</th><th>طريقة الدفع</th><th>مرجع</th><th>ملاحظات</th><th>الرصيد المتبقي</th><th>إجراءات</th></tr></thead>
         <tbody>`;
+      const accIcons={'كاش':'🪙','تحويل':'🏦','فيزا':'💳','شيك':'📄'};
       supPays.forEach((p,i)=>{
         running+=+p.amount;
         const rem=totalObligation-running;
+        const accLabel=p.payment_account?(accIcons[p.payment_account]||'💰')+' '+(p.payment_account):'—';
         html+=`<tr>
           <td>${i+1}</td>
           <td>${fd(p.payment_date)}</td>
           <td><b style="color:var(--green)">${fn(p.amount)}</b></td>
           <td>${p.currency||'EGP'}</td>
+          <td><span style="font-weight:600;color:var(--gold-light)">${accLabel}</span></td>
           <td>${p.payment_method||'-'}</td>
           <td>${p.reference_no||'-'}</td>
           <td style="font-size:12px;color:var(--text3)">${p.notes||''}</td>
@@ -7147,6 +7160,7 @@ function openSupPayModal(tripId,supId){
   document.getElementById('spm-ref').value='';
   document.getElementById('spm-nts').value='';
   document.getElementById('spm-dt').value=new Date().toISOString().split('T')[0];
+  document.getElementById('spm-account').value='';
   document.getElementById('sup-pay-modal').style.display='flex';
 }
 
@@ -7154,11 +7168,14 @@ async function saveSupplierPayment(){
   const tid=+document.getElementById('spm-trip-id').value;
   const sid=+document.getElementById('spm-sup-id').value;
   const amt=+document.getElementById('spm-amt').value;
+  const account=document.getElementById('spm-account').value;
   if(!amt||amt<=0){toast('أدخل مبلغ صحيح','error');return;}
+  if(!account){toast('اختر الحساب (خزنة / بنك)','error');return;}
   const d={
     trip_id:tid,supplier_id:sid,amount:amt,
     currency:document.getElementById('spm-cur').value,
     payment_method:document.getElementById('spm-mth').value,
+    payment_account:account,
     payment_date:document.getElementById('spm-dt').value,
     reference_no:document.getElementById('spm-ref').value.trim()||null,
     notes:document.getElementById('spm-nts').value.trim()||null

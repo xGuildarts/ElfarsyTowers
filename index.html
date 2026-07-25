@@ -1497,6 +1497,23 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
           <div class="form-group col2"><label>سبب الخصم (اختياري)</label><input id="bk-exdisc-r" type="text" placeholder="مثال: عرض خاص / عميل قديم"></div>
         </div>
       </div>
+      <!-- بانر قفل السعر (يظهر فقط عند تعديل حجز قديم) -->
+      <div id="px-lock-banner" style="display:none;background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.4);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--gold-light)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">🔒</span>
+            <div>
+              <div style="font-weight:700;font-size:13px">السعر محفوظ من تاريخ الحجز الأصلي</div>
+              <div style="color:var(--text3);font-size:11px;margin-top:2px">إذا تغيّر سعر الرحلة بعد الحجز، التغيير لن يؤثر على هذا الحجز</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-outline btn-sm" onclick="unlockPriceRecalc()" title="أعد حساب السعر من الرحلة الحالية" style="font-size:11px;padding:4px 10px">🔄 تحديث للسعر الجديد</button>
+            <button class="btn btn-outline btn-sm" onclick="keepLockedPrice()" title="احتفظ بالسعر الأصلي" style="font-size:11px;padding:4px 10px;color:var(--green-light);border-color:var(--green)">✅ احتفظ بالسعر القديم</button>
+          </div>
+        </div>
+        <div id="px-lock-diff" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(0,0,0,.2);border-radius:6px;font-size:12px"></div>
+      </div>
       <div class="price-summary">
         <div class="price-row"><span>💺 سعر التسكين الأساسي</span><span id="px-base">0 ج</span></div>
         <div class="price-row deduct" id="px-tkt-r" style="display:none"><span>- ✈️ تذكرة طيران</span><span id="px-tkt">0 ج</span></div>
@@ -2973,13 +2990,41 @@ function renderBks(list){
   }).join('');
 }
 async function _openBkModalBase(id=null,preCl=null){
-  ed.bk=id;document.getElementById('bk-ttl').textContent=id?'تعديل الحجز':'حجز جديد';
+  ed.bk=id;
+  if(id){
+    const b=aBks.find(x=>x.id==id);
+    const bkDate=b?.created_at?fd(b.created_at.split('T')[0]):'';
+    document.getElementById('bk-ttl').innerHTML=`تعديل الحجز <small style="font-size:11px;color:var(--text3);font-weight:400">#${id}${bkDate?' · '+bkDate:''}</small>`;
+  } else {
+    document.getElementById('bk-ttl').textContent='حجز جديد';
+  }
   if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
   if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
   fillClSels();fillTrSels();
   ['bk-tkt','bk-brc','bk-vis','bk-mls','bk-trn','bk-mkv','bk-hrv'].forEach(f=>document.getElementById(f).checked=false);
-  if(!id){document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-exdisc').value='';resetSupCostOverride();document.getElementById('bk-exdisc-r').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
-  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';document.getElementById('bk-exdisc').value=b.extra_discount||'';document.getElementById('bk-exdisc-r').value=b.extra_discount_reason||'';calcPx();}
+  if(!id){_resetPriceLock();document.getElementById('bk-rm').value='ثنائي';['bk-rm-mc','bk-rm-md','bk-nts'].forEach(f=>document.getElementById(f).value='');document.getElementById('bk-supcost').value='';document.getElementById('bk-exdisc').value='';resetSupCostOverride();document.getElementById('bk-exdisc-r').value='';document.getElementById('bk-cur').value='EGP';document.getElementById('bk-vstat').value='لم تُقدَّم';document.getElementById('bk-vac').value='غير مكتملة';document.getElementById('bk-st').value='محجوز';document.getElementById('bk-tp').value='بالغ';document.getElementById('bk-pg').innerHTML='<option value="">-- اختر الرحلة أولاً --</option>';if(preCl){document.getElementById('bk-cl').value=preCl;onClChange();}}
+  else{const b=aBks.find(x=>x.id==id);if(!b)return;document.getElementById('bk-cl').value=b.client_id;document.getElementById('bk-tr').value=b.trip_id;await onTrChange();document.getElementById('bk-pg').value=b.program_id;document.getElementById('bk-tp').value=b.traveler_type;document.getElementById('bk-rm').value=b.room_type||'ثنائي';document.getElementById('bk-rm-mc').value=b.room_number_mecca||'';document.getElementById('bk-rm-md').value=b.room_number_madina||'';document.getElementById('bk-tkt').checked=b.has_own_ticket||false;document.getElementById('bk-brc').checked=b.has_own_barcode||false;document.getElementById('bk-vis').checked=b.has_own_visa||false;document.getElementById('bk-mls').checked=b.has_meals||false;document.getElementById('bk-trn').checked=b.has_train||false;document.getElementById('bk-mkv').checked=b.has_makkah_view||false;document.getElementById('bk-hrv').checked=b.has_haram_view||false;document.getElementById('bk-cur').value=b.currency||'EGP';document.getElementById('bk-vstat').value=b.visa_status;document.getElementById('bk-vac').value=b.vaccine_status;document.getElementById('bk-st').value=b.status;document.getElementById('bk-nts').value=b.notes||'';document.getElementById('bk-supcost').value=b.supplier_cost||'';document.getElementById('bk-exdisc').value=b.extra_discount||'';document.getElementById('bk-exdisc-r').value=b.extra_discount_reason||'';
+    // ===== قفل السعر للحجوزات القديمة =====
+    window._lockedBkPrice = {base:+b.base_price||0, deduct:+b.deductions_total||0, add:+b.additions_total||0, fin:+b.final_price||0};
+    window._priceIsLocked = true;
+    calcPx(); // يحسب السعر الجديد مؤقتاً لنقارنه
+    const newBase = prc.base;
+    const oldBase = window._lockedBkPrice.base;
+    // نعيد السعر القديم لأن الحجز محفوظ عليه
+    prc = {...window._lockedBkPrice};
+    document.getElementById('px-base').textContent = fn(oldBase)+' ج';
+    document.getElementById('px-fin').textContent = fn(window._lockedBkPrice.fin)+' ج';
+    // اظهر البانر
+    const banner = document.getElementById('px-lock-banner');
+    if(banner){ banner.style.display='block';
+      const diffEl = document.getElementById('px-lock-diff');
+      if(newBase !== oldBase && diffEl){
+        const diff = newBase - oldBase;
+        diffEl.style.display='block';
+        diffEl.innerHTML = `<span style="color:var(--text3)">سعر الرحلة الحالي للتسكين:</span> <b style="color:${diff>0?'var(--red-light)':'#4caf84'}">${fn(newBase)} ج</b> &nbsp;|&nbsp; <span style="color:var(--text3)">السعر المحفوظ في الحجز:</span> <b style="color:var(--gold)">${fn(oldBase)} ج</b> &nbsp;|&nbsp; <span style="color:${diff>0?'var(--red-light)':'#4caf84'}">${diff>0?'↑':'↓'} فرق ${fn(Math.abs(diff))} ج</span>`;
+      } else if(diffEl){ diffEl.style.display='none'; }
+    }
+  }
   openM('bk-modal');
 }
 function editBk(id){openBkModal(id);}
@@ -3000,6 +3045,25 @@ async function onTrChange(){
 }
 function calcPx(){
   if(!curTrip)return;
+  // لو السعر مقفول (حجز قديم)، نستخدم السعر المحفوظ بس نحسب الإضافات/الخصومات المتغيرة
+  if(window._priceIsLocked && window._lockedBkPrice){
+    const lk=window._lockedBkPrice;
+    const exdisc=+document.getElementById('bk-exdisc')?.value||0;
+    const gt=id=>document.getElementById(id).checked;
+    const deduct=(gt('bk-tkt')?+curTrip.ticket_price:0)+(gt('bk-brc')?+curTrip.barcode_price:0)+(gt('bk-vis')?+curTrip.visa_price:0);
+    const add=(gt('bk-mls')?+curTrip.meals_price:0)+(gt('bk-trn')?+curTrip.train_price:0)+(gt('bk-mkv')?+curTrip.makkah_view_price:0)+(gt('bk-hrv')?+curTrip.haram_view_price:0);
+    const fin=lk.base-deduct+add-exdisc;
+    document.getElementById('px-base').textContent=fn(lk.base)+' ج';
+    document.getElementById('px-fin').textContent=fn(fin)+' ج';
+    const sw=(id,cond,amt)=>{document.getElementById(id+'-r').style.display=cond?'flex':'none';if(cond)document.getElementById(id).textContent=fn(amt)+' ج';};
+    sw('px-tkt',gt('bk-tkt'),curTrip.ticket_price);sw('px-brc',gt('bk-brc'),curTrip.barcode_price);sw('px-vis',gt('bk-vis'),curTrip.visa_price);sw('px-mls',gt('bk-mls'),curTrip.meals_price);sw('px-trn',gt('bk-trn'),curTrip.train_price);sw('px-mkv',gt('bk-mkv'),curTrip.makkah_view_price);sw('px-hrv',gt('bk-hrv'),curTrip.haram_view_price);
+    sw('px-exdisc',exdisc>0,exdisc);
+    prc={base:lk.base,deduct,add,exdisc,fin};
+    const supEl=document.getElementById('bk-supcost');const supCost=supEl?(+supEl.value||0):0;
+    const profitR=document.getElementById('px-profit-r');
+    if(supCost>0){profitR.style.display='flex';const prof=fin-supCost;document.getElementById('px-profit').textContent=fn(prof)+' ج';document.getElementById('px-profit').style.color=prof>=0?'#4caf84':'var(--red-light)';}else profitR.style.display='none';
+    return;
+  }
   const tp=document.getElementById('bk-tp').value,rm=document.getElementById('bk-rm').value;
   const pgSel=document.getElementById('bk-pg'),opt=pgSel.options[pgSel.selectedIndex];
   let pg=null;try{if(opt&&opt.dataset.p)pg=JSON.parse(opt.dataset.p);}catch(e){}
@@ -3030,6 +3094,28 @@ function calcPx(){
   if(supCost>0){profitR.style.display='flex';const prof=fin-supCost;document.getElementById('px-profit').textContent=fn(prof)+' ج';document.getElementById('px-profit').style.color=prof>=0?'#4caf84':'var(--red-light)';}
   else profitR.style.display='none';
 }
+// ===== دوال قفل/فتح السعر =====
+function unlockPriceRecalc(){
+  // فتح القفل: نحسب السعر الجديد من الرحلة الحالية
+  window._priceIsLocked=false;window._lockedBkPrice=null;
+  const banner=document.getElementById('px-lock-banner');
+  if(banner) banner.style.display='none';
+  calcPx();
+  toast('✅ تم تحديث السعر من الرحلة الحالية - راجع السعر قبل الحفظ','info');
+}
+function keepLockedPrice(){
+  // الاحتفاظ بالسعر القديم وإخفاء البانر
+  const banner=document.getElementById('px-lock-banner');
+  if(banner) banner.style.display='none';
+  toast('🔒 تم الاحتفاظ بالسعر الأصلي للحجز','info');
+}
+function _resetPriceLock(){
+  window._priceIsLocked=false;window._lockedBkPrice=null;
+  const banner=document.getElementById('px-lock-banner');
+  if(banner){banner.style.display='none';}
+  const diffEl=document.getElementById('px-lock-diff');
+  if(diffEl){diffEl.style.display='none';diffEl.innerHTML='';}
+}
 // لو المستخدم عدّل تكلفة المورد يدوياً نحط flag عشان مانعملوش override
 function onSupCostInput(){
   const el=document.getElementById('bk-supcost');
@@ -3038,6 +3124,7 @@ function onSupCostInput(){
 }
 // لما تتغير الرحلة أو البرنامج نمسح الـ override
 function resetSupCostOverride(){
+  _resetPriceLock(); // لما تتغير الرحلة أو البرنامج نفتح القفل تلقائياً
   const el=document.getElementById('bk-supcost');
   if(el){el.dataset.manualOverride='';el.value='';}
 }

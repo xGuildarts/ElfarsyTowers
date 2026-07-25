@@ -1188,7 +1188,9 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         <div id="jrn-supplier-row" style="display:none;margin-top:10px">
           <div class="form-grid">
             <div class="form-group"><label>المورد</label><select id="jrn-sup-sel" onchange="rebuildJrnLines()"><option value="">-- اختر المورد --</option></select></div>
-            <div class="form-group"><label>الرحلة</label><select id="jrn-trip-sel"><option value="">-- اختر الرحلة --</option></select></div>
+            <div class="form-group"><label>الرحلة (اختياري)</label><select id="jrn-trip-sel"><option value="">-- اختر الرحلة --</option></select>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">لو حددت الرحلة والاتجاه "دفع للمورد"، هيترحّل تلقائيًا في كشف حساب المورد لنفس الرحلة (تبويب 🏢 حساب المورد) وينقص من المتبقي عليك.</div>
+            </div>
             <div class="form-group"><label>الاتجاه *</label>
               <select id="jrn-sup-dir" onchange="rebuildJrnLines()">
                 <option value="out">➡️ دفع للمورد (صرف)</option>
@@ -5683,7 +5685,7 @@ async function loadTripStatement() {
 let _jrnLineIdx = 0;
 let _jrnCurrentEntry = null;
 
-function openJournalModal(entryId=null){
+async function openJournalModal(entryId=null){
   _jrnCurrentEntry = entryId;
   _jrnLineIdx = 0;
   document.getElementById('jrn-edit-id').value = entryId || '';
@@ -5704,14 +5706,22 @@ function openJournalModal(entryId=null){
   document.getElementById('jrn-lines-cnt').innerHTML = '';
   document.getElementById('jrn-balance-check').style.display = 'none';
   const cSel = document.getElementById('jrn-client-sel');
-  cSel.innerHTML = '<option value="">-- اختر العميل --</option>' + aClients.map(c=>`<option value="${c.id}">${c.full_name_ar}</option>`).join('');
   const supSel = document.getElementById('jrn-sup-sel');
-  supSel.innerHTML = '<option value="">-- اختر المورد --</option>' + aSups.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   const tripSel = document.getElementById('jrn-trip-sel');
+  cSel.innerHTML = '<option value="">-- جاري تحميل العملاء... --</option>';
+  supSel.innerHTML = '<option value="">-- جاري تحميل الموردين... --</option>';
+  openM('jrn-modal');
+  // نتأكد إن قوائم العملاء/الموردين/الرحلات محمّلة فعليًا قبل ما نعرضها (ممكن تكون لسه ماتحمّلتش لو المستخدم مفتحش تبويبهم الأصلي قبل كده)
+  try{
+    if(!aClients.length) aClients = await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+    if(!aSups.length) aSups = await sb('haj_suppliers?order=name.asc&limit=200');
+    if(!aTrips.length) aTrips = await sb('haj_trips?order=depart_date.desc&limit=200');
+  }catch(e){ toast('تعذر تحميل قوائم العملاء/الموردين: '+e.message,'error'); }
+  cSel.innerHTML = '<option value="">-- اختر العميل --</option>' + aClients.map(c=>`<option value="${c.id}">${c.full_name_ar}</option>`).join('');
+  supSel.innerHTML = '<option value="">-- اختر المورد --</option>' + aSups.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   tripSel.innerHTML = '<option value="">-- اختر الرحلة --</option>' + aTrips.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
   onJrnTypeChange();
   if(entryId){ loadJrnEntryForEdit(entryId); }
-  openM('jrn-modal');
 }
 
 async function loadJrnEntryForEdit(id){
@@ -5985,9 +5995,22 @@ async function saveJrnEntry(){
   };
   try{
     let savedId;
+    const isNewEntry = !entryId;
     if(entryId){ await sb(`haj_journal?id=eq.${entryId}`,'PATCH',entry); savedId = +entryId; await sb(`haj_journal_lines?journal_id=eq.${entryId}`,'DELETE'); }
     else{ const res = await sb('haj_journal','POST',entry); savedId = res[0]?.id; }
     for(const l of lineData){ await sb('haj_journal_lines','POST',{journal_id:savedId, side:l.side, account_name:l.account_name, amount:l.amount}); }
+    // لو القيد "دفع لمورد" مربوط برحلة، نسجّله كمان في مدفوعات المورد عشان يظهر وينقص من كشف حساب المورد لنفس الرحلة تلقائيًا
+    if(isNewEntry && entry.entry_type==='supplier' && document.getElementById('jrn-sup-dir').value==='out' && entry.trip_id && entry.supplier_id){
+      try{
+        await sb('haj_supplier_payments','POST',{
+          trip_id: entry.trip_id, supplier_id: entry.supplier_id, amount: totalDebit, currency: entry.currency,
+          payment_method: document.getElementById('jrn-sup-method').value||null,
+          payment_date: entry.entry_date, reference_no: entry.reference_no,
+          notes: `مرحّل تلقائيًا من القيد اليومي #${savedId} — ${entry.description}`
+        });
+        delete _supPayCache[entry.trip_id];
+      }catch(e){ /* الجدول أو الربط قد لا يكون متاحًا؛ القيد اليومي نفسه اتحفظ بنجاح على أي حال */ }
+    }
     toast(`✅ تم حفظ القيد رقم ${savedId}`,'success');
     closeM('jrn-modal'); loadJournal();
   }catch(e){

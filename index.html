@@ -2505,75 +2505,157 @@ function fixMrzLine(line){
 }
 
 // يدور على سطرين الـ MRZ جوه النص المستخرج ويفكهم - مع تصحيح أخطاء OCR
-function parseMRZ(rawText){
-  if(!rawText)return null;
-  // تصحيح أخطاء بسيطة قبل ما نقسم السطور: مسافات جوه MRZ ممكن يحطها Tesseract
-  const lines=rawText.split(/\n/).map(l=>{
-    // شيل المسافات وحوّل لـ uppercase
-    let clean=l.replace(/\s/g,'').toUpperCase();
-    // استبدل الأرقام صفر العربية/الفارسية لو موجودة
-    clean=clean.replace(/[٠-٩]/g,d=>String.fromCharCode(d.charCodeAt(0)-1632+48));
-    return clean;
-  }).filter(l=>{
-    const angleCount=(l.match(/</g)||[]).length;
-    // نقبل سطور من 25+ حرف وفيها على الأقل 2 علامة < (بعض OCR بيضيف spaces بدل <)
-    return l.length>=25&&(angleCount>=2)&&/^[A-Z0-9<]+$/.test(l);
-  });
-  if(lines.length<2)return null;
-
-  // نجرب كل زوج متتالي من السطور مش بس آخر اتنين - لأن OCR ممكن يضيف سطور زيادة
-  let bestResult=null;
-  for(let i=0;i<lines.length-1;i++){
-    const l1=lines[i],l2=lines[i+1];
-    if(!l1.startsWith('P<')&&!l1.startsWith('P4')&&!l1.startsWith('PC'))continue;
-    // السطر التاني لازم يبدأ بحرف أو رقم وطوله كافي
-    if(l2.length<30)continue;
-    const pad=s=>(s+'<'.repeat(44)).substr(0,44);
-    // تصحيح أخطاء OCR في السطر التاني (الأرقامي)
-    const l2raw=pad(l2);
-    // السطر التاني: أرقام وحروف - نصلح الـ O→0 في المواضع الرقمية
-    const l2fixed=l2raw.substr(0,9).replace(/O/g,'0').replace(/I/g,'1') // رقم الجواز
-      + l2raw.substr(9,1)  // check digit
-      + l2raw.substr(10,3) // الجنسية (حروف)
-      + l2raw.substr(13,6).replace(/O/g,'0').replace(/I/g,'1') // تاريخ الميلاد
-      + l2raw.substr(19,1) // check digit
-      + l2raw.substr(20,1) // الجنس
-      + l2raw.substr(21,6).replace(/O/g,'0').replace(/I/g,'1') // تاريخ الانتهاء
-      + l2raw.substr(27); // الباقي
-
-    const passportNo=l2fixed.substr(0,9).replace(/</g,'').replace(/O/g,'0');
-    const nationalityCode=l2fixed.substr(10,3).replace(/</g,'');
-    const birthRaw=l2fixed.substr(13,6);
-    const birthISO=yymmddToISO(birthRaw,false);
-    const sexChar=l2fixed.substr(20,1);
-    const expiryRaw=l2fixed.substr(21,6);
-    const expiryISO=yymmddToISO(expiryRaw,true);
-
-    // الاسم من السطر الأول: P<CCCSURNAME<<GIVEN<NAMES<<<<<
-    const namesPart=pad(l1).substr(5).replace(/<+$/,'');
-    const dbl=namesPart.indexOf('<<');
-    let surname='',given='';
-    if(dbl>=0){surname=namesPart.substr(0,dbl);given=namesPart.substr(dbl+2);}
-    else{surname=namesPart;}
-    const fullNameEn=[given.replace(/</g,' ').trim(),surname.replace(/</g,' ').trim()].filter(Boolean).join(' ');
-
-    // نتحقق إن الناتج معقول: لازم يكون فيه رقم جواز أو تاريخ أو اسم
-    if(!passportNo&&!birthISO&&!fullNameEn)continue;
-    bestResult={
-      passport_no:passportNo||null,
-      nationality:MRZ_NAT_MAP[nationalityCode]||nationalityCode||null,
-      birth_date:birthISO,
-      gender:sexChar==='M'?'ذكر':sexChar==='F'?'أنثى':null,
-      passport_expiry_date:expiryISO,
-      full_name_en:fullNameEn||null,
-    };
-    break; // أول زوج صالح كافي
+// تصحيح سطر MRZ بشكل كامل - كل موضع له قواعده
+function correctMrzLine2(raw){
+  // السطر التاني من MRZ الجواز:
+  // [0-8]  رقم الجواز (alphanumeric - حروف+أرقام)
+  // [9]    check digit (رقم)
+  // [10-12] كود الجنسية (حروف)
+  // [13-18] تاريخ الميلاد YYMMDD (أرقام فقط)
+  // [19]   check digit (رقم)
+  // [20]   الجنس M/F/< (حرف)
+  // [21-26] تاريخ الانتهاء YYMMDD (أرقام فقط)
+  // [27]   check digit (رقم)
+  // [28-41] optional data (أرقام)
+  // [42]   check digit
+  // [43]   check digit كلي
+  const s=(raw+'<'.repeat(44)).substr(0,44);
+  // دالة تصلح موضع رقمي: حروف OCR شائعة بتتشابه مع أرقام
+  const fixNum=c=>{
+    const m={'O':'0','o':'0','I':'1','l':'1','i':'1','S':'5','s':'5','B':'8','b':'8','G':'6','g':'6','Z':'2','z':'2','T':'7','A':'4','Q':'0','U':'0','D':'0','L':'1'};
+    return m[c]||c;
+  };
+  // دالة تصلح موضع حرفي: أرقام OCR شائعة بتتشابه مع حروف
+  const fixAlpha=c=>{
+    const m={'0':'O','1':'I','4':'A','5':'S','8':'B','6':'G','2':'Z'};
+    return m[c]||c;
+  };
+  let out='';
+  // [0-8] رقم الجواز: alphanumeric - نصلح الأرقام المتشابهة مع الحروف فقط في المواضع الرقمية
+  // رقم الجواز المصري: حرف أو حرفين ثم أرقام (مثلاً A416102644)
+  // نحاول نتعرف على الجزء الحرفي في الأول ثم الباقي أرقام
+  const ppRaw=s.substr(0,9);
+  let ppFixed='';
+  let numStarted=false;
+  for(let j=0;j<ppRaw.length;j++){
+    const c=ppRaw[j];
+    if(c==='<'){ppFixed+='<';continue;}
+    if(!numStarted&&/[A-Za-z]/.test(c)&&j<=1){
+      // أول حرف أو حرفين: احتمال جزء حرفي من رقم الجواز
+      ppFixed+=c.toUpperCase();
+    }else{
+      numStarted=true;
+      ppFixed+=fixNum(c);
+    }
   }
-  return bestResult;
+  out+=ppFixed;
+  // [9] check digit: رقم
+  out+=fixNum(s[9]);
+  // [10-12] الجنسية: حروف
+  out+=s.substr(10,3).split('').map(c=>(/\d/.test(c)?fixAlpha(c):c.toUpperCase())).join('');
+  // [13-18] تاريخ الميلاد: أرقام فقط
+  out+=s.substr(13,6).split('').map(fixNum).join('');
+  // [19] check digit
+  out+=fixNum(s[19]);
+  // [20] الجنس: M أو F أو <
+  const sex=s[20].toUpperCase();
+  out+=(sex==='M'||sex==='F')?sex:'<';
+  // [21-26] تاريخ الانتهاء: أرقام فقط
+  out+=s.substr(21,6).split('').map(fixNum).join('');
+  // [27-43] الباقي: أرقام و<
+  out+=s.substr(27).split('').map(c=>(c==='<'?'<':fixNum(c))).join('');
+  return out;
 }
 
-// كلمات/عناوين مطبوعة بتظهر كتير في صفحة بيانات الجواز - لو السطر يحتوي عليها فهو مش الاسم
-const ARABIC_LABEL_BLACKLIST=['جمهورية مصر العربية','جمهورية مصر','مصر العربية','جواز سفر','جواز السفر','وزارة الداخلية','النوع','اللقب','الجنسية','تاريخ الميلاد','تاريخ الاصدار','تاريخ الإصدار','تاريخ الانتهاء','تاريخ الانتهاي','مكان الميلاد','الرقم القومى','الرقم القومي','جهة الاصدار','جهة الإصدار','نوع الجواز','رقم الجواز','التوقيع','محل الاقامة','محل الإقامة','الديانة','المهنة','الحالة الاجتماعية','جمهورية','وزارة','الداخلية','EGYPT','Republic'];
+function parseMRZ(rawText){
+  if(!rawText)return null;
+  // خطوة 1: تنظيف السطور وتوحيدها
+  const rawLines=rawText.split(/\n/).map(l=>{
+    let clean=l.toUpperCase();
+    // استبدل الأرقام العربية/الفارسية
+    clean=clean.replace(/[٠-٩]/g,d=>String.fromCharCode(d.charCodeAt(0)-1632+48));
+    // شيل المسافات الداخلية في سطور MRZ (Tesseract أحياناً بيضيف space جوه الـ MRZ)
+    clean=clean.replace(/\s/g,'');
+    return clean;
+  });
+
+  // خطوة 2: نجمع كل سطور MRZ المحتملة - نقبل سطور فيها < وحروف+أرقام فقط
+  // بنخلي الـ filter أقل صرامة عشان نمسك أكبر عدد من السطور
+  const candidates=rawLines.filter(l=>{
+    if(l.length<20)return false;
+    // شيل أي حرف مش حرف لاتيني أو رقم أو < قبل التحقق
+    const stripped=l.replace(/[^A-Z0-9<]/g,'');
+    return stripped.length>=20&&(stripped.match(/</g)||[]).length>=1;
+  }).map(l=>l.replace(/[^A-Z0-9<]/g,'')); // نظّفها من أي رموز غريبة
+
+  if(candidates.length<2)return null;
+
+  // خطوة 3: نجرب كل زوج من السطور
+  for(let i=0;i<candidates.length-1;i++){
+    const l1=candidates[i];
+    // السطر الأول لازم يبدأ بـ P< أو P< مع تصحيح محتمل (PK, PC, P4 كلها أخطاء OCR لـ P<)
+    if(!l1.match(/^P[<K4C]/))continue;
+    // لو بدأ بـ PK أو P4 أو PC صلحها لـ P<
+    const l1fixed='P<'+l1.substr(2);
+
+    for(let j=i+1;j<Math.min(i+3,candidates.length);j++){
+      const l2=candidates[j];
+      if(l2.length<30)continue;
+      // السطر التاني لازم يبدأ بـ alphanumeric (مش <)
+      if(l2[0]==='<')continue;
+
+      const l2fixed=correctMrzLine2(l2);
+      const pad=s=>(s+'<'.repeat(44)).substr(0,44);
+
+      const passportNo=l2fixed.substr(0,9).replace(/</g,'');
+      const nationalityCode=l2fixed.substr(10,3).replace(/</g,'');
+      const birthRaw=l2fixed.substr(13,6);
+      const birthISO=yymmddToISO(birthRaw,false);
+      const sexChar=l2fixed.substr(20,1);
+      const expiryRaw=l2fixed.substr(21,6);
+      const expiryISO=yymmddToISO(expiryRaw,true);
+
+      // الاسم من السطر الأول: P<CCCSURNAME<<GIVEN<NAMES<<<<<
+      const l1pad=pad(l1fixed);
+      const namesPart=l1pad.substr(5).replace(/<+$/,'');
+      const dbl=namesPart.indexOf('<<');
+      let surname='',given='';
+      if(dbl>=0){surname=namesPart.substr(0,dbl);given=namesPart.substr(dbl+2);}
+      else{surname=namesPart;}
+      // ترتيب الاسم في MRZ: SURNAME<<GIVEN → نعرضه GIVEN SURNAME
+      const fullNameEn=[given.replace(/</g,' ').trim(),surname.replace(/</g,' ').trim()].filter(Boolean).join(' ');
+
+      // تحقق بسيط: لازم يكون فيه على الأقل رقم جواز أو تاريخ صحيح
+      if(passportNo.length<5&&!birthISO&&!expiryISO)continue;
+
+      return{
+        passport_no:passportNo||null,
+        nationality:MRZ_NAT_MAP[nationalityCode]||nationalityCode||null,
+        birth_date:birthISO,
+        gender:sexChar==='M'?'ذكر':sexChar==='F'?'أنثى':null,
+        passport_expiry_date:expiryISO,
+        full_name_en:fullNameEn||null,
+      };
+    }
+  }
+  return null;
+}
+
+// كلمات/عناوين بتظهر في صفحة الجواز - السطر اللي يحتوي عليها مش اسم
+const ARABIC_LABEL_BLACKLIST=[
+  'جمهورية مصر العربية','جمهورية مصر','مصر العربية','جواز سفر','جواز السفر',
+  'وزارة الداخلية','الجنسية','تاريخ الميلاد','تاريخ الاصدار','تاريخ الإصدار',
+  'تاريخ الانتهاء','تاريخ الانتهاي','مكان الميلاد','الرقم القومى','الرقم القومي',
+  'جهة الاصدار','جهة الإصدار','نوع الجواز','رقم الجواز','التوقيع',
+  'محل الاقامة','محل الإقامة','الديانة','المهنة','الحالة الاجتماعية',
+  'جمهورية','وزارة','الداخلية','إدارة الجوازات','اسم الزوج','اسم الزوجة',
+  'المنوفية','الغربية','القاهرة','الإسكندرية','الجيزة','البحيرة','الشرقية',
+  'المنيا','أسيوط','سوهاج','قنا','الأقصر','أسوان','بني سويف','الفيوم',
+  'دمياط','كفر الشيخ','مرسى مطروح','شمال سيناء','جنوب سيناء','البحر الأحمر',
+  'بورسعيد','السويس','الإسماعيلية','العنوان','المحافظة','البر','بركة',
+  'الوظيفة','المهنة','ربة منزل','موظف','طالب','مهندس','طبيب',
+  'EGYPT','Republic','ARAB','PASSPORT'
+];
 
 // تنضيف النص العربي: شيل التشكيل والتطويل وأي حروف مش عربية
 function normalizeArabic(s){
@@ -2585,55 +2667,83 @@ function normalizeArabic(s){
     .trim();
 }
 
-// يدور على الاسم بالعربي في النص المطبوع بالصفحة (مش موجود في الـ MRZ أصلاً)
+// يدور على الاسم بالعربي - محسوب على layout الجواز المصري
 function extractArabicName(text){
   if(!text)return null;
   const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
 
-  // استراتيجية 1: سطر يكون بعد كلمة "الاسم" مباشرة (في سطر لوحده أو جنبها)
+  // ====== استراتيجية 1: بحث مباشر عن label "الاسم" أو "Full Name" ======
+  // في الجواز المصري الاسم العربي بيكون في السطر اللي فيه كلمة "الاسم" أو اللي بعده
   for(let i=0;i<lines.length;i++){
     const l=lines[i];
-    // لو السطر فيه "الاسم" وبعدها نص في نفس السطر
-    if(/الاسم/.test(l)){
-      const parts=l.split(/الاسم\s*/);
-      for(const part of parts.slice(1)){
-        const c=normalizeArabic(part);
-        const words=c.split(' ').filter(w=>w.length>1);
-        if(words.length>=2&&words.length<=6&&!ARABIC_LABEL_BLACKLIST.some(w=>c.includes(w)))return c;
-      }
-      // جرب السطر اللي بعده
-      if(i+1<lines.length){
-        const next=normalizeArabic(lines[i+1]);
-        const words=next.split(' ').filter(w=>w.length>1);
-        if(words.length>=2&&words.length<=6&&!ARABIC_LABEL_BLACKLIST.some(w=>next.includes(w))){
-          const arabicRatio=(next.match(/[\u0600-\u06FF]/g)||[]).length/Math.max(next.replace(/\s/g,'').length,1);
-          if(arabicRatio>=0.8)return next;
-        }
+    // لو السطر فيه "الاسم" بس مش "اسم الزوج" أو "اسم المحافظة" أو أي اسم تاني
+    if(/\bالاسم\b/.test(l)&&!/اسم الزوج|اسم الأب|اسم الأم/.test(l)){
+      // جرب ما بعد "الاسم" في نفس السطر
+      const after=l.replace(/.*الاسم\s*/,'');
+      const c=normalizeArabic(after);
+      const words=c.split(' ').filter(w=>w.length>1);
+      if(words.length>=2&&words.length<=7&&!ARABIC_LABEL_BLACKLIST.some(w=>c.includes(w)))return c;
+      // جرب السطر اللي بعده مباشرة
+      for(let k=i+1;k<=Math.min(i+2,lines.length-1);k++){
+        const next=normalizeArabic(lines[k]);
+        if(!next)continue;
+        const nwords=next.split(' ').filter(w=>w.length>1);
+        const arabicRatio=(next.match(/[\u0600-\u06FF]/g)||[]).length/Math.max(next.replace(/\s/g,'').length,1);
+        if(nwords.length>=2&&nwords.length<=7&&arabicRatio>=0.75&&!ARABIC_LABEL_BLACKLIST.some(w=>next.includes(w)))return next;
       }
     }
   }
 
-  // استراتيجية 2: اللي جاي بعد "الجنسية" أو "المهنة" سطر بسطر - الاسم غالباً فوقيهم
-  const landmarkIdx=lines.findIndex(l=>/الجنسية|تاريخ الميلاد|مكان الميلاد/.test(l));
-  const searchLines = landmarkIdx>0 ? lines.slice(0, landmarkIdx+2) : lines;
+  // ====== استراتيجية 2: الاسم يجي قبل "تاريخ الميلاد" أو "الجنسية" في layout الجواز ======
+  // في الجواز المصري الترتيب: الاسم → تاريخ الميلاد → الجنسية → ...
+  // فالاسم هيكون في أول سطور عربية قبل الـ landmark ده
+  const landmarkIdx=lines.findIndex(l=>/تاريخ الميلاد|الجنسية|مكان الميلاد|Date of Birth/.test(l));
+  // لو لقينا landmark، نبحث في السطور قبله بس
+  // لو ملقيناش، نبحث في كل السطور
+  const upperBound=landmarkIdx>0?landmarkIdx:lines.length;
+  const searchLines=lines.slice(0,upperBound);
 
-  // استراتيجية 3: أفضل سطر عربي خالص بدون عناوين
+  // ====== استراتيجية 3: أفضل سطر عربي خالص في منطقة الاسم ======
   let best=null,bestScore=0;
   for(const l of searchLines){
-    const arabicChars=(l.match(/[\u0600-\u06FF]/g)||[]);
-    const arabicCount=arabicChars.length;
+    const arabicCount=(l.match(/[\u0600-\u06FF]/g)||[]).length;
     const totalNoSpace=l.replace(/\s/g,'').length;
-    if(totalNoSpace===0||arabicCount<6)continue;
+    if(totalNoSpace===0||arabicCount<5)continue;
     const ratio=arabicCount/totalNoSpace;
-    if(ratio<0.80)continue; // خففنا من 0.85 لأن OCR أحياناً بيحط علامات ترقيم
+    if(ratio<0.75)continue;
     const c=normalizeArabic(l);
-    if(!c)continue;
+    if(!c||c.length<4)continue;
     if(ARABIC_LABEL_BLACKLIST.some(w=>c.includes(w)))continue;
-    const words=c.split(' ').filter(w=>w.length>1); // كلمات أكثر من حرف واحد
+    const words=c.split(' ').filter(w=>w.length>1);
     if(words.length<2||words.length>7)continue;
-    // نفضّل 3-5 كلمات (الاسم الثلاثي أو الرباعي أو الخماسي الشائع في مصر)
-    const score=arabicCount+(words.length>=3&&words.length<=5?8:0)+(words.length===4?3:0);
+    // نفضّل 3-5 كلمات (اسم ثلاثي أو رباعي أو خماسي)
+    // وكمان نعاقب السطور اللي فيها كلمات قصيرة جداً (زي العناوين)
+    const avgWordLen=words.reduce((s,w)=>s+w.length,0)/words.length;
+    const score=arabicCount
+      +(words.length>=3&&words.length<=5?10:0)
+      +(words.length===4?5:0)
+      +(avgWordLen>=3?5:0); // الأسماء كلماتها أطول من كلمات العناوين القصيرة
     if(score>bestScore){best=c;bestScore=score;}
+  }
+
+  // ====== استراتيجية 4 (fallback): لو ملقيناش في منطقة الاسم، ابحث في كل السطور ======
+  if(!best){
+    for(const l of lines){
+      const arabicCount=(l.match(/[\u0600-\u06FF]/g)||[]).length;
+      const totalNoSpace=l.replace(/\s/g,'').length;
+      if(totalNoSpace===0||arabicCount<5)continue;
+      const ratio=arabicCount/totalNoSpace;
+      if(ratio<0.75)continue;
+      const c=normalizeArabic(l);
+      if(!c)continue;
+      if(ARABIC_LABEL_BLACKLIST.some(w=>c.includes(w)))continue;
+      const words=c.split(' ').filter(w=>w.length>1);
+      if(words.length<2||words.length>5)continue;
+      const avgWordLen=words.reduce((s,w)=>s+w.length,0)/words.length;
+      if(avgWordLen<3)continue; // كلمات قصيرة جداً = عنوان مش اسم
+      const score=arabicCount+(words.length>=3?8:0);
+      if(score>bestScore){best=c;bestScore=score;}
+    }
   }
   return best;
 }

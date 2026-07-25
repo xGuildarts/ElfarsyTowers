@@ -1975,7 +1975,7 @@ function notesBlockHtml(notes){
 }
 
 function openM(id){document.getElementById(id).classList.add('open');}
-function closeM(id){document.getElementById(id).classList.remove('open'); _formDirty=false;}
+function closeM(id){const el=document.getElementById(id);el.classList.remove('open');if(el.style.display==='flex')el.style.display='none'; _formDirty=false;}
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 
 // ============ تنبيه فقدان البيانات غير المحفوظة ============

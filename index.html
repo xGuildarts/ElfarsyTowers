@@ -2978,6 +2978,9 @@ function renderBks(list){
     const rem=(+b.final_price)-paid;
     const disc=[b.has_own_ticket&&'&#x2708;&#xFE0F;',b.has_own_barcode&&'&#x1F4CA;',b.has_own_visa&&'&#x1FABA;'].filter(Boolean).join(' ');
     const add=[b.has_meals&&'&#x1F35D;',b.has_train&&'&#x1F68D;',b.has_makkah_view&&'&#x1F54C;',b.has_haram_view&&'&#x1F54B;'].filter(Boolean).join(' ');
+    const rootId=c?familyRootId(c.id):null;
+    const famCount=rootId?aBks.filter(x=>x.trip_id==b.trip_id&&x.status!=='ملغي'&&aClients.some(cc=>cc.id==x.client_id&&familyRootId(cc.id)===rootId)).length:1;
+    const famBtn=famCount>1?`<button class="btn btn-gold btn-sm btn-icon" onclick="printFamilyFile(${b.trip_id},${rootId})" title="ملف الأسرة (${famCount} أفراد)">👪</button> `:'';
     return`<tr><td>${i+1}</td>
     <td><b style="cursor:pointer;color:var(--gold)" onclick="openClientProfile(${b.client_id})">${c?c.full_name_ar:'-'}</b>${c?.phone?`<br><small style="color:var(--text3)">📱 ${c.phone}</small>`:''}</td>
     <td>${t?t.name:'-'}${pg?`<br><span class="badge badge-blue">&#x643;&#x648;&#x62F; ${pg.code}</span>`:''}</td>
@@ -2986,7 +2989,7 @@ function renderBks(list){
     <td><b style="color:var(--gold)">${fn(b.final_price)} ${b.currency}</b>${disc?`<br><small style="color:var(--red-light)">${disc}</small>`:''}${add?`<br><small style="color:#4caf84">${add}</small>`:''}${(+b.supplier_cost>0)?`<br><small style="color:${(b.final_price-b.supplier_cost)>=0?'#4caf84':'var(--red-light)'}">📈 مكسب: ${fn(b.final_price-b.supplier_cost)} ج</small>`:''}</td>
     <td><span style="color:#4caf84">${fn(paid)} ج</span>${rem>0?`<br><small style="color:var(--red-light)">&#x645;&#x62A;&#x628;&#x642;&#x64A;: ${fn(rem)}</small>`:''}</td>
     <td>${bdg(b.status)}</td><td>${bdg(b.visa_status)}</td>
-    <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editBk(${b.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})" title="دفعة">&#x1F4B0;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="printBkCard(${b.id})" title="طباعة">&#x1F5A8;&#xFE0F;</button> <button class="btn btn-outline btn-sm btn-icon" onclick="openClientProfile(${b.client_id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelBk(${b.id},'${c?c.full_name_ar:''}')" title="حذف">&#x1F5D1;&#xFE0F;</button></td>
+    <td style="white-space:nowrap">${famBtn}<button class="btn btn-outline btn-sm btn-icon" onclick="editBk(${b.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})" title="دفعة">&#x1F4B0;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="printBkCard(${b.id})" title="طباعة">&#x1F5A8;&#xFE0F;</button> <button class="btn btn-outline btn-sm btn-icon" onclick="openClientProfile(${b.client_id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelBk(${b.id},'${c?c.full_name_ar:''}')" title="حذف">&#x1F5D1;&#xFE0F;</button></td>
     </tr>`;
   }).join('');
 }
@@ -3391,6 +3394,102 @@ async function _printRepBase(type,tid){
 }
 
 // ============ PRINT CARDS ============
+async function printFamilyFile(tid, rootClientId){
+  if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+  if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
+  if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
+  const rootId=familyRootId(rootClientId);
+  const root=aClients.find(x=>x.id==rootId);
+  // كل أفراد الأسرة: رب الأسرة + كل اللي مربوطين بيه
+  const familyClientIds=aClients.filter(c=>familyRootId(c.id)===rootId).map(c=>c.id);
+  if(!familyClientIds.length){toast('تعذر إيجاد أفراد الأسرة','error');return;}
+  const bks=(await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=500`)).filter(b=>familyClientIds.includes(b.client_id));
+  if(!bks.length){toast('لا توجد حجوزات لهذه الأسرة في هذه الرحلة','error');return;}
+  const bids=bks.map(b=>b.id);
+  const pays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
+  const t=aTrips.find(x=>x.id==tid);
+  const coName=getCoName(), coPh=getCoPhone();
+  const fileNo='FAM-'+String(rootId).padStart(5,'0')+'-'+tid;
+  const totalFinal=bks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
+  const totalPaid=pays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
+  const totalRem=totalFinal-totalPaid;
+  const _pn=await askPrintNotes('ملف حجز الأسرة');
+  const rows=bks.map((b,i)=>{
+    const c=aClients.find(x=>x.id==b.client_id), pg=aProgs.find(x=>x.id==b.program_id);
+    const bPaid=pays.filter(p=>p.booking_id==b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
+    const bRem=(+b.final_price)-bPaid;
+    return`<tr>
+      <td>${i+1}</td>
+      <td>BK-${String(b.id).padStart(5,'0')}</td>
+      <td style="text-align:right"><b>${c?.full_name_ar||'-'}</b>${c?.link_relation?` <small style="color:#999">(${c.link_relation})</small>`:(c?.id===rootId?' <small style="color:#999">(رب الأسرة)</small>':'')}</td>
+      <td>${c?.passport_no||'-'}</td>
+      <td>${b.traveler_type}</td>
+      <td>${pg?'كود '+pg.code:'-'}</td>
+      <td>${b.room_type||'-'}</td>
+      <td style="font-weight:700">${fn(b.final_price)}</td>
+      <td style="color:#2e7d32">${fn(bPaid)}</td>
+      <td style="color:${bRem>0?'#c62828':'#2e7d32'}">${fn(bRem)}</td>
+    </tr>`;
+  }).join('');
+  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>ملف حجز أسرة - ${root?.full_name_ar||''}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;padding:0;margin:0;background:#f5f5f5}
+    .page{max-width:900px;margin:20px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+    .header{background:linear-gradient(135deg,#1a6b4a,#2a8a60);padding:20px 25px;color:white;display:flex;justify-content:space-between;align-items:center}
+    .co-name{font-size:22px;font-weight:800;margin-bottom:3px}
+    .co-sub{font-size:12px;opacity:.8}
+    .rcpno{background:rgba(255,255,255,.2);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px}
+    .gold-bar{height:4px;background:linear-gradient(90deg,#c9a84c,#e8c97a,#c9a84c)}
+    .body{padding:20px 25px}
+    .fam-title{font-size:19px;font-weight:800;color:#1a6b4a;margin-bottom:4px}
+    .fam-sub{font-size:13px;color:#666;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:16px}
+    th{background:#f0f0f0;padding:8px 10px;text-align:center;border:1px solid #e0e0e0;font-weight:700;color:#333}
+    td{padding:8px 10px;text-align:center;border:1px solid #eee}
+    tfoot td{background:#f9f5e7;font-weight:800;font-size:14px}
+    .status-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+    .status-box{text-align:center;padding:12px;border-radius:8px}
+    .s-total{background:#fff8e1;border:1px solid #f9a825}.s-paid{background:#e8f5e9;border:1px solid #2e7d32}.s-rem{background:${totalRem>0?'#fde8e8':'#e8f5e9'};border:1px solid ${totalRem>0?'#c62828':'#2e7d32'}}
+    .s-lbl{font-size:11px;color:#666;margin-bottom:4px}.s-val{font-size:18px;font-weight:800}
+    .notes{background:#fffde7;border:1px solid #f9a825;border-radius:8px;padding:12px;font-size:12px;color:#666;margin-bottom:10px}
+    .footer{background:#f9f9f9;padding:12px 25px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#999;border-top:1px solid #eee}
+    @media print{body{background:white}.page{margin:0;box-shadow:none;border-radius:0}}
+  </style></head><body>
+  <div class="page">
+    <div class="header">
+      <div style="display:flex;align-items:center;gap:12px">
+        ${coLogoImgHtml(46)}
+        <div><div class="co-name">🕌 ${coName}</div><div class="co-sub">إدارة السياحة الدينية${coPh?' | '+coPh:''}</div>${coLicenseLineHtml()}</div>
+      </div>
+      <div style="text-align:left"><div class="rcpno">${fileNo}</div><div style="font-size:11px;margin-top:4px;opacity:.7">👪 ملف حجز أسرة</div></div>
+    </div>
+    <div class="gold-bar"></div>
+    <div class="body">
+      <div class="fam-title">👪 أسرة ${root?.full_name_ar||''}</div>
+      <div class="fam-sub">${t?.name||''} | 📅 ${fd(t?.depart_date)} | عدد الأفراد: ${bks.length}${root?.phone?' | 📱 '+root.phone:''}</div>
+      <table>
+        <thead><tr><th>#</th><th>مرجع</th><th>الاسم</th><th>الجواز</th><th>النوع</th><th>الكود</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="7">الإجمالي</td><td>${fn(totalFinal)} ج</td><td style="color:#2e7d32">${fn(totalPaid)} ج</td><td style="color:${totalRem>0?'#c62828':'#2e7d32'}">${fn(totalRem)} ج</td></tr></tfoot>
+      </table>
+      <div class="status-bar">
+        <div class="status-box s-total"><div class="s-lbl">إجمالي الأسرة</div><div class="s-val" style="color:#f9a825">${fn(totalFinal)} ج</div></div>
+        <div class="status-box s-paid"><div class="s-lbl">إجمالي المدفوع</div><div class="s-val" style="color:#2e7d32">${fn(totalPaid)} ج</div></div>
+        <div class="status-box s-rem"><div class="s-lbl">إجمالي المتبقي</div><div class="s-val" style="color:${totalRem>0?'#c62828':'#2e7d32'}">${fn(totalRem)} ج</div></div>
+      </div>
+      ${t?.form_notes?`<div class="notes"><b>📋 شروط الحجز:</b><br>${t.form_notes.replace(/\n/g,'<br>')}</div>`:''}
+      ${notesBlockHtml(_pn)}
+    </div>
+    <div class="footer">
+      <span>🗓️ تاريخ الطباعة: ${fd(new Date().toISOString())}</span>
+      <span>${fileNo} | ${coName}</span>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:10px"><button onclick="window.print()" style="padding:10px 30px;background:#1a6b4a;color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer">🖨️ طباعة</button></div>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();
+}
 async function printBkCard(bid){
   if(!aBks.length)return;const b=aBks.find(x=>x.id==bid);if(!b)return;
   const c=aClients.find(x=>x.id==b.client_id),t=aTrips.find(x=>x.id==b.trip_id),pg=aProgs.find(x=>x.id==b.program_id);
@@ -4415,6 +4514,7 @@ async function openClientProfile(cid){
   const body=document.getElementById('client-profile-body');
   body.innerHTML='<div class="loading"><div class="spinner"></div><p>جاري التحميل...</p></div>';
   try{
+    if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
     const c=aClients.find(x=>x.id==cid)||await sb(`haj_clients?id=eq.${cid}&limit=1`).then(r=>r[0]);
     if(!c){body.innerHTML='<div class="info-box danger">❌ العميل غير موجود</div>';return;}
     const bks=await sb(`haj_bookings?client_id=eq.${cid}&order=created_at.desc&limit=50`);
@@ -4460,13 +4560,15 @@ async function openClientProfile(cid){
           const t=aTrips.find(x=>x.id==b.trip_id),pg=aProgs.find(x=>x.id==b.program_id);
           const paid=bkPays.filter(p=>p.booking_id==b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
           const rem=(+b.final_price)-paid;
+          const _root=familyRootId(cid);
+          const _famCount=aClients.filter(cc=>familyRootId(cc.id)===_root).length;
           return`<tr><td><b>${t?.name||'-'}</b>${pg?`<br><span class="badge badge-blue">كود ${pg.code}</span>`:''}<br><small style="color:var(--text3)">${fd(b.created_at)}</small></td>
           <td>${b.traveler_type}</td><td>${b.room_type||'-'}</td>
           <td style="color:var(--gold);font-weight:700">${fn(b.final_price)} ${b.currency}</td>
           <td style="color:#4caf84">${fn(paid)} ج</td>
           <td style="color:${rem>0?'var(--red-light)':'#4caf84'};font-weight:${rem>0?700:400}">${fn(rem)} ج</td>
           <td>${bdg(b.status)}</td><td>${bdg(b.visa_status)}</td>
-          <td><button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})">💰</button></td></tr>`;
+          <td>${_famCount>1?`<button class="btn btn-gold btn-sm btn-icon" onclick="printFamilyFile(${b.trip_id},${_root})" title="ملف الأسرة">👪</button> `:''}<button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})">💰</button></td></tr>`;
         }).join('')}</tbody>
       </table></div>`:'<div class="empty-state"><div class="empty-icon">📋</div><h3>لا توجد حجوزات</h3></div>'}
     </div>
@@ -5192,6 +5294,10 @@ async function saveFam() {
     toast(`تم حفظ الأسرة كاملة (${ordered.length} فرد) ✅`);
     aClients=[]; aBks=[];
     closeFamModal();
+    if(await sConfirm('تم الحفظ بنجاح ✅','تحب تطبع ملف الأسرة دلوقتي؟ (كل الأفراد في صفحة واحدة بإجمالي واحد)','👪')){
+      aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+      printFamilyFile(tid, head.client_id);
+    }
   } catch(e) {
     toast('حصل خطأ أثناء الحفظ: '+e.message+' - اللي اتحفظ فعلاً مش هيتكرر، صلّحي المشكلة واضغطي حفظ تاني','error');
   } finally {
@@ -5776,11 +5882,23 @@ async function loadTripStatement() {
     if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
     const bids=bks.map(b=>b.id);
     const tpays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];
+    // مدفوعات المورد الفعلية لهذه الرحلة (اللي فعلاً اتدفعله)
+    let supPays=[];
+    try{supPays=await sb(`haj_supplier_payments?trip_id=eq.${tid}&order=payment_date.asc&limit=500`);}catch(e){supPays=[];}
+
+    // --- الإيرادات والمحصّل والمتبقي ---
     const totalRev=bks.filter(b=>b.currency==='EGP').reduce((s,b)=>s+(+b.final_price),0);
     const totalColl=tpays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
-    const totalExp=exps.filter(e=>e.currency==='EGP').reduce((s,e)=>s+(+e.amount),0);
-    const profit=totalColl-totalExp;
     const remaining=totalRev-totalColl;
+
+    // --- تكلفة الرحلة: من تكلفة المورد بتاعة كل حجز (اللي بتدفعها للمورد) ---
+    const supplierObligation=bks.reduce((s,b)=>s+(+b.supplier_cost||0),0); // الالتزام الكلي للمورد (سواء اتدفع أو لسه)
+    const supplierPaidActual=supPays.filter(p=>p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0); // اللي فعلاً اتدفع للمورد
+    const otherExp=exps.filter(e=>e.currency==='EGP').reduce((s,e)=>s+(+e.amount),0); // مصاريف إضافية (خلاف المورد) زي مواصلات إلخ
+
+    // --- الربح: الإيراد - تكلفة المورد - المصاريف الإضافية ---
+    const totalCost=supplierObligation+otherExp;
+    const profit=totalRev-totalCost;
 
     let rows='';
     bks.forEach(b=>{
@@ -5789,6 +5907,8 @@ async function loadTripStatement() {
       const paid=bkPays.reduce((s,p)=>s+(+p.amount),0);
       const final=b.currency==='EGP'?+b.final_price:0;
       const rem=final-paid;
+      const sc=+b.supplier_cost||0;
+      const pr=final-sc;
       rows+=`<tr>
         <td>${c?.full_name_ar||'-'}</td>
         <td>${c?.passport_no||'-'}</td>
@@ -5797,6 +5917,8 @@ async function loadTripStatement() {
         <td style="color:var(--red-light)">${fn(final)} ج</td>
         <td style="color:#4caf84">${fn(paid)} ج</td>
         <td style="color:${rem>0?'var(--red-light)':'#4caf84'};font-weight:${rem>0?'700':'400'}">${fn(rem)} ج</td>
+        <td>${sc>0?fn(sc)+' ج':'-'}</td>
+        <td style="color:${pr>=0?'#4caf84':'var(--red-light)'};font-weight:700">${sc>0?fn(pr)+' ج':'-'}</td>
         <td>${bdg(b.status)}</td>
       </tr>`;
     });
@@ -5809,19 +5931,26 @@ async function loadTripStatement() {
         <button class="btn btn-primary btn-sm" onclick="exportExcel('financial',${tid})">📊 Excel</button>
       </div>
     </div>
-    <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:14px">
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
       <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num">${bks.length}</div><div class="stat-label">إجمالي الحجوزات</div></div>
-      <div class="stat-card red"><div class="stat-icon">💸</div><div class="stat-num">${fn(totalRev)}</div><div class="stat-label">إيرادات متوقعة</div></div>
-      <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-num">${fn(totalColl)}</div><div class="stat-label">محصّل</div></div>
-      <div class="stat-card ${remaining>0?'red':'green'}"><div class="stat-icon">⏳</div><div class="stat-num">${fn(remaining)}</div><div class="stat-label">متبقي</div></div>
-      <div class="stat-card ${profit>=0?'green':'red'}"><div class="stat-icon">${profit>=0?'📈':'📉'}</div><div class="stat-num">${fn(profit)}</div><div class="stat-label">صافي الربح</div></div>
+      <div class="stat-card red"><div class="stat-icon">💵</div><div class="stat-num">${fn(totalRev)}</div><div class="stat-label">إجمالي إيراد الرحلة (البيع)</div></div>
+      <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-num">${fn(totalColl)}</div><div class="stat-label">إجمالي المحصّل من العملاء</div></div>
+      <div class="stat-card ${remaining>0?'red':'green'}"><div class="stat-icon">⏳</div><div class="stat-num">${fn(remaining)}</div><div class="stat-label">إجمالي المتبقي على العملاء</div></div>
+      <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-num" style="color:#5dade2">${fn(supplierObligation)}</div><div class="stat-label">إجمالي تكلفة الرحلة (المورد)</div></div>
+      <div class="stat-card ${profit>=0?'green':'red'}"><div class="stat-icon">${profit>=0?'📈':'📉'}</div><div class="stat-num">${fn(Math.abs(profit))}</div><div class="stat-label">${profit>=0?'✅ صافي ربح الرحلة':'⚠️ خسارة الرحلة'}</div></div>
+    </div>
+    <div style="background:linear-gradient(135deg,var(--side-2),var(--side-3));border:1px solid var(--side-border);border-radius:var(--radius);padding:14px;margin-bottom:16px;font-size:13px;display:flex;flex-wrap:wrap;gap:16px">
+      <div>🏢 <b>المدفوع فعليًا للمورد:</b> <span style="color:#4caf84;font-weight:700">${fn(supplierPaidActual)} ج</span></div>
+      <div>⚖️ <b>المتبقي للمورد:</b> <span style="color:${(supplierObligation-supplierPaidActual)>0?'var(--red-light)':'#4caf84'};font-weight:700">${fn(Math.abs(supplierObligation-supplierPaidActual))} ج</span></div>
+      ${otherExp>0?`<div>💸 <b>مصاريف إضافية (خلاف المورد):</b> <span style="color:var(--red-light);font-weight:700">${fn(otherExp)} ج</span></div>`:''}
+      <div>📊 <b>إجمالي تكلفة الرحلة (مورد + مصاريف):</b> <span style="color:var(--red-light);font-weight:700">${fn(totalCost)} ج</span></div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>العميل</th><th>الجواز</th><th>النوع</th><th>التسكين</th><th style="color:var(--red-light)">المستحق</th><th style="color:#4caf84">المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
+      <thead><tr><th>العميل</th><th>الجواز</th><th>النوع</th><th>التسكين</th><th style="color:var(--red-light)">المستحق</th><th style="color:#4caf84">المدفوع</th><th>المتبقي</th><th>تكلفة المورد</th><th>المكسب</th><th>الحالة</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr style="background:var(--bg3);font-weight:700"><td colspan="4">الإجمالي</td><td style="color:var(--red-light)">${fn(totalRev)} ج</td><td style="color:#4caf84">${fn(totalColl)} ج</td><td style="color:var(--red-light)">${fn(remaining)} ج</td><td></td></tr></tfoot>
+      <tfoot><tr style="background:var(--bg3);font-weight:700"><td colspan="4">الإجمالي</td><td style="color:var(--red-light)">${fn(totalRev)} ج</td><td style="color:#4caf84">${fn(totalColl)} ج</td><td style="color:var(--red-light)">${fn(remaining)} ج</td><td>${fn(supplierObligation)} ج</td><td style="color:${profit>=0?'#4caf84':'var(--red-light)'}">${fn(profit)} ج</td><td></td></tr></tfoot>
     </table></div>
-    ${exps.length?`<div style="margin-top:14px"><div class="card-title" style="margin-bottom:10px">💸 مصروفات الرحلة</div><div class="table-wrap"><table><thead><tr><th>البند</th><th>المورد</th><th>المبلغ</th><th>العملة</th></tr></thead><tbody>${exps.map(e=>`<tr><td>${e.category}</td><td>${e.supplier||'-'}</td><td>${fn(e.amount)}</td><td>${e.currency}</td></tr>`).join('')}</tbody><tfoot><tr style="font-weight:700;background:var(--bg3)"><td colspan="2">إجمالي المصروفات</td><td>${fn(totalExp)} ج</td><td></td></tr></tfoot></table></div></div>`:''}`;
+    ${exps.length?`<div style="margin-top:14px"><div class="card-title" style="margin-bottom:10px">💸 مصروفات الرحلة الإضافية (خلاف المورد)</div><div class="table-wrap"><table><thead><tr><th>البند</th><th>المورد</th><th>المبلغ</th><th>العملة</th></tr></thead><tbody>${exps.map(e=>`<tr><td>${e.category}</td><td>${e.supplier||'-'}</td><td>${fn(e.amount)}</td><td>${e.currency}</td></tr>`).join('')}</tbody><tfoot><tr style="font-weight:700;background:var(--bg3)"><td colspan="2">إجمالي المصروفات الإضافية</td><td>${fn(otherExp)} ج</td><td></td></tr></tfoot></table></div></div>`:''}`;
   } catch(e){res.innerHTML='<div class="info-box danger">❌ خطأ: '+e.message+'</div>';}
 }
 

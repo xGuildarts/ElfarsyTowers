@@ -5799,26 +5799,109 @@ function rebuildJrnLines(){
   }
 }
 
+function jlAccTypeOptions(selectedType){
+  const opts = [
+    ['cash','🪙 الخزنة (كاش)'],
+    ['bank','🏦 البنك (تحويل)'],
+    ['visa','💳 فيزا'],
+    ['check','📄 شيكات'],
+    ['client','👤 عميل معين'],
+    ['supplier','🏢 مورد معين'],
+    ['other','✏️ حساب آخر (حر)']
+  ];
+  return opts.map(([v,l])=>`<option value="${v}" ${v===selectedType?'selected':''}>${l}</option>`).join('');
+}
+
+// يحاول يفهم نوع الحساب من النص المخزّن (لعرض القيود القديمة/الجاهزة بشكل صحيح كقوائم)
+function inferJlAccType(accountName){
+  const n = (accountName||'').trim();
+  if(n==='الخزنة (كاش)') return {type:'cash', detail:''};
+  if(n==='البنك (تحويل)') return {type:'bank', detail:''};
+  if(n==='فيزا') return {type:'visa', detail:''};
+  if(n==='شيكات') return {type:'check', detail:''};
+  if(n.startsWith('ذمم العميل - ')){
+    const label = n.slice('ذمم العميل - '.length);
+    const c = aClients.find(x=>x.full_name_ar===label);
+    if(c) return {type:'client', detail:String(c.id)};
+    return {type:'other', detail:n};
+  }
+  if(n==='ذمم العملاء') return {type:'client', detail:''};
+  if(n.startsWith('ذمم المورد - ')){
+    const label = n.slice('ذمم المورد - '.length);
+    const s = aSups.find(x=>x.name===label);
+    if(s) return {type:'supplier', detail:String(s.id)};
+    return {type:'other', detail:n};
+  }
+  if(n==='ذمم الموردين') return {type:'supplier', detail:''};
+  return {type:'other', detail:n};
+}
+
+function renderJlDetail(idx, type, presetDetail){
+  const wrap = document.getElementById('jl-detail-wrap-'+idx);
+  if(!wrap) return;
+  if(type==='client'){
+    wrap.innerHTML = `<select id="jl-detail-${idx}" onchange="updateJrnBalance()" style="border-radius:6px;padding:7px 10px;font-size:13px;width:100%"><option value="">-- اختر العميل --</option>${aClients.map(c=>`<option value="${c.id}" ${String(c.id)===String(presetDetail)?'selected':''}>${c.full_name_ar}</option>`).join('')}</select>`;
+  } else if(type==='supplier'){
+    wrap.innerHTML = `<select id="jl-detail-${idx}" onchange="updateJrnBalance()" style="border-radius:6px;padding:7px 10px;font-size:13px;width:100%"><option value="">-- اختر المورد --</option>${aSups.map(s=>`<option value="${s.id}" ${String(s.id)===String(presetDetail)?'selected':''}>${s.name}</option>`).join('')}</select>`;
+  } else if(type==='other'){
+    wrap.innerHTML = `<input id="jl-detail-${idx}" type="text" list="jrn-accounts-list" value="${(presetDetail||'').replace(/"/g,'&quot;')}" placeholder="اسم الحساب..." style="border-radius:6px;padding:7px 10px;font-size:13px;width:100%">`;
+  } else {
+    wrap.innerHTML = `<div style="padding:7px 10px;font-size:12px;color:var(--text-muted,#999)">— حساب مالي مباشر —</div>`;
+  }
+}
+
+function onJlAccTypeChange(idx){
+  const type = document.getElementById('jl-acctype-'+idx).value;
+  renderJlDetail(idx, type, '');
+  updateJrnBalance();
+}
+
+// يبني اسم الحساب النهائي اللي هيتخزن من نوع السطر + التفصيلة المختارة
+function jlAccountName(idx){
+  const type = document.getElementById('jl-acctype-'+idx)?.value;
+  if(type==='cash') return 'الخزنة (كاش)';
+  if(type==='bank') return 'البنك (تحويل)';
+  if(type==='visa') return 'فيزا';
+  if(type==='check') return 'شيكات';
+  if(type==='client'){
+    const sel = document.getElementById('jl-detail-'+idx);
+    const name = sel && sel.value ? sel.options[sel.selectedIndex].textContent : '';
+    return name ? `ذمم العميل - ${name}` : '';
+  }
+  if(type==='supplier'){
+    const sel = document.getElementById('jl-detail-'+idx);
+    const name = sel && sel.value ? sel.options[sel.selectedIndex].textContent : '';
+    return name ? `ذمم المورد - ${name}` : '';
+  }
+  const inp = document.getElementById('jl-detail-'+idx);
+  return inp ? inp.value.trim() : '';
+}
+
 function addJrnLine(data={}){
   _jrnLineIdx++;
   const idx = _jrnLineIdx;
-  const COMMON_ACCOUNTS = ['الخزنة (كاش)','البنك (تحويل)','فيزا','شيكات','ذمم العملاء','ذمم الموردين','إيرادات الرحلات','مصروفات عامة','مصروفات فنادق','مصروفات تذاكر','مصروفات تأشيرات','مصروفات نقل','أرباح رحلات'];
+  let type, detail;
+  if(data.acctype){ type = data.acctype; detail = data.detail||''; }
+  else { const inf = inferJlAccType(data.account); type = inf.type; detail = inf.detail; }
   const div = document.createElement('div');
   div.id = 'jrn-line-' + idx;
-  div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 160px auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)';
+  div.style.cssText = 'display:grid;grid-template-columns:95px 150px 1fr 130px auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)';
   div.innerHTML = `
-    <select id="jl-side-${idx}" onchange="updateJrnBalance()" style="border-radius:6px;padding:7px 10px;font-size:12px;font-weight:700">
+    <select id="jl-side-${idx}" onchange="updateJrnBalance()" style="border-radius:6px;padding:7px 8px;font-size:12px;font-weight:700">
       <option value="debit" ${data.side==='debit'?'selected':''}>مدين (ح)</option>
       <option value="credit" ${data.side==='credit'?'selected':''}>دائن (د)</option>
     </select>
-    <input id="jl-acc-${idx}" type="text" list="jrn-accounts-list" value="${data.account||''}" placeholder="اسم الحساب..." style="border-radius:6px;padding:7px 10px;font-size:13px">
+    <select id="jl-acctype-${idx}" onchange="onJlAccTypeChange(${idx})" style="border-radius:6px;padding:7px 8px;font-size:12px">${jlAccTypeOptions(type)}</select>
+    <div id="jl-detail-wrap-${idx}"></div>
     <input id="jl-amt-${idx}" type="number" value="${data.amount||0}" min="0" step="0.01" placeholder="0.00" oninput="updateJrnBalance()" style="border-radius:6px;padding:7px 10px;font-size:13px;font-weight:700">
     <button onclick="removeJrnLine(${idx})" style="background:rgba(192,57,43,.15);border:1px solid rgba(192,57,43,.3);color:var(--red-light);border-radius:6px;padding:7px 9px;cursor:pointer;font-size:13px">🗑️</button>
   `;
   document.getElementById('jrn-lines-cnt').appendChild(div);
+  renderJlDetail(idx, type, detail);
   if(!document.getElementById('jrn-accounts-list')){
     const dl = document.createElement('datalist');
     dl.id = 'jrn-accounts-list';
+    const COMMON_ACCOUNTS = ['إيرادات الرحلات','أرباح رحلات','مصروفات عامة','مصروفات فنادق','مصروفات تذاكر','مصروفات تأشيرات','مصروفات نقل'];
     dl.innerHTML = COMMON_ACCOUNTS.map(a=>`<option value="${a}">`).join('');
     document.body.appendChild(dl);
   }
@@ -5864,17 +5947,28 @@ async function saveJrnEntry(){
   const lines = [...document.querySelectorAll('[id^="jrn-line-"]')];
   let totalDebit=0, totalCredit=0;
   const lineData = [];
+  let lineClientId = document.getElementById('jrn-client-sel').value || null;
+  let lineSupplierId = document.getElementById('jrn-sup-sel').value || null;
   lines.forEach(l=>{
     const idx = l.id.replace('jrn-line-','');
     const side = document.getElementById('jl-side-'+idx)?.value;
-    const acc = document.getElementById('jl-acc-'+idx)?.value.trim();
+    const type = document.getElementById('jl-acctype-'+idx)?.value;
+    const acc = jlAccountName(idx);
     const amt = +document.getElementById('jl-amt-'+idx)?.value||0;
     if(!acc||!amt) return;
     if(side==='debit') totalDebit+=amt; else totalCredit+=amt;
     lineData.push({side,account_name:acc,amount:amt});
+    if(type==='client' && !lineClientId){
+      const sel = document.getElementById('jl-detail-'+idx);
+      if(sel && sel.value) lineClientId = sel.value;
+    }
+    if(type==='supplier' && !lineSupplierId){
+      const sel = document.getElementById('jl-detail-'+idx);
+      if(sel && sel.value) lineSupplierId = sel.value;
+    }
   });
   if(Math.abs(totalDebit-totalCredit)>0.01){toast('القيد غير متوازن — يجب أن يتساوى المدين والدائن','error');return;}
-  if(!lineData.length){toast('أضف سطور القيد أولاً','error');return;}
+  if(!lineData.length){toast('أضف سطور القيد أولاً (لازم تختار حساب ومبلغ لكل سطر)','error');return;}
   const entry = {
     entry_date: date, description: desc,
     reference_no: document.getElementById('jrn-ref').value.trim()||null,
@@ -5882,8 +5976,8 @@ async function saveJrnEntry(){
     currency: document.getElementById('jrn-currency').value,
     notes: document.getElementById('jrn-notes').value.trim()||null,
     total_debit: totalDebit, total_credit: totalCredit,
-    client_id: document.getElementById('jrn-client-sel').value||null,
-    supplier_id: document.getElementById('jrn-sup-sel').value||null,
+    client_id: lineClientId||null,
+    supplier_id: lineSupplierId||null,
     trip_id: document.getElementById('jrn-trip-sel').value||null,
     from_account: document.getElementById('jrn-from-acc').value||null,
     to_account: document.getElementById('jrn-to-acc').value||null,

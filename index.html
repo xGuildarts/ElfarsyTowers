@@ -2372,6 +2372,10 @@ function addProgRow(d=null){
       <div class="form-group"><label>رباعي</label><input id="pc-p4-${idx}" type="number" value="${di.price_quad||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
       <div class="form-group"><label>خماسي</label><input id="pc-p5-${idx}" type="number" value="${di.price_quint||0}" min="0" oninput="autoFillSupCost(${idx})"></div>
     </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px">
+      <div class="form-group"><label>🧒 طفل (بدون سرير)</label><input id="pc-p6-${idx}" type="number" value="${di.price_child||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>👶 رضيع</label><input id="pc-p7-${idx}" type="number" value="${di.price_infant||0}" min="0" placeholder="0"></div>
+    </div>
     <div class="form-group" style="margin-top:8px"><label>نوع النقل</label><input id="pc-tr-${idx}" type="text" value="${di.transfer_type||'bus'}" placeholder="bus / سيرا بالأقدام"></div>
   </div>
   <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
@@ -2383,6 +2387,10 @@ function addProgRow(d=null){
       <div class="form-group"><label>رباعي</label><input id="pc-sc4-${idx}" type="number" value="${di.sup_cost_quad||0}" min="0" placeholder="0"></div>
       <div class="form-group"><label>خماسي</label><input id="pc-sc5-${idx}" type="number" value="${di.sup_cost_quint||0}" min="0" placeholder="0"></div>
     </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px">
+      <div class="form-group"><label>🧒 طفل (بدون سرير)</label><input id="pc-sc6-${idx}" type="number" value="${di.sup_cost_child||0}" min="0" placeholder="0"></div>
+      <div class="form-group"><label>👶 رضيع</label><input id="pc-sc7-${idx}" type="number" value="${di.sup_cost_infant||0}" min="0" placeholder="0"></div>
+    </div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px">💡 هيتحسب تلقائياً في الحجز بناءً على نوع الغرفة المختارة — ممكن تعدّله في الحجز لو احتجت</div>
   </div>
   <input type="hidden" id="pc-id-${idx}" value="${di.id||''}">`;
@@ -2391,7 +2399,7 @@ function addProgRow(d=null){
 function getProgRows(){
   return[...document.querySelectorAll('[id^="pr-"]')].map(row=>{
     const i=row.id.replace('pr-','');
-    return{_id:document.getElementById('pc-id-'+i)?.value,code:+document.getElementById('pc-c-'+i)?.value||1,program_details:document.getElementById('pc-d-'+i)?.value.trim()||null,pax_on_trip:+document.getElementById('pc-p-'+i)?.value||0,mecca_hotel:document.getElementById('pc-mh-'+i)?.value.trim()||null,mecca_nights:+document.getElementById('pc-mn-'+i)?.value||0,mecca_meal_plan:document.getElementById('pc-mm-'+i)?.value.trim()||null,madina_hotel:document.getElementById('pc-dh-'+i)?.value.trim()||null,madina_nights:+document.getElementById('pc-dn-'+i)?.value||0,madina_meal_plan:document.getElementById('pc-dm-'+i)?.value.trim()||null,transfer_type:document.getElementById('pc-tr-'+i)?.value.trim()||null,price_single:+document.getElementById('pc-p1-'+i)?.value||0,price_double:+document.getElementById('pc-p2-'+i)?.value||0,price_triple:+document.getElementById('pc-p3-'+i)?.value||0,price_quad:+document.getElementById('pc-p4-'+i)?.value||0,price_quint:+document.getElementById('pc-p5-'+i)?.value||0,sup_cost_single:+document.getElementById('pc-sc1-'+i)?.value||0,sup_cost_double:+document.getElementById('pc-sc2-'+i)?.value||0,sup_cost_triple:+document.getElementById('pc-sc3-'+i)?.value||0,sup_cost_quad:+document.getElementById('pc-sc4-'+i)?.value||0,sup_cost_quint:+document.getElementById('pc-sc5-'+i)?.value||0};
+    return{_id:document.getElementById('pc-id-'+i)?.value,code:+document.getElementById('pc-c-'+i)?.value||1,program_details:document.getElementById('pc-d-'+i)?.value.trim()||null,pax_on_trip:+document.getElementById('pc-p-'+i)?.value||0,mecca_hotel:document.getElementById('pc-mh-'+i)?.value.trim()||null,mecca_nights:+document.getElementById('pc-mn-'+i)?.value||0,mecca_meal_plan:document.getElementById('pc-mm-'+i)?.value.trim()||null,madina_hotel:document.getElementById('pc-dh-'+i)?.value.trim()||null,madina_nights:+document.getElementById('pc-dn-'+i)?.value||0,madina_meal_plan:document.getElementById('pc-dm-'+i)?.value.trim()||null,transfer_type:document.getElementById('pc-tr-'+i)?.value.trim()||null,price_single:+document.getElementById('pc-p1-'+i)?.value||0,price_double:+document.getElementById('pc-p2-'+i)?.value||0,price_triple:+document.getElementById('pc-p3-'+i)?.value||0,price_quad:+document.getElementById('pc-p4-'+i)?.value||0,price_quint:+document.getElementById('pc-p5-'+i)?.value||0,price_child:+document.getElementById('pc-p6-'+i)?.value||0,price_infant:+document.getElementById('pc-p7-'+i)?.value||0,sup_cost_single:+document.getElementById('pc-sc1-'+i)?.value||0,sup_cost_double:+document.getElementById('pc-sc2-'+i)?.value||0,sup_cost_triple:+document.getElementById('pc-sc3-'+i)?.value||0,sup_cost_quad:+document.getElementById('pc-sc4-'+i)?.value||0,sup_cost_quint:+document.getElementById('pc-sc5-'+i)?.value||0,sup_cost_child:+document.getElementById('pc-sc6-'+i)?.value||0,sup_cost_infant:+document.getElementById('pc-sc7-'+i)?.value||0};
   });
 }
 // بيجيب كل أسماء الفنادق اللي اتكتبت قبل كده في أي رحلة (مكة أو المدينة) ويحطها في قايمة اقتراحات
@@ -3013,7 +3021,7 @@ function calcPx(){
   // --- تكلفة المورد التلقائية من البرنامج ---
   const supEl=document.getElementById('bk-supcost');
   if(supEl && pg && !supEl.dataset.manualOverride){
-    const scMap={فردي:pg.sup_cost_single,ثنائي:pg.sup_cost_double,ثلاثي:pg.sup_cost_triple,رباعي:pg.sup_cost_quad,خماسي:pg.sup_cost_quint};
+    const scMap={فردي:pg.sup_cost_single,ثنائي:pg.sup_cost_double,ثلاثي:pg.sup_cost_triple,رباعي:pg.sup_cost_quad,خماسي:pg.sup_cost_quint,بدون:pg.sup_cost_child,رضيع:pg.sup_cost_infant};
     const autoSc=+(scMap[rm]||0);
     if(autoSc>0 && supEl.value==='') supEl.value=autoSc;
   }
@@ -7064,6 +7072,8 @@ async function loadSupplierAccount() {
         if(rt==='بدون'){
           // طفل بدون سرير — يستخدم sup_cost_child أو child_cost إن وُجد، وإلا صفر
           cost=(+pg.sup_cost_child||+pg.child_cost||0);
+        } else if(rt==='رضيع'){
+          cost=(+pg.sup_cost_infant||0);
         } else {
           const key='sup_cost_'+(roomMap[rt]||'double');
           cost=(+pg[key]||0);
@@ -7097,7 +7107,7 @@ async function loadSupplierAccount() {
     if(progRows.length){
       html+=`<div class="card-title" style="margin:16px 0 8px">📋 تفاصيل الالتزام بالبرنامج</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>كود البرنامج</th><th>عدد الأفراد</th><th>التوزيع</th><th>تكلفة الثنائي</th><th>تكلفة الثلاثي</th><th>تكلفة الرباعي</th><th>تكلفة الخماسي</th><th>تكلفة الطفل</th><th>الالتزام</th></tr></thead>
+        <thead><tr><th>كود البرنامج</th><th>عدد الأفراد</th><th>التوزيع</th><th>تكلفة الثنائي</th><th>تكلفة الثلاثي</th><th>تكلفة الرباعي</th><th>تكلفة الخماسي</th><th>تكلفة الطفل</th><th>تكلفة الرضيع</th><th>الالتزام</th></tr></thead>
         <tbody>`;
       progRows.forEach(r=>{
         html+=`<tr>
@@ -7109,10 +7119,11 @@ async function loadSupplierAccount() {
           <td>${fn(r.pg.sup_cost_quad||0)} ج</td>
           <td>${fn(r.pg.sup_cost_quint||0)} ج</td>
           <td>${fn(r.pg.sup_cost_child||r.pg.child_cost||0)} ج</td>
+          <td>${fn(r.pg.sup_cost_infant||0)} ج</td>
           <td><b style="color:var(--gold)">${fn(r.pgObl)} ج</b></td>
         </tr>`;
       });
-      html+=`<tr style="background:var(--side-2)"><td colspan="8"><b>إجمالي الالتزام</b></td><td><b style="color:var(--red-light);font-size:16px">${fn(totalObligation)} ج</b></td></tr>
+      html+=`<tr style="background:var(--side-2)"><td colspan="9"><b>إجمالي الالتزام</b></td><td><b style="color:var(--red-light);font-size:16px">${fn(totalObligation)} ج</b></td></tr>
       </tbody></table></div>`;
     }
 

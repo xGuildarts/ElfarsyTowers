@@ -1167,28 +1167,56 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
         </div>
         <div id="jrn-client-row" style="display:none;margin-top:10px">
           <div class="form-grid">
-            <div class="form-group"><label>العميل</label><select id="jrn-client-sel"><option value="">-- اختر العميل --</option></select></div>
+            <div class="form-group"><label>العميل</label><select id="jrn-client-sel" onchange="rebuildJrnLines()"><option value="">-- اختر العميل --</option></select></div>
             <div class="form-group"><label>الحجز</label><select id="jrn-bk-sel"><option value="">-- اختر الحجز --</option></select></div>
-          </div>
-        </div>
-        <div id="jrn-supplier-row" style="display:none;margin-top:10px">
-          <div class="form-grid">
-            <div class="form-group"><label>المورد</label><select id="jrn-sup-sel"><option value="">-- اختر المورد --</option></select></div>
-            <div class="form-group"><label>الرحلة</label><select id="jrn-trip-sel"><option value="">-- اختر الرحلة --</option></select></div>
-          </div>
-        </div>
-        <div id="jrn-transfer-row" style="display:none;margin-top:10px">
-          <div class="form-grid">
-            <div class="form-group"><label>من حساب</label>
-              <select id="jrn-from-acc">
+            <div class="form-group"><label>الاتجاه *</label>
+              <select id="jrn-client-dir" onchange="rebuildJrnLines()">
+                <option value="in">⬅️ تحصيل من العميل (قبض)</option>
+                <option value="out">➡️ دفع / استرجاع للعميل (صرف)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>عن طريق</label>
+              <select id="jrn-client-method" onchange="rebuildJrnLines()">
                 <option value="كاش">🪙 الخزنة (كاش)</option>
                 <option value="تحويل">🏦 البنك (تحويل)</option>
                 <option value="فيزا">💳 فيزا</option>
                 <option value="شيك">📄 شيكات</option>
               </select>
             </div>
-            <div class="form-group"><label>إلى حساب</label>
-              <select id="jrn-to-acc">
+          </div>
+        </div>
+        <div id="jrn-supplier-row" style="display:none;margin-top:10px">
+          <div class="form-grid">
+            <div class="form-group"><label>المورد</label><select id="jrn-sup-sel" onchange="rebuildJrnLines()"><option value="">-- اختر المورد --</option></select></div>
+            <div class="form-group"><label>الرحلة</label><select id="jrn-trip-sel"><option value="">-- اختر الرحلة --</option></select></div>
+            <div class="form-group"><label>الاتجاه *</label>
+              <select id="jrn-sup-dir" onchange="rebuildJrnLines()">
+                <option value="out">➡️ دفع للمورد (صرف)</option>
+                <option value="in">⬅️ تحصيل / استرجاع من المورد (قبض)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>عن طريق</label>
+              <select id="jrn-sup-method" onchange="rebuildJrnLines()">
+                <option value="كاش">🪙 الخزنة (كاش)</option>
+                <option value="تحويل">🏦 البنك (تحويل)</option>
+                <option value="فيزا">💳 فيزا</option>
+                <option value="شيك">📄 شيكات</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="jrn-transfer-row" style="display:none;margin-top:10px">
+          <div class="form-grid">
+            <div class="form-group"><label>من حساب (يخرج منه)</label>
+              <select id="jrn-from-acc" onchange="rebuildJrnLines()">
+                <option value="كاش">🪙 الخزنة (كاش)</option>
+                <option value="تحويل">🏦 البنك (تحويل)</option>
+                <option value="فيزا">💳 فيزا</option>
+                <option value="شيك">📄 شيكات</option>
+              </select>
+            </div>
+            <div class="form-group"><label>إلى حساب (يدخل فيه)</label>
+              <select id="jrn-to-acc" onchange="rebuildJrnLines()">
                 <option value="تحويل">🏦 البنك (تحويل)</option>
                 <option value="كاش">🪙 الخزنة (كاش)</option>
                 <option value="فيزا">💳 فيزا</option>
@@ -5667,19 +5695,22 @@ function openJournalModal(entryId=null){
   document.getElementById('jrn-notes').value = '';
   document.getElementById('jrn-type').value = 'manual';
   document.getElementById('jrn-currency').value = 'EGP';
+  document.getElementById('jrn-client-dir').value = 'in';
+  document.getElementById('jrn-client-method').value = 'كاش';
+  document.getElementById('jrn-sup-dir').value = 'out';
+  document.getElementById('jrn-sup-method').value = 'كاش';
+  document.getElementById('jrn-from-acc').value = 'كاش';
+  document.getElementById('jrn-to-acc').value = 'تحويل';
   document.getElementById('jrn-lines-cnt').innerHTML = '';
   document.getElementById('jrn-balance-check').style.display = 'none';
-  onJrnTypeChange();
   const cSel = document.getElementById('jrn-client-sel');
   cSel.innerHTML = '<option value="">-- اختر العميل --</option>' + aClients.map(c=>`<option value="${c.id}">${c.full_name_ar}</option>`).join('');
   const supSel = document.getElementById('jrn-sup-sel');
   supSel.innerHTML = '<option value="">-- اختر المورد --</option>' + aSups.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   const tripSel = document.getElementById('jrn-trip-sel');
   tripSel.innerHTML = '<option value="">-- اختر الرحلة --</option>' + aTrips.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
-  if(entryId){ loadJrnEntryForEdit(entryId); } else {
-    addJrnLine({side:'debit', account:'', amount:0});
-    addJrnLine({side:'credit', account:'', amount:0});
-  }
+  onJrnTypeChange();
+  if(entryId){ loadJrnEntryForEdit(entryId); }
   openM('jrn-modal');
 }
 
@@ -5713,12 +5744,58 @@ function onJrnTypeChange(){
   document.getElementById('jrn-client-row').style.display   = (t==='client') ? 'block' : 'none';
   document.getElementById('jrn-supplier-row').style.display = (t==='supplier') ? 'block' : 'none';
   document.getElementById('jrn-transfer-row').style.display = (t==='transfer') ? 'block' : 'none';
-  if(document.getElementById('jrn-lines-cnt').innerHTML===''){
-    if(t==='client'){addJrnLine({side:'debit',account:'ذمم العملاء',amount:0});addJrnLine({side:'credit',account:'إيرادات الرحلات',amount:0});}
-    else if(t==='supplier'){addJrnLine({side:'debit',account:'المورد',amount:0});addJrnLine({side:'credit',account:'الخزنة (كاش)',amount:0});}
-    else if(t==='transfer'){addJrnLine({side:'debit',account:'البنك',amount:0});addJrnLine({side:'credit',account:'الخزنة (كاش)',amount:0});}
-    else if(t==='expense'){addJrnLine({side:'debit',account:'مصروفات',amount:0});addJrnLine({side:'credit',account:'الخزنة (كاش)',amount:0});}
-    else{addJrnLine({side:'debit',account:'',amount:0});addJrnLine({side:'credit',account:'',amount:0});}
+  rebuildJrnLines();
+}
+
+const JRN_METHOD_LABELS = {'كاش':'🪙 الخزنة (كاش)','تحويل':'🏦 البنك (تحويل)','فيزا':'💳 فيزا','شيك':'📄 شيكات'};
+
+// يعيد بناء سطري القيد الافتراضيين حسب النوع + الاتجاه (تحصيل/دفع) + طريقة الدفع
+// بيحافظ على أي سطور إضافية ضافها المستخدم يدويًا (بيتوقف عن اللمس لو فيه أكتر من سطرين)
+function rebuildJrnLines(){
+  const t = document.getElementById('jrn-type').value;
+  const cnt = document.getElementById('jrn-lines-cnt');
+  const curLines = [...cnt.querySelectorAll('[id^="jrn-line-"]')];
+  if(curLines.length > 2) return;
+  let keepAmount = 0;
+  if(curLines.length){
+    const idx0 = curLines[0].id.replace('jrn-line-','');
+    keepAmount = +document.getElementById('jl-amt-'+idx0)?.value || 0;
+  }
+  cnt.innerHTML = '';
+  _jrnLineIdx = 0;
+
+  const clientSel = document.getElementById('jrn-client-sel');
+  const clientName = clientSel && clientSel.value ? clientSel.options[clientSel.selectedIndex].textContent : '';
+  const supSel = document.getElementById('jrn-sup-sel');
+  const supName = supSel && supSel.value ? supSel.options[supSel.selectedIndex].textContent : '';
+
+  if(t==='client'){
+    const dir = document.getElementById('jrn-client-dir').value; // in=تحصيل من العميل | out=دفع/استرجاع له
+    const methodLabel = JRN_METHOD_LABELS[document.getElementById('jrn-client-method').value] || 'الخزنة (كاش)';
+    const clAcc = clientName ? `ذمم العميل - ${clientName}` : 'ذمم العملاء';
+    if(dir==='in'){ addJrnLine({side:'debit',account:methodLabel,amount:keepAmount}); addJrnLine({side:'credit',account:clAcc,amount:keepAmount}); }
+    else{ addJrnLine({side:'debit',account:clAcc,amount:keepAmount}); addJrnLine({side:'credit',account:methodLabel,amount:keepAmount}); }
+  }
+  else if(t==='supplier'){
+    const dir = document.getElementById('jrn-sup-dir').value; // out=دفع للمورد | in=تحصيل/استرجاع منه
+    const methodLabel = JRN_METHOD_LABELS[document.getElementById('jrn-sup-method').value] || 'الخزنة (كاش)';
+    const supAcc = supName ? `ذمم المورد - ${supName}` : 'ذمم الموردين';
+    if(dir==='out'){ addJrnLine({side:'debit',account:supAcc,amount:keepAmount}); addJrnLine({side:'credit',account:methodLabel,amount:keepAmount}); }
+    else{ addJrnLine({side:'debit',account:methodLabel,amount:keepAmount}); addJrnLine({side:'credit',account:supAcc,amount:keepAmount}); }
+  }
+  else if(t==='transfer'){
+    const from = document.getElementById('jrn-from-acc').value;
+    const to = document.getElementById('jrn-to-acc').value;
+    addJrnLine({side:'debit',account:JRN_METHOD_LABELS[to]||to,amount:keepAmount});
+    addJrnLine({side:'credit',account:JRN_METHOD_LABELS[from]||from,amount:keepAmount});
+  }
+  else if(t==='expense'){
+    addJrnLine({side:'debit',account:'مصروفات',amount:keepAmount});
+    addJrnLine({side:'credit',account:'الخزنة (كاش)',amount:keepAmount});
+  }
+  else{
+    addJrnLine({side:'debit',account:'',amount:keepAmount});
+    addJrnLine({side:'credit',account:'',amount:keepAmount});
   }
 }
 

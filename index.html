@@ -660,7 +660,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 <div id="tab-bookings" class="tab-content" style="display:none">
   <div class="section-title"><span>📋</span> <span class="lang-ar">الحجوزات</span><span class="lang-en">Bookings</span></div>
   <div class="card">
-    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة الحجوزات</span><span class="lang-en">Bookings List</span></div><div style="display:flex;gap:8px"><button class="btn btn-gold" onclick="openFamModal()">👪 إضافة أسرة</button><button class="btn btn-primary" onclick="openBkModal()"><span class="lang-ar">➕ حجز جديد</span><span class="lang-en">➕ New Booking</span></button></div></div>
+    <div class="card-header"><div class="card-title"><span class="lang-ar">قائمة الحجوزات</span><span class="lang-en">Bookings List</span></div><div style="display:flex;gap:8px"><button class="btn btn-outline" id="bk-recalc-btn" onclick="recalcTripBookingPrices()" title="يحدّث أسعار كل الحجوزات في الرحلة المختارة لتطابق أسعار البرنامج الحالية">🔄 تحديث الأسعار من الرحلة</button><button class="btn btn-gold" onclick="openFamModal()">👪 إضافة أسرة</button><button class="btn btn-primary" onclick="openBkModal()"><span class="lang-ar">➕ حجز جديد</span><span class="lang-en">➕ New Booking</span></button></div></div>
     <div class="search-bar">
       <select id="bk-trip-f" onchange="loadBookings()" style="flex:0 0 200px"><option value="">كل الرحلات</option></select>
       <select id="bk-stat-f" onchange="loadBookings()"><option value="">كل الحالات</option><option value="محجوز">محجوز</option><option value="مدفوع جزئي">مدفوع جزئي</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select>
@@ -895,10 +895,11 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
     <!-- Modal إضافة دفعة للمورد -->
     <div id="sup-pay-modal" class="modal-overlay" style="display:none">
       <div class="modal" style="max-width:480px">
-        <div class="modal-header"><div class="modal-title">💸 تسجيل دفعة للمورد</div><button class="close-btn" onclick="closeM('sup-pay-modal')">✕</button></div>
+        <div class="modal-header"><div class="modal-title" id="spm-ttl">💸 تسجيل دفعة للمورد</div><button class="close-btn" onclick="closeM('sup-pay-modal')">✕</button></div>
         <div class="modal-body">
           <input type="hidden" id="spm-trip-id">
           <input type="hidden" id="spm-sup-id">
+          <input type="hidden" id="spm-edit-id">
           <div class="form-grid">
             <div class="form-group"><label>المبلغ *</label><input id="spm-amt" type="number" min="0" step="0.01" placeholder="0"></div>
             <div class="form-group"><label>العملة</label><select id="spm-cur"><option value="EGP">جنيه (EGP)</option><option value="USD">دولار (USD)</option><option value="SAR">ريال (SAR)</option><option value="EUR">يورو (EUR)</option></select></div>
@@ -2988,6 +2989,55 @@ function renderBks(list){
     <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="editBk(${b.id})" title="تعديل">&#x270F;&#xFE0F;</button> <button class="btn btn-primary btn-sm btn-icon" onclick="addPayForBk(${b.id})" title="دفعة">&#x1F4B0;</button> <button class="btn btn-gold btn-sm btn-icon" onclick="printBkCard(${b.id})" title="طباعة">&#x1F5A8;&#xFE0F;</button> <button class="btn btn-outline btn-sm btn-icon" onclick="openClientProfile(${b.client_id})" title="ملف العميل">👤</button> <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelBk(${b.id},'${c?c.full_name_ar:''}')" title="حذف">&#x1F5D1;&#xFE0F;</button></td>
     </tr>`;
   }).join('');
+}
+async function recalcTripBookingPrices(){
+  const tid=document.getElementById('bk-trip-f').value;
+  if(!tid){toast('اختر رحلة معينة من فوق أولاً عشان نعرف نحدّث حجوزات مين','error');return;}
+  const btn=document.getElementById('bk-recalc-btn');
+  try{
+    if(btn){btn.disabled=true;btn.textContent='⏳ جاري الحساب...';}
+    const trip=await sb(`haj_trips?id=eq.${tid}&limit=1`).then(r=>r[0]);
+    if(!trip){toast('الرحلة غير موجودة','error');return;}
+    const progs=await sb(`haj_programs?trip_id=eq.${tid}&limit=200`);
+    const bks=await sb(`haj_bookings?trip_id=eq.${tid}&status=neq.ملغي&limit=1000`);
+    if(!bks.length){toast('لا توجد حجوزات لهذه الرحلة','info');return;}
+    if(!aPays.length)aPays=await sb('haj_payments?limit=2000');
+    const rmap={فردي:'price_single',ثنائي:'price_double',ثلاثي:'price_triple',رباعي:'price_quad',خماسي:'price_quint'};
+    const changes=[];
+    bks.forEach(b=>{
+      const pg=progs.find(p=>p.id==b.program_id);
+      let base=0;
+      if(b.traveler_type==='رضيع')base=+trip.infant_price||0;
+      else if(b.traveler_type==='طفل')base=+trip.child_price||0;
+      else if(pg){const key=rmap[b.room_type||'ثنائي'];base=+(pg[key]||0);}
+      else base=+b.base_price||0; // مفيش برنامج مرتبط، سيب السعر الأساسي زي ما هو
+      const deduct=(b.has_own_ticket?+trip.ticket_price||0:0)+(b.has_own_barcode?+trip.barcode_price||0:0)+(b.has_own_visa?+trip.visa_price||0:0);
+      const add=(b.has_meals?+trip.meals_price||0:0)+(b.has_train?+trip.train_price||0:0)+(b.has_makkah_view?+trip.makkah_view_price||0:0)+(b.has_haram_view?+trip.haram_view_price||0:0);
+      const exdisc=+b.extra_discount||0;
+      const fin=base-deduct+add-exdisc;
+      if(Math.abs(fin-(+b.final_price))>0.009){
+        changes.push({b,base,deduct,add,fin,oldFin:+b.final_price});
+      }
+    });
+    if(!changes.length){toast('✅ كل الحجوزات متطابقة بالفعل مع أسعار الرحلة الحالية','success');return;}
+    const totalDiff=changes.reduce((s,c)=>s+(c.fin-c.oldFin),0);
+    const ok=await sConfirm(
+      `تحديث سعر ${changes.length} حجز؟`,
+      `هيتغير السعر النهائي لـ ${changes.length} حجز بناءً على أسعار الرحلة/البرنامج الحالية. الفرق الإجمالي: ${totalDiff>=0?'+':''}${fn(totalDiff)} ج. الخصومات والإضافات والخصم الخاص بكل حجز هتفضل زي ما هي.`,
+      '🔄', true
+    );
+    if(!ok)return;
+    let done=0;
+    for(const c of changes){
+      const paid=aPays.filter(p=>p.booking_id==c.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0);
+      const ns=c.b.status==='ملغي'?c.b.status:(paid>=c.fin?'مكتمل':paid>0?'مدفوع جزئي':'محجوز');
+      await sb(`haj_bookings?id=eq.${c.b.id}`,'PATCH',{base_price:c.base,deductions_total:c.deduct,additions_total:c.add,final_price:c.fin,status:ns});
+      done++;
+    }
+    toast(`✅ تم تحديث ${done} حجز بنجاح`,'success');
+    loadBookings();
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{ if(btn){btn.disabled=false;btn.textContent='🔄 تحديث الأسعار من الرحلة';} }
 }
 async function _openBkModalBase(id=null,preCl=null){
   ed.bk=id;
@@ -7251,7 +7301,7 @@ async function loadSupplierAccount() {
           <td>${p.reference_no||'-'}</td>
           <td style="font-size:12px;color:var(--text3)">${p.notes||''}</td>
           <td><b style="color:${rem<=0?'var(--green)':'var(--red-light)'}">${fn(Math.abs(rem))} ${rem<=0?'✅':''}</b></td>
-          <td><button class="btn btn-danger btn-sm btn-icon" onclick="delSupPay(${p.id},${tid})" title="حذف">🗑️</button></td>
+          <td><button class="btn btn-outline btn-sm btn-icon" onclick="editSupPay(${p.id},${tid})" title="تعديل">✏️</button> <button class="btn btn-danger btn-sm btn-icon" onclick="delSupPay(${p.id},${tid})" title="حذف">🗑️</button></td>
         </tr>`;
       });
       html+=`<tr style="background:var(--side-2)"><td colspan="2"><b>الإجمالي المدفوع</b></td><td colspan="6"><b style="color:var(--green);font-size:15px">${fn(totalPaid)} ج</b></td><td></td></tr>
@@ -7264,6 +7314,8 @@ async function loadSupplierAccount() {
 }
 
 function openSupPayModal(tripId,supId){
+  document.getElementById('spm-ttl').textContent='💸 تسجيل دفعة للمورد';
+  document.getElementById('spm-edit-id').value='';
   document.getElementById('spm-trip-id').value=tripId;
   document.getElementById('spm-sup-id').value=supId;
   document.getElementById('spm-amt').value='';
@@ -7271,10 +7323,30 @@ function openSupPayModal(tripId,supId){
   document.getElementById('spm-nts').value='';
   document.getElementById('spm-dt').value=new Date().toISOString().split('T')[0];
   document.getElementById('spm-account').value='';
+  document.getElementById('spm-cur').value='EGP';
+  document.getElementById('spm-mth').value='كاش';
+  document.getElementById('sup-pay-modal').style.display='flex';
+}
+
+function editSupPay(id,tid){
+  const p=(_supPayCache[tid]||[]).find(x=>x.id==id);
+  if(!p){toast('تعذر إيجاد الدفعة','error');return;}
+  document.getElementById('spm-ttl').textContent='✏️ تعديل دفعة المورد';
+  document.getElementById('spm-edit-id').value=id;
+  document.getElementById('spm-trip-id').value=p.trip_id;
+  document.getElementById('spm-sup-id').value=p.supplier_id;
+  document.getElementById('spm-amt').value=p.amount;
+  document.getElementById('spm-cur').value=p.currency||'EGP';
+  document.getElementById('spm-mth').value=p.payment_method||'كاش';
+  document.getElementById('spm-account').value=p.payment_account||'';
+  document.getElementById('spm-dt').value=p.payment_date;
+  document.getElementById('spm-ref').value=p.reference_no||'';
+  document.getElementById('spm-nts').value=p.notes||'';
   document.getElementById('sup-pay-modal').style.display='flex';
 }
 
 async function saveSupplierPayment(){
+  const editId=document.getElementById('spm-edit-id').value;
   const tid=+document.getElementById('spm-trip-id').value;
   const sid=+document.getElementById('spm-sup-id').value;
   const amt=+document.getElementById('spm-amt').value;
@@ -7291,8 +7363,13 @@ async function saveSupplierPayment(){
     notes:document.getElementById('spm-nts').value.trim()||null
   };
   try{
-    await sb('haj_supplier_payments','POST',d);
-    toast('تم تسجيل الدفعة ✅','success');
+    if(editId){
+      await sb(`haj_supplier_payments?id=eq.${editId}`,'PATCH',d);
+      toast('تم تعديل الدفعة ✅','success');
+    } else {
+      await sb('haj_supplier_payments','POST',d);
+      toast('تم تسجيل الدفعة ✅','success');
+    }
     closeM('sup-pay-modal');
     delete _supPayCache[tid];
     loadSupplierAccount();

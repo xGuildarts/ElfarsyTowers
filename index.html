@@ -7041,8 +7041,20 @@ function stopTaskReminders(){
 let _supPayCache = {}; // { tripId: [...payments] }
 
 async function loadSupplierAccount() {
-  const tid = +document.getElementById('sup-acc-trip').value;
   const el = document.getElementById('sup-acc-result');
+  // تأكد إن البيانات الأساسية موجودة
+  if(!aTrips.length){
+    try{aTrips=await sb('haj_trips?order=depart_date.desc&limit=200');}catch(e){}
+  }
+  if(!aSups.length){
+    try{aSups=await sb('haj_suppliers?order=name.asc&limit=200');}catch(e){}
+  }
+  // إعادة ملء القايمة لو كانت فاضية
+  const sel=document.getElementById('sup-acc-trip');
+  if(sel && sel.options.length<=1 && aTrips.length){
+    sel.innerHTML='<option value="">-- اختر الرحلة --</option>'+aTrips.map(t=>`<option value="${t.id}">${t.name} ${t.supplier_id?'('+(aSups.find(s=>s.id==t.supplier_id)?.name||'')+')':''}</option>`).join('');
+  }
+  const tid = +sel.value;
   if(!tid){el.innerHTML='<div class="empty-state"><div class="empty-icon">🏢</div><h3>اختر رحلة</h3></div>';return;}
   el.innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div><h3>جاري الحساب...</h3></div>';
   try{

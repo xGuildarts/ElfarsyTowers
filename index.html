@@ -1752,6 +1752,7 @@ body.light-mode input,body.light-mode select,body.light-mode textarea{background
 // ============ CONFIG ============
 let SURL=localStorage.getItem('hj_url')||'', SKEY=localStorage.getItem('hj_key')||'';
 let aTrips=[],aProgs=[],aClients=[],aBks=[],aPays=[],aSups=[];
+let _cbPayMap={}, _cbSupPayMap={}; // كاش لدفعات العملاء/الموردين المعروضة في كشوف الحسابات (لأزرار عرض/تعديل القيد)
 let ed={}, curTrip=null, prc={};
 
 // ============ SUPABASE ============
@@ -3459,7 +3460,15 @@ async function saveEditPay(){
   if(!_editPayId)return;
   const d={amount:+document.getElementById('ep-amt').value,currency:document.getElementById('ep-cur').value,payment_method:document.getElementById('ep-mth').value,payment_date:document.getElementById('ep-dt').value,receipt_no:document.getElementById('ep-rc').value.trim()||null,notes:document.getElementById('ep-nts').value.trim()||null};
   if(!d.amount){toast('يرجى إدخال المبلغ','error');return;}
-  try{await sb(`haj_payments?id=eq.${_editPayId}`,'PATCH',d);const idx=aPays.findIndex(p=>p.id==_editPayId);if(idx>-1)aPays[idx]={...aPays[idx],...d};toast('تم التعديل ✅');closeM('edit-pay-modal');loadPayments();}catch(e){toast('خطأ: '+e.message,'error');}
+  try{
+    await sb(`haj_payments?id=eq.${_editPayId}`,'PATCH',d);
+    const idx=aPays.findIndex(p=>p.id==_editPayId);if(idx>-1)aPays[idx]={...aPays[idx],...d};
+    if(_cbPayMap[_editPayId]) _cbPayMap[_editPayId]={..._cbPayMap[_editPayId],...d};
+    toast('تم التعديل ✅');closeM('edit-pay-modal');
+    loadPayments();
+    if(document.querySelector('#cb-result table')) loadCashboxStatement();
+    if(document.getElementById('acc-jrn-from')?.value || document.getElementById('acc-jrn-to')?.value) loadJournal();
+  }catch(e){toast('خطأ: '+e.message,'error');}
 }
 function delPayFromEditModal(){
   if(!_editPayId||!requirePerm('حذف دفعة')) return;
@@ -6744,10 +6753,22 @@ async function loadJournal() {
       if(!aBks.length)aBks=await sb('haj_bookings?limit=500');
       if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
       if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
+      payEntries.forEach(p=>_cbPayMap[p.id]=p);
+    }
+    let supPayEntries=[];
+    if(typeF!=='manual' && typeF!=='client'){
+      let supPayQ=`haj_supplier_payments?order=payment_date.desc&limit=500`;
+      if(from) supPayQ+=`&payment_date=gte.${from}`;
+      if(to)   supPayQ+=`&payment_date=lte.${to}`;
+      try{ supPayEntries = await sb(supPayQ); }catch(e){}
+      if(!aSups.length)aSups=await sb('haj_suppliers?order=name.asc&limit=200');
+      if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
+      supPayEntries.forEach(p=>_cbSupPayMap[p.id]=p);
     }
     const allItems = [
       ...manualEntries.map(e=>({_type:'manual',date:e.entry_date,desc:e.description,ref:e.reference_no||'',entryType:e.entry_type||'manual',totalDebit:+e.total_debit||0,totalCredit:+e.total_credit||0,currency:e.currency||'EGP',id:e.id})),
-      ...payEntries.map(p=>{const bk=aBks.find(x=>x.id==p.booking_id);const c=bk?aClients.find(x=>x.id==bk.client_id):null;const t=bk?aTrips.find(x=>x.id==bk.trip_id):null;return{_type:'payment',date:p.payment_date,desc:`دفعة: ${c?.full_name_ar||'-'} — ${t?.name||'-'}`,ref:p.receipt_no||'',entryType:'client',totalDebit:0,totalCredit:+p.amount,currency:p.currency||'EGP',id:'pay_'+p.id};})
+      ...payEntries.map(p=>{const bk=aBks.find(x=>x.id==p.booking_id);const c=bk?aClients.find(x=>x.id==bk.client_id):null;const t=bk?aTrips.find(x=>x.id==bk.trip_id):null;return{_type:'payment',date:p.payment_date,desc:`دفعة: ${c?.full_name_ar||'⚠️ عميل غير معروف'} — ${t?.name||'-'}`,ref:p.receipt_no||'',entryType:'client',totalDebit:0,totalCredit:+p.amount,currency:p.currency||'EGP',id:'pay_'+p.id,rawId:p.id};}),
+      ...supPayEntries.map(p=>{const t=aTrips.find(x=>x.id==p.trip_id);const s=aSups.find(x=>x.id==p.supplier_id);return{_type:'supplier_payment',date:p.payment_date,desc:`دفعة مورد: ${s?.name||'⚠️ مورد غير معروف'} — ${t?.name||'-'}`,ref:p.reference_no||'',entryType:'supplier',totalDebit:+p.amount,totalCredit:0,currency:p.currency||'EGP',id:'suppay_'+p.id,rawId:p.id};})
     ].sort((a,b)=>b.date.localeCompare(a.date));
     const totalDebit=allItems.reduce((s,x)=>s+(x.totalDebit||0),0);
     const totalCredit=allItems.reduce((s,x)=>s+(x.totalCredit||0),0);
@@ -6760,14 +6781,27 @@ async function loadJournal() {
     const typeLabel={manual:'يدوي',client:'عميل',supplier:'مورد',transfer:'تحويل',expense:'مصروف'};
     const rows=allItems.map((item,i)=>{
       const isManual=item._type==='manual';
-      return`<tr style="cursor:${isManual?'pointer':'default'}" onclick="${isManual?`viewJrnEntry(${item.id})`:''}">
+      const isClientPay=item._type==='payment';
+      const isSupPay=item._type==='supplier_payment';
+      let actionsHtml;
+      if(isManual){
+        actionsHtml=`<div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();viewJrnEntry(${item.id})" title="عرض القيد">👁️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();openJournalModal(${item.id})" title="تعديل">✏️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();deleteJrnEntryFromList(${item.id})" title="حذف">🗑️</button></div>`;
+      } else if(isClientPay){
+        actionsHtml=`<div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();viewAutoEntry('client',${item.rawId})" title="عرض القيد">👁️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();editCbClientPayment(${item.rawId})" title="تعديل">✏️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();confirmDelPay(${item.rawId})" title="حذف">🗑️</button></div>`;
+      } else if(isSupPay){
+        actionsHtml=`<div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();viewAutoEntry('supplier',${item.rawId})" title="عرض القيد">👁️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();editCbSupplierPayment(${item.rawId})" title="تعديل">✏️</button></div>`;
+      } else {
+        actionsHtml='<span style="font-size:11px;color:var(--text3)">تلقائي</span>';
+      }
+      const rowClick=isManual?`viewJrnEntry(${item.id})`:isClientPay?`viewAutoEntry('client',${item.rawId})`:isSupPay?`viewAutoEntry('supplier',${item.rawId})`:'';
+      return`<tr style="cursor:${rowClick?'pointer':'default'}" onclick="${rowClick}">
         <td>${i+1}</td><td>${fd(item.date)}</td>
         <td><span class="badge badge-${item.entryType==='client'?'green':item.entryType==='supplier'?'blue':item.entryType==='transfer'?'gold':item.entryType==='expense'?'red':'gray'}">${typeIcon[item.entryType]||'📒'} ${typeLabel[item.entryType]||item.entryType}</span></td>
         <td style="max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${item.desc}</b></td>
         <td style="color:var(--text3);font-size:12px">${item.ref||'-'}</td>
         <td style="color:var(--red-light);font-weight:700">${item.totalDebit>0?fn(item.totalDebit)+' '+item.currency:''}</td>
         <td style="color:#3ed898;font-weight:700">${item.totalCredit>0?fn(item.totalCredit)+' '+item.currency:''}</td>
-        <td>${isManual?`<div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();viewJrnEntry(${item.id})">👁️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();openJournalModal(${item.id})">✏️</button><button class="btn btn-outline btn-sm btn-icon" onclick="event.stopPropagation();deleteJrnEntryFromList(${item.id})">🗑️</button></div>`:'<span style="font-size:11px;color:var(--text3)">تلقائي</span>'}</td>
+        <td>${actionsHtml}</td>
       </tr>`;
     }).join('');
     res.innerHTML=`<div class="table-wrap"><table><thead><tr><th>#</th><th>التاريخ</th><th>النوع</th><th>البيان</th><th>مرجع</th><th style="color:var(--red-light)">مدين</th><th style="color:#3ed898">دائن</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody><tfoot><tr style="background:var(--bg3);font-weight:700"><td colspan="5">الإجمالي (${allItems.length} قيد)</td><td style="color:var(--red-light)">${fn(totalDebit)}</td><td style="color:#3ed898">${fn(totalCredit)}</td><td></td></tr></tfoot></table></div>`;
@@ -7843,6 +7877,7 @@ async function saveSupplierPayment(){
   try{
     if(editId){
       await sb(`haj_supplier_payments?id=eq.${editId}`,'PATCH',d);
+      if(_cbSupPayMap[editId]) _cbSupPayMap[editId]={..._cbSupPayMap[editId],...d};
       toast('تم تعديل الدفعة ✅','success');
     } else {
       await sb('haj_supplier_payments','POST',d);
@@ -7851,6 +7886,8 @@ async function saveSupplierPayment(){
     closeM('sup-pay-modal');
     delete _supPayCache[tid];
     loadSupplierAccount();
+    if(document.querySelector('#cb-result table')) loadCashboxStatement();
+    if(document.getElementById('acc-jrn-from')?.value || document.getElementById('acc-jrn-to')?.value) loadJournal();
   }catch(e){toast('خطأ: '+e.message,'error');}
 }
 
@@ -7895,6 +7932,11 @@ async function loadCashboxStatement(){
   if(!method){el.innerHTML='<div class="empty-state"><div class="empty-icon">🏦</div><h3>اختر الخزنة أو البنك</h3></div>';sumEl.style.display='none';return;}
   el.innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div><h3>جاري التحميل...</h3></div>';
   try{
+    // تحميل الجداول المرجعية كاملة أولاً (عشان اسم العميل/المورد/الرحلة يظهر صح في كل الأحوال)
+    if(!aSups.length)   aSups=await sb('haj_suppliers?order=name.asc&limit=200');
+    if(!aTrips.length)  aTrips=await sb('haj_trips?limit=200');
+    if(!aBks.length)    aBks=await sb('haj_bookings?limit=2000');
+    if(!aClients.length)aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
     // دفعات العملاء
     let payQ=`haj_payments?payment_method=eq.${encodeURIComponent(method)}&order=payment_date.asc&limit=2000`;
     if(from) payQ+=`&payment_date=gte.${from}`;
@@ -7906,6 +7948,9 @@ async function loadCashboxStatement(){
     if(to)   supPayQ+=`&payment_date=lte.${to}`;
     let supPays=[];
     try{supPays=await sb(supPayQ);}catch(e){}
+    // كاش سريع لأزرار عرض/تعديل القيد
+    pays.forEach(p=>_cbPayMap[p.id]=p);
+    supPays.forEach(p=>_cbSupPayMap[p.id]=p);
     // دمج الحركات وترتيبها
     const credits=pays.map(p=>({date:p.payment_date,type:'credit',desc:'دفعة عميل',ref:p.receipt_no||'',amount:+p.amount,currency:p.currency||'EGP',src:p}));
     const debits=supPays.map(p=>({date:p.payment_date,type:'debit',desc:'دفعة للمورد',ref:p.reference_no||'',amount:+p.amount,currency:p.currency||'EGP',src:p}));
@@ -7931,12 +7976,14 @@ async function loadCashboxStatement(){
       if(x.type==='credit'){
         const bk=aBks?.find?.(b=>b.id==x.src.booking_id);
         const cl=bk?aClients.find(c=>c.id==bk.client_id):null;
-        name=cl?.full_name_ar||'-';
+        const trip=bk?aTrips.find(t=>t.id==bk.trip_id):null;
+        name=(cl?.full_name_ar||'⚠️ عميل غير معروف')+(trip?' / '+trip.name:'');
       } else {
         const trip=aTrips.find(t=>t.id==x.src.trip_id);
         const sup=aSups.find(s=>s.id==x.src.supplier_id);
-        name=(sup?.name||'')+(trip?' / '+trip.name:'');
+        name=(sup?.name||'⚠️ مورد غير معروف')+(trip?' / '+trip.name:'');
       }
+      const entryKind=x.type==='credit'?'client':'supplier';
       rows+=`<tr>
         <td>${i+1}</td>
         <td>${fd(x.date)}</td>
@@ -7946,6 +7993,7 @@ async function loadCashboxStatement(){
         <td style="color:var(--green);font-weight:700">${x.type==='credit'?fn(x.amount)+' '+x.currency:''}</td>
         <td style="color:var(--red-light);font-weight:700">${x.type==='debit'?fn(x.amount)+' '+x.currency:''}</td>
         <td style="font-weight:700;color:${running>=0?'var(--green)':'var(--red-light)'}">${fn(running)}</td>
+        <td style="white-space:nowrap"><button class="btn btn-outline btn-sm btn-icon" onclick="viewAutoEntry('${entryKind}',${x.src.id})" title="عرض تفاصيل القيد">👁️</button> <button class="btn btn-outline btn-sm btn-icon" onclick="${entryKind==='client'?`editCbClientPayment(${x.src.id})`:`editCbSupplierPayment(${x.src.id})`}" title="تعديل القيد">✏️</button></td>
       </tr>`;
     });
     el.innerHTML=`<div style="margin-bottom:8px;font-size:13px;color:var(--text2)">
@@ -7954,7 +8002,7 @@ async function loadCashboxStatement(){
       <button class="btn btn-outline btn-sm" onclick="exportCashboxExcel()">📊 Excel</button>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>#</th><th>التاريخ</th><th>البيان</th><th>الجهة</th><th>مرجع</th><th style="color:var(--green)">وارد</th><th style="color:var(--red-light)">صادر</th><th>الرصيد</th></tr></thead>
+      <thead><tr><th>#</th><th>التاريخ</th><th>البيان</th><th>الجهة</th><th>مرجع</th><th style="color:var(--green)">وارد</th><th style="color:var(--red-light)">صادر</th><th>الرصيد</th><th>إجراءات</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   }catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><h3>خطأ: ${e.message}</h3></div>`;console.error(e);}
@@ -7964,9 +8012,14 @@ function printCashboxStatement(){
   const method=document.getElementById('cb-method-sel').value;
   if(!method){toast('اختر طريقة الدفع أولاً','error');return;}
   const sum=document.getElementById('cb-summary').innerHTML;
-  const body=document.getElementById('cb-result').innerHTML;
-  if(!body || !body.includes('<table')){toast('لا توجد بيانات لطباعتها','error');return;}
-  openStyledPrintWindow(`كشف ${method}`,'🏦 كشف حساب', 'كشف حركة: '+method, '', sum+body);
+  const srcTable=document.querySelector('#cb-result table');
+  if(!srcTable){toast('لا توجد بيانات لطباعتها','error');return;}
+  const clone=srcTable.cloneNode(true);
+  clone.querySelectorAll('tr').forEach(tr=>{ if(tr.children.length) tr.removeChild(tr.lastElementChild); }); // استبعاد عمود إجراءات (عرض/تعديل) من الطباعة
+  const bodyWrap=document.getElementById('cb-result').cloneNode(true);
+  const wrapTable=bodyWrap.querySelector('table');
+  if(wrapTable) wrapTable.replaceWith(clone);
+  openStyledPrintWindow(`كشف ${method}`,'🏦 كشف حساب', 'كشف حركة: '+method, '', sum+bodyWrap.innerHTML);
 }
 
 async function exportCashboxExcel(){
@@ -7974,10 +8027,117 @@ async function exportCashboxExcel(){
   if(!method){toast('اختر طريقة الدفع','error');return;}
   const table=document.querySelector('#cb-result table');
   if(!table){toast('لا توجد بيانات للتصدير','error');return;}
+  const clone=table.cloneNode(true);
+  clone.querySelectorAll('tr').forEach(tr=>{ if(tr.children.length) tr.removeChild(tr.lastElementChild); }); // استبعاد عمود إجراءات (عرض/تعديل)
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.table_to_sheet(table);
+  const ws=XLSX.utils.table_to_sheet(clone);
   XLSX.utils.book_append_sheet(wb,ws,'كشف '+method);
   XLSX.writeFile(wb,`cashbox_${method}.xlsx`);
+}
+// ================================================================
+
+// ================================================================
+// عرض/تعديل أطراف القيد التلقائي (دفعة عميل / دفعة مورد) — نفس منطق
+// نافذة "تفاصيل القيد" (jrn-view-modal) المستخدمة للقيود اليدوية، بحيث
+// أي قيد في النظام (يدوي أو تلقائي من أمر دفع) له نفس زر 👁️ عرض و ✏️ تعديل.
+// يُستخدم من: كشف الخزنة/البنك، دفتر اليومية، وأي شاشة أخرى مستقبلاً.
+// ================================================================
+async function viewAutoEntry(kind, id){
+  try{
+    let p, debitParty, creditParty, desc, ref, dateVal, curr, amt, partyLabel, partyName, extraInfo, editFn;
+    if(kind==='client'){
+      p=_cbPayMap[id];
+      if(!p){ const recs=await sb(`haj_payments?id=eq.${id}&limit=1`); if(!recs.length){toast('لم يتم العثور على الدفعة','error');return;} p=recs[0]; _cbPayMap[id]=p; }
+      if(!aBks.length) aBks=await sb('haj_bookings?limit=2000');
+      if(!aClients.length) aClients=await sb('haj_clients?is_cancelled=eq.false&limit=1000');
+      if(!aTrips.length) aTrips=await sb('haj_trips?limit=200');
+      const bk=aBks.find(b=>b.id==p.booking_id);
+      const cl=bk?aClients.find(c=>c.id==bk.client_id):null;
+      const trip=bk?aTrips.find(t=>t.id==bk.trip_id):null;
+      partyLabel='العميل'; partyName=cl?cl.full_name_ar:'⚠️ عميل غير معروف';
+      extraInfo=trip?trip.name:'';
+      debitParty=p.payment_method||'الخزنة/البنك';
+      creditParty=partyName;
+      desc='دفعة عميل'+(extraInfo?(' — '+extraInfo):'');
+      ref=p.receipt_no||''; dateVal=p.payment_date; curr=p.currency||'EGP'; amt=+p.amount;
+      editFn=()=>{closeM('jrn-view-modal'); editCbClientPayment(p.id);};
+    } else {
+      p=_cbSupPayMap[id];
+      if(!p){ const recs=await sb(`haj_supplier_payments?id=eq.${id}&limit=1`); if(!recs.length){toast('لم يتم العثور على الدفعة','error');return;} p=recs[0]; _cbSupPayMap[id]=p; }
+      if(!aSups.length) aSups=await sb('haj_suppliers?order=name.asc&limit=200');
+      if(!aTrips.length) aTrips=await sb('haj_trips?limit=200');
+      const sup=aSups.find(s=>s.id==p.supplier_id);
+      const trip=aTrips.find(t=>t.id==p.trip_id);
+      partyLabel='المورد'; partyName=sup?sup.name:'⚠️ مورد غير معروف';
+      extraInfo=trip?trip.name:'';
+      debitParty=partyName;
+      creditParty=p.payment_account||p.payment_method||'الخزنة/البنك';
+      desc='دفعة للمورد'+(extraInfo?(' — '+extraInfo):'');
+      ref=p.reference_no||''; dateVal=p.payment_date; curr=p.currency||'EGP'; amt=+p.amount;
+      editFn=()=>{closeM('jrn-view-modal'); editCbSupplierPayment(p.id);};
+    }
+    const linesHtml=`<tr><td><span class="badge badge-red">مدين</span></td><td style="font-weight:600">${debitParty}</td><td style="color:var(--red-light);font-weight:700;text-align:left">${fn(amt)} ${curr}</td></tr>
+      <tr><td><span class="badge badge-green">دائن</span></td><td style="font-weight:600">${creditParty}</td><td style="color:#3ed898;font-weight:700;text-align:left">${fn(amt)} ${curr}</td></tr>`;
+    document.getElementById('jrn-view-title').textContent=`${kind==='client'?'دفعة عميل':'دفعة مورد'} #${p.id} — ${fd(dateVal)}`;
+    document.getElementById('jrn-view-edit-btn').style.display='';
+    document.getElementById('jrn-view-edit-btn').onclick=editFn;
+    document.getElementById('jrn-view-content').innerHTML=`
+      <div class="jrn-view-section"><div class="jrn-view-title">بيانات القيد</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+          <div><span style="color:var(--text3)">التاريخ:</span> <b>${fd(dateVal)}</b></div>
+          <div><span style="color:var(--text3)">النوع:</span> <b>${kind==='client'?'أداء عميل (تلقائي)':'دفعة مورد (تلقائي)'}</b></div>
+          <div style="grid-column:1/-1"><span style="color:var(--text3)">البيان:</span> <b>${desc}</b></div>
+          ${ref?`<div><span style="color:var(--text3)">المرجع:</span> <b>${ref}</b></div>`:''}
+          <div><span style="color:var(--text3)">${partyLabel}:</span> <b>${partyName}</b></div>
+          ${extraInfo?`<div><span style="color:var(--text3)">الرحلة/البرنامج:</span> <b>${extraInfo}</b></div>`:''}
+          ${p.notes?`<div style="grid-column:1/-1"><span style="color:var(--text3)">ملاحظات:</span> ${p.notes}</div>`:''}
+        </div>
+      </div>
+      <div style="margin-top:12px"><div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px">📊 أطراف القيد</div>
+        <table class="jrn-lines-table">
+          <thead><tr><th>الجانب</th><th>الحساب</th><th style="text-align:left">المبلغ</th></tr></thead>
+          <tbody>${linesHtml}</tbody>
+          <tfoot><tr style="background:var(--bg3);font-weight:700"><td colspan="2">الإجمالي</td><td style="text-align:left"><span style="color:var(--red-light)">م: ${fn(amt)}</span> &nbsp;|&nbsp; <span style="color:#3ed898">د: ${fn(amt)}</span></td></tr></tfoot>
+        </table>
+        <div class="jrn-balance-check ok" style="margin-top:10px">✅ القيد متوازن</div>
+      </div>`;
+    openM('jrn-view-modal');
+  }catch(e){toast('خطأ: '+e.message,'error');}
+}
+
+// فتح نافذة تعديل دفعة عميل من أي مكان (كشف خزنة، دفتر يومية...) بدون الاعتماد على تحميل تبويب المدفوعات أولاً
+function editCbClientPayment(id){
+  const p=_cbPayMap[id]||aPays.find(x=>x.id==id);
+  if(!p){toast('تعذر إيجاد الدفعة، افتح تبويب المدفوعات وحاول مجدداً','error');return;}
+  _editPayId=id;
+  document.getElementById('ep-amt').value=p.amount;
+  document.getElementById('ep-cur').value=p.currency;
+  document.getElementById('ep-mth').value=p.payment_method;
+  document.getElementById('ep-dt').value=p.payment_date;
+  document.getElementById('ep-rc').value=p.receipt_no||'';
+  document.getElementById('ep-nts').value=p.notes||'';
+  if(!aPays.some(x=>x.id==id)) aPays.push(p);
+  openM('edit-pay-modal');
+}
+
+// فتح نافذة تعديل دفعة مورد من أي مكان بنفس فكرة editCbClientPayment
+function editCbSupplierPayment(id){
+  const p=_cbSupPayMap[id];
+  if(!p){toast('تعذر إيجاد الدفعة، افتح تبويب حساب المورد وحاول مجدداً','error');return;}
+  document.getElementById('spm-ttl').textContent='✏️ تعديل دفعة المورد';
+  document.getElementById('spm-edit-id').value=id;
+  document.getElementById('spm-trip-id').value=p.trip_id;
+  document.getElementById('spm-sup-id').value=p.supplier_id;
+  document.getElementById('spm-amt').value=p.amount;
+  document.getElementById('spm-cur').value=p.currency||'EGP';
+  document.getElementById('spm-mth').value=p.payment_method||'كاش';
+  document.getElementById('spm-account').value=p.payment_account||'';
+  document.getElementById('spm-dt').value=p.payment_date;
+  document.getElementById('spm-ref').value=p.reference_no||'';
+  document.getElementById('spm-nts').value=p.notes||'';
+  if(!_supPayCache[p.trip_id]) _supPayCache[p.trip_id]=[];
+  if(!_supPayCache[p.trip_id].some(x=>x.id==id)) _supPayCache[p.trip_id].push(p);
+  document.getElementById('sup-pay-modal').style.display='flex';
 }
 // ================================================================
 

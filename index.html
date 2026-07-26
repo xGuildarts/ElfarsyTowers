@@ -3355,42 +3355,57 @@ async function _printRepBase(type,tid){
   if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
   const trip=aTrips.find(x=>x.id==tid);
   const REP_TITLES={travelers:'قائمة المسافرين',passports:'قائمة الجوازات',visa:'متابعة التأشيرات',vaccine:'متابعة التطعيمات',financial:'الحساب المالي'};
-  const css=`<style>body{font-family:Arial,sans-serif;padding:20px;direction:rtl}h1{text-align:center;color:#1a6b4a;margin-bottom:15px}p.sub{text-align:center;color:#666;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 10px;text-align:right;font-size:12px}th{background:#f0f0f0;font-weight:bold}.exp{color:red}@media print{body{padding:5px}}</style>`;
+  const REP_ICONS={travelers:'👥',passports:'🛂',visa:'📋',vaccine:'💉',financial:'💰'};
   const rows=bks.map((b,i)=>{const c=aClients.find(x=>x.id==b.client_id),pg=aProgs.find(x=>x.id==b.program_id);return{i:i+1,b,c,pg};});
+  // شارة حالة صغيرة بلون مناسب بدل النص العادي
+  const stBadge=txt=>{
+    const t=(txt||'').toString();
+    const green=['موافق عليها','تم','مكتملة','مؤكد'];
+    const red=['مرفوضة','لم تقدم','غير مكتملة','ملغي'];
+    const gold=['قيد المراجعة','جاري التقديم'];
+    let cls='badge-gray';
+    if(green.some(k=>t.includes(k)))cls='badge-green';
+    else if(red.some(k=>t.includes(k)))cls='badge-red';
+    else if(gold.some(k=>t.includes(k)))cls='badge-gold';
+    return t?`<span class="badge ${cls}">${t}</span>`:'-';
+  };
   let body='';
   if(type==='travelers'){
-    body=`<h1>قائمة المسافرين - ${trip?.name||''}</h1><p class="sub">${fd(trip?.depart_date)}</p>
-    <table><thead><tr><th>#</th><th>الاسم</th><th>الاسم إنجليزي</th><th>الجنس</th><th>النوع</th><th>الكود</th><th>التسكين</th><th>التأشيرة</th><th>التطعيمات</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.c?.full_name_en||'-'}</td><td>${r.c?.gender||'-'}</td><td>${r.b.traveler_type}</td><td>${r.pg?'كود '+r.pg.code:'-'}</td><td>${r.b.room_type||'-'}</td><td>${r.b.visa_status}</td><td>${r.b.vaccine_status}</td></tr>`).join('')}
-    </tbody></table>`;
+    body=`<div class="table-wrap"><table><thead><tr><th>#</th><th>الاسم</th><th>الاسم إنجليزي</th><th>الجنس</th><th>النوع</th><th>الكود</th><th>التسكين</th><th>التأشيرة</th><th>التطعيمات</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${r.i}</td><td style="font-weight:700">${r.c?.full_name_ar||'-'}</td><td>${r.c?.full_name_en||'-'}</td><td>${r.c?.gender||'-'}</td><td>${r.b.traveler_type}</td><td>${r.pg?'كود '+r.pg.code:'-'}</td><td>${r.b.room_type||'-'}</td><td>${stBadge(r.b.visa_status)}</td><td>${stBadge(r.b.vaccine_status)}</td></tr>`).join('')}
+    </tbody></table></div>`;
   }else if(type==='passports'){
-    body=`<h1>قائمة الجوازات - ${trip?.name||''}</h1>
-    <table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>تاريخ الميلاد</th><th>الجنسية</th><th>إصدار</th><th>انتهاء الجواز</th></tr></thead><tbody>
-    ${rows.map(r=>{const exp=r.c?.passport_expiry_date&&new Date(r.c.passport_expiry_date)<new Date();return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td class="${exp?'exp':''}">${r.c?.passport_no||'-'}</td><td>${fd(r.c?.birth_date)}</td><td>${r.c?.nationality||'-'}</td><td>${fd(r.c?.passport_issue_date)}</td><td class="${exp?'exp':''}">${fd(r.c?.passport_expiry_date)}${exp?' ⚠️':''}</td></tr>`;}).join('')}
-    </tbody></table>`;
+    body=`<div class="table-wrap"><table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>تاريخ الميلاد</th><th>الجنسية</th><th>إصدار</th><th>انتهاء الجواز</th></tr></thead><tbody>
+    ${rows.map(r=>{const exp=r.c?.passport_expiry_date&&new Date(r.c.passport_expiry_date)<new Date();return`<tr><td>${r.i}</td><td style="font-weight:700">${r.c?.full_name_ar||'-'}</td><td style="${exp?'color:#c0392b;font-weight:700':''}">${r.c?.passport_no||'-'}</td><td>${fd(r.c?.birth_date)}</td><td>${r.c?.nationality||'-'}</td><td>${fd(r.c?.passport_issue_date)}</td><td style="${exp?'color:#c0392b;font-weight:700':''}">${fd(r.c?.passport_expiry_date)}${exp?' ⚠️':''}</td></tr>`;}).join('')}
+    </tbody></table></div>`;
   }else if(type==='visa'){
-    body=`<h1>متابعة التأشيرات - ${trip?.name||''}</h1>
-    <table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>حالة التأشيرة</th><th>تأشيرة خاصة</th><th>باركود</th><th>تذكرة خاصة</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.c?.passport_no||'-'}</td><td>${r.b.visa_status}</td><td>${r.b.has_own_visa?'✅':'❌'}</td><td>${r.b.has_own_barcode?'✅':'❌'}</td><td>${r.b.has_own_ticket?'✅':'❌'}</td></tr>`).join('')}
-    </tbody></table>`;
+    body=`<div class="table-wrap"><table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>حالة التأشيرة</th><th>تأشيرة خاصة</th><th>باركود</th><th>تذكرة خاصة</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${r.i}</td><td style="font-weight:700">${r.c?.full_name_ar||'-'}</td><td>${r.c?.passport_no||'-'}</td><td>${stBadge(r.b.visa_status)}</td><td>${r.b.has_own_visa?'✅':'❌'}</td><td>${r.b.has_own_barcode?'✅':'❌'}</td><td>${r.b.has_own_ticket?'✅':'❌'}</td></tr>`).join('')}
+    </tbody></table></div>`;
   }else if(type==='vaccine'){
-    body=`<h1>متابعة التطعيمات - ${trip?.name||''}</h1>
-    <table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>التطعيمات</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.c?.passport_no||'-'}</td><td>${r.b.vaccine_status}</td></tr>`).join('')}
-    </tbody></table>`;
+    body=`<div class="table-wrap"><table><thead><tr><th>#</th><th>الاسم</th><th>رقم الجواز</th><th>التطعيمات</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${r.i}</td><td style="font-weight:700">${r.c?.full_name_ar||'-'}</td><td>${r.c?.passport_no||'-'}</td><td>${stBadge(r.b.vaccine_status)}</td></tr>`).join('')}
+    </tbody></table></div>`;
   }else if(type==='financial'){
     const bids=bks.map(b=>b.id);const pays=bids.length?await sb(`haj_payments?booking_id=in.(${bids.join(',')})&limit=1000`):[];const tpays=pays;
-    body=`<h1>الحساب المالي - ${trip?.name||''}</h1>
-    <table><thead><tr><th>#</th><th>العميل</th><th>النوع</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>تكلفة المورد</th><th>المكسب</th><th>الحالة</th></tr></thead><tbody>
-    ${rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid,sc=+r.b.supplier_cost||0,pr=sc>0?(+r.b.final_price)-sc:null;return`<tr><td>${r.i}</td><td>${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:green">${fn(paid)} ج</td><td style="${rem>0?'color:red':''}">${fn(rem)} ج</td><td>${sc>0?fn(sc)+' ج':'-'}</td><td style="${pr!==null?(pr>=0?'color:green':'color:red'):''}">${pr!==null?fn(pr)+' ج':'-'}</td><td>${r.b.status}</td></tr>`;}).join('')}
-    </tbody></table>`;
+    let totalFinal=0,totalPaid=0,totalRem=0;
+    const trs=rows.map(r=>{const paid=tpays.filter(p=>p.booking_id==r.b.id&&p.currency==='EGP').reduce((s,p)=>s+(+p.amount),0),rem=(+r.b.final_price)-paid,sc=+r.b.supplier_cost||0,pr=sc>0?(+r.b.final_price)-sc:null;
+      totalFinal+=(+r.b.final_price||0);totalPaid+=paid;totalRem+=rem;
+      return`<tr><td>${r.i}</td><td style="font-weight:700">${r.c?.full_name_ar||'-'}</td><td>${r.b.traveler_type}</td><td>${r.b.room_type||'-'}</td><td>${fn(r.b.final_price)} ${r.b.currency}</td><td style="color:#1a7a52;font-weight:700">${fn(paid)} ج</td><td style="${rem>0?'color:#c0392b;font-weight:700':''}">${fn(rem)} ج</td><td>${sc>0?fn(sc)+' ج':'-'}</td><td style="${pr!==null?(pr>=0?'color:#1a7a52':'color:#c0392b'):''}">${pr!==null?fn(pr)+' ج':'-'}</td><td>${stBadge(r.b.status)}</td></tr>`;}).join('');
+    body=`<div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">💵</div><div class="stat-num">${fn(totalFinal)}</div><div class="stat-label">إجمالي المستحق</div></div>
+      <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-num">${fn(totalPaid)}</div><div class="stat-label">إجمالي المدفوع</div></div>
+      <div class="stat-card ${totalRem>0?'red':'green'}"><div class="stat-icon">${totalRem>0?'⏳':'✅'}</div><div class="stat-num">${fn(totalRem)}</div><div class="stat-label">إجمالي المتبقي</div></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>العميل</th><th>النوع</th><th>التسكين</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>تكلفة المورد</th><th>المكسب</th><th>الحالة</th></tr></thead><tbody>
+    ${trs}
+    </tbody><tfoot><tr><td colspan="4">الإجمالي</td><td>${fn(totalFinal)} ج</td><td style="color:#1a7a52">${fn(totalPaid)} ج</td><td style="${totalRem>0?'color:#c0392b':''}">${fn(totalRem)} ج</td><td colspan="2"></td></tr></tfoot></table></div>`;
   }
   const _pn = await askPrintNotes(REP_TITLES[type]||'التقرير');
-  const w=window.open('','_blank');w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير</title>${css}</head><body>
-  <div style="text-align:center;margin-bottom:8px">${coLogoImgHtml(50)}</div>
-  ${body}
-  ${notesBlockHtml(_pn)}
-  <p style="text-align:center;color:#999;margin-top:20px;font-size:11px">${getCoName()}${getCoLicense()?' | ترخيص: '+getCoLicense():''} | ${fd(new Date().toISOString())}</p></body></html>`);w.document.close();w.print();
+  const heading=`${REP_ICONS[type]||'📋'} ${REP_TITLES[type]||'تقرير'} - ${trip?.name||''}`;
+  const sub=`📅 ${fd(trip?.depart_date)} &nbsp;|&nbsp; 👥 عدد المسافرين: ${rows.length}`;
+  const footer=notesBlockHtml(_pn);
+  openStyledPrintWindow(REP_TITLES[type]||'تقرير', trip?.name?`رحلة: ${trip.name}`:'', heading, sub, body, footer);
 }
 
 // ============ PRINT CARDS ============
@@ -3432,9 +3447,13 @@ async function printFamilyFile(tid, rootClientId){
     </tr>`;
   }).join('');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>ملف حجز أسرة - ${root?.full_name_ar||''}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;padding:0;margin:0;background:#f5f5f5}
+    @page{size:A4;margin:10mm 12mm}
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:0;margin:0;background:#f5f5f5;line-height:1.6}
     .page{max-width:900px;margin:20px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
     .header{background:linear-gradient(135deg,#1a6b4a,#2a8a60);padding:20px 25px;color:white;display:flex;justify-content:space-between;align-items:center}
     .co-name{font-size:22px;font-weight:800;margin-bottom:3px}
@@ -3498,6 +3517,7 @@ async function printFamilyFile(tid, rootClientId){
 // ============================================================
 function _printLightCss(){
   return `
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap');
   :root{
     --gold:#a07820;--gold-light:#c9a027;--gold-dark:#8a6816;--gold-glow:rgba(160,120,32,.10);
     --green:#1a7a52;--green-light:#1f9463;--green-dark:#0e4830;--green-glow:rgba(26,122,82,.08);
@@ -3509,40 +3529,52 @@ function _printLightCss(){
     --side-1:#f7f7f7;--side-2:#f2f2f2;--side-3:#ececec;
     --side-border:#dddddd;--side-text:#444444;--side-text-strong:#222222;--side-text-dim:#888888;
   }
-  *{box-sizing:border-box}
-  body{font-family:Arial,'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;margin:0;padding:0;color:#222}
-  .page{max-width:980px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
-  .header{background:linear-gradient(135deg,#1a6b4a,#2a8a60);padding:20px 25px;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-  .co-name{font-size:22px;font-weight:800;margin-bottom:3px}
-  .co-sub{font-size:12px;opacity:.85}
-  .rcpno{background:rgba(255,255,255,.2);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap}
-  .gold-bar{height:4px;background:linear-gradient(90deg,#c9a84c,#e8c97a,#c9a84c)}
-  .body{padding:20px 25px}
-  .p-title{font-size:18px;font-weight:800;color:#1a6b4a;margin-bottom:4px}
-  .p-sub{font-size:13px;color:#666;margin-bottom:16px}
-  .footer{background:#f9f9f9;padding:12px 25px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#999;border-top:1px solid #eee;flex-wrap:wrap;gap:6px}
-  @media print{body{background:#fff}.page{margin:0;box-shadow:none;border-radius:0}.no-print{display:none!important}}
+  @page{size:A4;margin:10mm 12mm}
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;background:#f0f0f0;margin:0;padding:0;color:#222;line-height:1.65;font-feature-settings:"tnum" 1}
+  .page{max-width:980px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);border:1px solid #e6e6e6}
+  .header{background:linear-gradient(135deg,#0e4830,#1a6b4a 55%,#2a8a60);padding:22px 28px;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  .co-name{font-size:21px;font-weight:800;margin-bottom:3px;letter-spacing:.2px}
+  .co-sub{font-size:12px;opacity:.88;font-weight:500}
+  .rcpno{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+  .gold-bar{height:4px;background:linear-gradient(90deg,#a07820,#e8c97a,#a07820)}
+  .body{padding:24px 28px}
+  .p-title{font-size:18px;font-weight:800;color:#0e4830;margin-bottom:5px}
+  .p-sub{font-size:13px;color:#666;margin-bottom:18px;font-weight:500}
+  .footer{background:#f7f7f7;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#999;border-top:1px solid #eee;flex-wrap:wrap;gap:6px}
+  @media print{
+    body{background:#fff}
+    .page{margin:0;box-shadow:none;border-radius:0;border:none;max-width:none}
+    .no-print{display:none!important}
+    .card{page-break-inside:avoid}
+    table{page-break-inside:auto}
+    tr{page-break-inside:avoid;page-break-after:auto}
+    thead{display:table-header-group}
+    tfoot{display:table-footer-group}
+  }
 
   /* عناصر واجهة النظام معاد تلوينها بشكل فاتح واحترافي للطباعة */
   .btn,button.btn{display:none!important}
-  .card{background:#fff;border:1px solid #e2e2e2;border-radius:8px;padding:16px;margin-bottom:14px}
+  .card{background:#fff;border:1px solid #e2e2e2;border-radius:9px;padding:16px 18px;margin-bottom:16px}
   .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eee;flex-wrap:wrap;gap:8px}
   .card-title{font-size:14px;font-weight:700;color:#a07820}
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
-  .stat-card{background:#fafafa;border:1px solid #e5e5e5;border-radius:8px;padding:14px 12px;text-align:center;position:relative}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+  .stat-card{background:#fafafa;border:1px solid #e5e5e5;border-radius:9px;padding:14px 12px;text-align:center;position:relative}
   .stat-icon{font-size:20px;margin-bottom:6px;display:block}
   .stat-num{font-size:19px;font-weight:800;color:#a07820}
-  .stat-label{font-size:10.5px;color:#777;margin-top:4px}
+  .stat-label{font-size:10.5px;color:#777;margin-top:4px;font-weight:600}
   .stat-card.green .stat-num{color:#1a7a52}
   .stat-card.red .stat-num{color:#c0392b}
   .stat-card.blue .stat-num{color:#2471a3}
-  .table-wrap{overflow-x:auto}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
-  thead th{background:#1a6b4a;color:#fff;padding:8px 10px;text-align:right;font-weight:700;font-size:11px;white-space:nowrap}
+  .table-wrap{overflow-x:auto;border:1px solid #e6e6e6;border-radius:9px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{background:linear-gradient(135deg,#0e4830,#1a6b4a);color:#fff;padding:10px 12px;text-align:right;font-weight:700;font-size:11.5px;white-space:nowrap}
+  tbody tr:nth-child(even){background:#fafbfa}
   tbody tr{border-bottom:1px solid #eee}
-  tbody td{padding:7px 10px;color:#222}
-  tfoot td{background:#f9f5e7;font-weight:800}
-  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700}
+  tbody td{padding:8px 12px;color:#222}
+  tfoot td{background:#f9f5e7;font-weight:800;padding:9px 12px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700}
   .badge-green{background:#e8f5e9;color:#1a7a52;border:1px solid #b7dfc4}
   .badge-gold{background:#fbf1da;color:#a07820;border:1px solid #ecd8a3}
   .badge-red{background:#fdecea;color:#c0392b;border:1px solid #f3bcb5}
@@ -3551,13 +3583,17 @@ function _printLightCss(){
   .badge-purple{background:#f3e9f7;color:#7d3c98;border:1px solid #dcbfe6}
   .empty-state{text-align:center;padding:30px 20px;color:#999}
   .empty-icon{font-size:32px;margin-bottom:8px}
-  .info-box{padding:10px 14px;border-radius:8px;font-size:12.5px;margin-bottom:12px;border-right:3px solid #ccc;background:#f7f7f7}
+  .info-box{padding:10px 16px;border-radius:8px;font-size:12.5px;margin-bottom:12px;border-right:3px solid #a07820;background:#fbf7ec;color:#555}
   .search-bar,select,input:not([type=checkbox]){display:none!important}
   `;
 }
 function openStyledPrintWindow(title, badge, heading, sub, bodyHtml, footerNote){
   const coName=getCoName(), coPh=getCoPhone();
-  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>${title}</title><style>${_printLightCss()}</style></head><body>
+  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>${_printLightCss()}</style></head><body>
   <div class="page">
     <div class="header">
       <div style="display:flex;align-items:center;gap:12px">
@@ -3599,9 +3635,13 @@ async function printBkCard(bid){
   const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
   const _pn = await askPrintNotes('بطاقة الحجز');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>بطاقة حجز ${rcpNo}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;padding:0;margin:0;background:#f5f5f5}
+    @page{size:A4;margin:10mm 12mm}
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:0;margin:0;background:#f5f5f5;line-height:1.6}
     .page{max-width:680px;margin:20px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
     .header{background:linear-gradient(135deg,#1a6b4a,#2a8a60);padding:20px 25px;color:white;display:flex;justify-content:space-between;align-items:center}
     .co-name{font-size:22px;font-weight:800;margin-bottom:3px}
@@ -3703,7 +3743,9 @@ async function printPayRcp(pid){
   const bk=aBks.find(x=>x.id==p.booking_id),c=bk?aClients.find(x=>x.id==bk.client_id):null,t=bk?aTrips.find(x=>x.id==bk.trip_id):null;
   const coName=getCoName();
   const _pn = await askPrintNotes('إيصال الدفع');
-  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>إيصال</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:400px;margin:auto}h1{color:#1a6b4a;text-align:center}.r{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}.amt{font-size:32px;font-weight:800;color:#1a6b4a;text-align:center;padding:20px;background:#f9f5e7;border-radius:8px;margin:15px 0}</style></head><body>
+  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>إيصال</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:10mm}body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:30px;max-width:400px;margin:auto;line-height:1.6}h1{color:#1a6b4a;text-align:center}.r{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}.amt{font-size:32px;font-weight:800;color:#1a6b4a;text-align:center;padding:20px;background:#f9f5e7;border-radius:8px;margin:15px 0}</style></head><body>
   <div style="text-align:center;margin-bottom:10px">${coLogoImgHtml(55)}</div>
   <h1>🕌 إيصال دفع</h1>
   <div style="text-align:center;font-size:12px;color:#666;margin-bottom:8px">${coName}${coLicenseLineHtml()}</div>
@@ -4336,7 +4378,7 @@ async function printRep(type,tid){
     if(!aTrips.length)aTrips=await sb('haj_trips?limit=200');
     if(!aProgs.length)aProgs=await sb('haj_programs?limit=1000');
     const trip=aTrips.find(x=>x.id==tid);
-    const css=`<style>body{font-family:Arial,sans-serif;padding:20px;direction:ltr}h1{text-align:center;color:#1a6b4a;margin-bottom:5px}h2{text-align:center;color:#666;font-size:14px;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 10px;text-align:left;font-size:12px}th{background:#1a6b4a;color:white;font-weight:bold}.exp{color:red;font-weight:bold}@media print{body{padding:5px}}</style>`;
+    const css=`<style>body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:20px;direction:ltr}h1{text-align:center;color:#1a6b4a;margin-bottom:5px}h2{text-align:center;color:#666;font-size:14px;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 10px;text-align:left;font-size:12px}th{background:#1a6b4a;color:white;font-weight:bold}.exp{color:red;font-weight:bold}@media print{body{padding:5px}}</style>`;
     const rows=bks.map((b,i)=>{
       const c=aClients.find(x=>x.id==b.client_id),pg=aProgs.find(x=>x.id==b.program_id);
       const exp=c?.passport_expiry_date&&new Date(c.passport_expiry_date)<new Date();
@@ -4365,8 +4407,12 @@ async function printTripProgram(tid){
   const coPh=getCoPhone();
   const _pn = await askPrintNotes('برنامج الرحلة');
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>برنامج الرحلة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f5f5f5}
+    @page{size:A4;margin:10mm 12mm}
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;line-height:1.6}
     .page{max-width:720px;margin:20px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
     .header{background:linear-gradient(135deg,#1a6b4a,#2a8a60);padding:25px 30px;color:white}
     .co{font-size:14px;opacity:.8;margin-bottom:5px}.trip-name{font-size:24px;font-weight:800;margin-bottom:8px}
@@ -5823,7 +5869,8 @@ async function printRoomsReport() {
   });
   const trip = aTrips.find(x=>x.id==_roomsData.tripId);
   const html = `<html dir="rtl"><head><meta charset="UTF-8"><title>التسكين</title>
-  <style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1a6b4a;text-align:center}h2{color:#666;text-align:center;font-size:14px;margin-bottom:15px}.room{break-inside:avoid;margin-bottom:12px;border:1px solid #ccc;border-radius:8px;overflow:hidden}.room-hdr{background:#1a6b4a;color:white;padding:8px 12px;display:flex;justify-content:space-between}.room-body{padding:10px}.guest{padding:5px 0;border-bottom:1px solid #eee;font-size:13px}@media print{body{padding:5px}}</style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:10mm 12mm}body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:20px;line-height:1.6}h1{color:#1a6b4a;text-align:center}h2{color:#666;text-align:center;font-size:14px;margin-bottom:15px}.room{break-inside:avoid;margin-bottom:12px;border:1px solid #ccc;border-radius:8px;overflow:hidden}.room-hdr{background:#1a6b4a;color:white;padding:8px 12px;display:flex;justify-content:space-between}.room-body{padding:10px}.guest{padding:5px 0;border-bottom:1px solid #eee;font-size:13px}@media print{body{padding:5px}}</style>
   </head><body>
   <h1>توزيع الغرف - ${city}</h1><h2>${trip?.name||''}</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
@@ -6461,7 +6508,9 @@ function printJrnEntry(){
   const content = document.getElementById('jrn-view-content').innerHTML;
   const title = document.getElementById('jrn-view-title').textContent;
   const win = window.open('','_blank');
-  win.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:24px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px 10px;text-align:right;font-size:12px}th{background:#1a6b4a;color:white}.jrn-balance-check{padding:8px 14px;border-radius:6px;margin-top:12px;display:block;font-weight:700}.ok{background:#e8fef2;color:#1a6b4a}.err{background:#fef2f2;color:#c0392b}.jrn-view-section{background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:12px}.jrn-view-title{font-size:11px;text-transform:uppercase;color:#999;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}</style></head><body><h2>📒 ${title}</h2>${content}</body></html>`);
+  win.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:10mm 12mm}body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:24px;direction:rtl;line-height:1.6}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px 10px;text-align:right;font-size:12px}th{background:#1a6b4a;color:white}.jrn-balance-check{padding:8px 14px;border-radius:6px;margin-top:12px;display:block;font-weight:700}.ok{background:#e8fef2;color:#1a6b4a}.err{background:#fef2f2;color:#c0392b}.jrn-view-section{background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:12px}.jrn-view-title{font-size:11px;text-transform:uppercase;color:#999;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}</style></head><body><h2>📒 ${title}</h2>${content}</body></html>`);
   win.document.close();
   setTimeout(()=>win.print(),400);
 }
@@ -6599,7 +6648,8 @@ async function printClientStatement(cid) {
   });
   const coName=document.getElementById('cfg-co')?.value||'Adriaska Tours';
   const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>كشف حساب</title>
-  <style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1a6b4a;border-bottom:3px solid #c9a84c;padding-bottom:8px}h2{color:#666;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:7px 10px;text-align:right}th{background:#1a6b4a;color:white}.tot{font-weight:bold;background:#f0f0f0}@media print{body{padding:5px}}</style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:10mm 12mm}body{font-family:'Noto Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;padding:20px;line-height:1.6}h1{color:#1a6b4a;border-bottom:3px solid #c9a84c;padding-bottom:8px}h2{color:#666;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:7px 10px;text-align:right}th{background:#1a6b4a;color:white}.tot{font-weight:bold;background:#f0f0f0}@media print{body{padding:5px}}</style>
   </head><body>
   <h1>كشف حساب عميل - ${coName}</h1>
   <h2>العميل: ${c?.full_name_ar} | جواز: ${c?.passport_no||'-'} | تليفون: ${c?.phone||'-'}</h2>
@@ -6769,24 +6819,20 @@ async function generateCompRep(){
     status:r=>r.b.status,
     notes:r=>r.b.notes||'-',
   };
-  const css=`<style>body{font-family:Arial,sans-serif;padding:20px;direction:rtl}h1{text-align:center;color:#1a6b4a;margin-bottom:5px}p.sub{text-align:center;color:#666;margin-bottom:15px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px 9px;text-align:right;font-size:11.5px}th{background:#1a6b4a;color:white;font-weight:bold}tr.fam-hdr td{background:#fff8e1;font-weight:bold;color:#8a6d1a}@media print{body{padding:5px}}</style>`;
   let bodyRows='';
   let lastRoot=null;
   rows.forEach((r,i)=>{
     if(groupFam && r.rootId!==lastRoot){
       const famCnt=rows.filter(x=>x.rootId===r.rootId).length;
-      if(famCnt>1) bodyRows+=`<tr class="fam-hdr"><td colspan="${selected.length+1}">👨‍👩‍👧‍👦 أسرة ${r.rootName} (${famCnt} أفراد)</td></tr>`;
+      if(famCnt>1) bodyRows+=`<tr><td colspan="${selected.length+1}" style="background:#fbf1da;font-weight:800;color:#8a6d1a">👨‍👩‍👧‍👦 أسرة ${r.rootName} (${famCnt} أفراد)</td></tr>`;
       lastRoot=r.rootId;
     }
     bodyRows+=`<tr><td>${i+1}</td>${selected.map(c=>`<td>${cellFns[c.key](r)}</td>`).join('')}</tr>`;
   });
-  const html=`<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير شامل</title>${css}</head><body>
-  <h1>📋 تقرير شامل - رحلة ${trip?.name||''}</h1>
-  <p class="sub">${fd(trip?.depart_date)} | عدد المسافرين: ${rows.length}</p>
-  <table><thead><tr><th>#</th>${selected.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${bodyRows}</tbody></table>
-  <p style="text-align:center;color:#999;margin-top:20px;font-size:11px">${document.getElementById('cfg-co')?.value||'Adriaska Tours'} | ${fd(new Date().toISOString())}</p>
-  </body></html>`;
-  const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+  const body=`<div class="table-wrap"><table><thead><tr><th>#</th>${selected.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  const heading=`📋 تقرير شامل - رحلة ${trip?.name||''}`;
+  const sub=`📅 ${fd(trip?.depart_date)} &nbsp;|&nbsp; 👥 عدد المسافرين: ${rows.length}`;
+  openStyledPrintWindow('تقرير شامل', trip?.name?`رحلة: ${trip.name}`:'', heading, sub, body, '');
 }
 
 // ============================================================
